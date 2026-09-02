@@ -1,0 +1,7 @@
+SwiftBAT Explorer - progetto didattico per tesi universitaria.
+
+Il codice sorgente del progetto può essere usato, studiato e modificato per finalità didattiche e accademiche,
+con attribuzione a Matteo Casiraghi e indicazione delle fonti scientifiche utilizzate.
+
+I dati Swift/BAT restano di proprietà e sotto le condizioni d'uso degli enti che li pubblicano.
+Le librerie di terze parti mantengono le rispettive licenze.

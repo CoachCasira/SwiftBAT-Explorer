@@ -1,0 +1,83 @@
+name: Build applicazioni standalone
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "main"
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    name: macOS ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - name: Scarica il progetto
+        uses: actions/checkout@v4
+
+      - name: Configura Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Crea l'app macOS
+        run: |
+          chmod +x CREA_APP_MAC.command
+          ./CREA_APP_MAC.command
+
+      - name: Pubblica il pacchetto macOS
+        uses: actions/upload-artifact@v4
+        with:
+          name: SwiftBAT-Explorer-macOS-${{ matrix.arch }}
+          path: dist/SwiftBAT-Explorer-macOS-${{ matrix.arch }}.zip
+          if-no-files-found: error
+
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+
+    steps:
+      - name: Scarica il progetto
+        uses: actions/checkout@v4
+
+      - name: Configura Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Crea l'app Windows
+        shell: pwsh
+        run: ./packaging/build-windows.ps1
+
+      - name: Pubblica l'installer Windows autosufficiente
+        uses: actions/upload-artifact@v4
+        with:
+          name: SwiftBAT-Explorer-Windows-Installer
+          path: |
+            dist/SwiftBAT-Explorer-Setup-1.2.0.exe
+            dist/SwiftBAT-Explorer-Setup-1.2.0.sha256.txt
+          if-no-files-found: error
+
+      - name: Pubblica il pacchetto Windows portabile
+        uses: actions/upload-artifact@v4
+        with:
+          name: SwiftBAT-Explorer-Windows-Portable
+          path: dist/SwiftBAT-Explorer-Windows-x64-portable.zip
+          if-no-files-found: error

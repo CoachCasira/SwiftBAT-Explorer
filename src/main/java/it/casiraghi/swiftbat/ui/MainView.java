@@ -1,0 +1,300 @@
+package it.casiraghi.swiftbat.ui;
+
+import it.casiraghi.swiftbat.model.CatalogEntry;
+import it.casiraghi.swiftbat.model.GrbData;
+import it.casiraghi.swiftbat.service.OnlineGrbService;
+import it.casiraghi.swiftbat.service.SkyCatalogService;
+import it.casiraghi.swiftbat.service.SwiftCatalogService;
+import javafx.application.HostServices;
+import javafx.application.Platform;
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableMap;
+import javafx.concurrent.Task;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.control.Separator;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
+
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+public final class MainView {
+    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4, runnable -> {
+        Thread thread = new Thread(runnable, "swiftbat-worker");
+        thread.setDaemon(true);
+        return thread;
+    });
+
+    private final HostServices hostServices;
+    @SuppressWarnings("unused")
+    private final Stage owner;
+    private final SwiftCatalogService catalogService = new SwiftCatalogService();
+    private final SkyCatalogService skyCatalogService = new SkyCatalogService();
+    private final OnlineGrbService grbService = new OnlineGrbService();
+    private final ObservableMap<String, GrbData> sessionData = FXCollections.observableHashMap();
+
+    private final BorderPane root = new BorderPane();
+    private final StackPane pageHost = new StackPane();
+    private final Label connectionStatus = UiFactory.label("Connessione…", "status-pill", "status-neutral");
+    private final Label catalogStatus = UiFactory.label("Catalogo…", "top-info");
+    private final Label sessionStatus = UiFactory.label("0 in memoria", "top-info");
+
+    private final ExplorerPage explorerPage;
+    private final HomePage homePage;
+    private final GlossaryPage glossaryPage;
+    private final ComparePage comparePage;
+    private final SkyMapPage skyMapPage;
+    private final AboutPage aboutPage;
+    private final VBox navigation = new VBox(7);
+    private Button activeNavigationButton;
+
+    public MainView(HostServices hostServices, Stage owner) {
+        this.hostServices = hostServices;
+        this.owner = owner;
+        explorerPage = new ExplorerPage(hostServices, this::loadGrb, entry -> sessionData.containsKey(entry.grbName()));
+        glossaryPage = new GlossaryPage();
+        comparePage = new ComparePage(sessionData);
+        skyMapPage = new SkyMapPage(entry -> loadGrb(entry, false));
+        aboutPage = new AboutPage(hostServices, () -> navigate("glossary"));
+        homePage = new HomePage(
+                () -> navigate("explorer"),
+                () -> navigate("sky"),
+                () -> navigate("compare"),
+                () -> navigate("about"));
+        buildLayout();
+        sessionData.addListener((javafx.collections.MapChangeListener<String, GrbData>) change -> {
+            sessionStatus.setText(sessionData.size() + " in memoria");
+            explorerPage.refreshCacheIndicators();
+        });
+    }
+
+    public BorderPane getRoot() {
+        return root;
+    }
+
+    public void initialize() {
+        navigate("home");
+        loadCatalog();
+    }
+
+    public static void shutdownSharedExecutor() {
+        EXECUTOR.shutdownNow();
+    }
+
+    private void buildLayout() {
+        root.getStyleClass().add("app-root");
+        root.setLeft(buildNavigation());
+        root.setTop(buildTopBar());
+        pageHost.getStyleClass().add("page-host");
+        root.setCenter(pageHost);
+    }
+
+    private Node buildNavigation() {
+        navigation.getStyleClass().add("main-navigation");
+        navigation.setPadding(new Insets(20, 12, 16, 12));
+        navigation.setPrefWidth(218);
+        navigation.setMinWidth(204);
+
+        HBox brand = new HBox(10);
+        brand.getStyleClass().add("nav-brand");
+        brand.setAlignment(Pos.CENTER_LEFT);
+        Label logo = UiFactory.label("◉", "nav-logo");
+        VBox brandText = new VBox(0,
+                UiFactory.label("SwiftBAT", "nav-brand-title"),
+                UiFactory.label("GRB EXPLORER", "nav-brand-subtitle"));
+        brand.getChildren().addAll(logo, brandText);
+
+        Button home = navButton("⌂", "Home", "home");
+        Button explorer = navButton("✦", "Esplora", "explorer");
+        Button sky = navButton("◎", "Mappa celeste", "sky");
+        Button compare = navButton("⇄", "Confronta", "compare");
+        Button about = navButton("i", "Info", "about");
+
+        Region spacer = new Region();
+        VBox.setVgrow(spacer, Priority.ALWAYS);
+
+        Separator separator = new Separator();
+        separator.getStyleClass().add("soft-separator");
+        Label online = UiFactory.wrappedLabel("Dati scientifici online\nNASA/GSFC Swift/BAT", "nav-source");
+        Button source = UiFactory.button("Fonte ufficiale  ↗", "nav-source-button");
+        source.setMaxWidth(Double.MAX_VALUE);
+        source.setOnAction(event -> hostServices.showDocument(SwiftCatalogService.CATALOG_URL));
+
+        navigation.getChildren().addAll(brand, home, explorer, sky, compare, about,
+                spacer, separator, online, source);
+        return navigation;
+    }
+
+    private Button navButton(String glyph, String text, String page) {
+        Button button = UiFactory.button(glyph + "   " + text, "nav-button");
+        button.setMaxWidth(Double.MAX_VALUE);
+        button.setAlignment(Pos.CENTER_LEFT);
+        button.setOnAction(event -> {
+            activeNavigationButton = button;
+            updateNavigationSelection();
+            navigate(page);
+        });
+        button.setUserData(page);
+        return button;
+    }
+
+    private void updateNavigationSelection() {
+        for (Node node : navigation.getChildren()) {
+            if (node instanceof Button button && button.getStyleClass().contains("nav-button")) {
+                button.getStyleClass().remove("nav-button-active");
+            }
+        }
+        if (activeNavigationButton != null && !activeNavigationButton.getStyleClass().contains("nav-button-active")) {
+            activeNavigationButton.getStyleClass().add("nav-button-active");
+        }
+    }
+
+    private Node buildTopBar() {
+        HBox bar = new HBox(11);
+        bar.getStyleClass().add("top-bar");
+        bar.setPadding(new Insets(11, 18, 11, 20));
+        bar.setAlignment(Pos.CENTER_LEFT);
+
+        Label product = UiFactory.label("SwiftBAT Explorer", "top-product-title");
+        Label live = UiFactory.label("LIVE", "top-live-badge");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Button refresh = UiFactory.iconButton("↻", "Aggiorna il catalogo online");
+        refresh.setOnAction(event -> loadCatalog());
+        Button official = UiFactory.iconButton("↗", "Apri il catalogo ufficiale");
+        official.setOnAction(event -> hostServices.showDocument(SwiftCatalogService.CATALOG_URL));
+
+        bar.getChildren().addAll(product, live, spacer, catalogStatus, sessionStatus, connectionStatus, refresh, official);
+        return bar;
+    }
+
+    private void navigate(String page) {
+        Node node = switch (page) {
+            case "explorer" -> explorerPage;
+            case "compare" -> comparePage;
+            case "sky" -> skyMapPage;
+            case "glossary" -> glossaryPage;
+            case "about" -> aboutPage;
+            default -> homePage;
+        };
+        pageHost.getChildren().setAll(node);
+        boolean foundVisibleButton = false;
+        for (Node navNode : navigation.getChildren()) {
+            if (navNode instanceof Button button && page.equals(button.getUserData())) {
+                activeNavigationButton = button;
+                foundVisibleButton = true;
+                break;
+            }
+        }
+        // Il dizionario è una schermata secondaria aperta da Info: mantiene evidenziata Info.
+        if (!foundVisibleButton && "glossary".equals(page)) {
+            for (Node navNode : navigation.getChildren()) {
+                if (navNode instanceof Button button && "about".equals(button.getUserData())) {
+                    activeNavigationButton = button;
+                    break;
+                }
+            }
+        }
+        updateNavigationSelection();
+    }
+
+    private void loadCatalog() {
+        setConnection("Connessione…", "status-neutral");
+        catalogStatus.setText("Catalogo…");
+        Task<List<CatalogEntry>> task = new Task<>() {
+            @Override
+            protected List<CatalogEntry> call() throws Exception {
+                return catalogService.fetchCatalog();
+            }
+        };
+        task.setOnSucceeded(event -> {
+            List<CatalogEntry> entries = task.getValue();
+            explorerPage.setCatalog(entries, false);
+            skyMapPage.setBaseCatalog(entries);
+            catalogStatus.setText(entries.size() + " GRB");
+            setConnection("Online", "status-online");
+            loadSkyCatalog();
+        });
+        task.setOnFailed(event -> {
+            List<CatalogEntry> fallback = catalogService.fallbackCatalog();
+            explorerPage.setCatalog(fallback, true);
+            skyMapPage.setBaseCatalog(fallback);
+            catalogStatus.setText(fallback.size() + " GRB ridotti");
+            setConnection("Offline parziale", "status-warning");
+            loadSkyCatalog();
+        });
+        EXECUTOR.execute(task);
+    }
+
+    private void loadSkyCatalog() {
+        skyMapPage.showLoading("Coordinate celesti…");
+        Task<List<it.casiraghi.swiftbat.model.SkyBurst>> task = new Task<>() {
+            @Override
+            protected List<it.casiraghi.swiftbat.model.SkyBurst> call() throws Exception {
+                return skyCatalogService.fetchSkyCatalog();
+            }
+        };
+        task.setOnSucceeded(event -> skyMapPage.setSkyBursts(task.getValue()));
+        task.setOnFailed(event -> {
+            Throwable error = task.getException();
+            String detail = error == null || error.getMessage() == null
+                    ? "Coordinate celesti non disponibili"
+                    : "Mappa non disponibile: " + error.getMessage();
+            skyMapPage.showError(detail);
+        });
+        EXECUTOR.execute(task);
+    }
+
+    private void loadGrb(CatalogEntry entry, boolean forceRefresh) {
+        if (entry == null) {
+            return;
+        }
+        navigate("explorer");
+        explorerPage.setSelectedEntry(entry);
+
+        if (!forceRefresh) {
+            GrbData cached = sessionData.get(entry.grbName());
+            if (cached != null) {
+                explorerPage.showData(cached);
+                setConnection("In memoria", "status-online");
+                return;
+            }
+        }
+
+        explorerPage.showLoading(0.02, "Apro " + entry.grbName(), "Recupero i prodotti Swift/BAT online.");
+
+        Task<GrbData> task = new Task<>() {
+            @Override
+            protected GrbData call() throws Exception {
+                return grbService.load(entry, forceRefresh, update ->
+                        Platform.runLater(() -> explorerPage.showLoading(
+                                update.progress(), update.title(), update.detail())));
+            }
+        };
+        task.setOnSucceeded(event -> {
+            GrbData data = task.getValue();
+            sessionData.put(data.grbName(), data);
+            explorerPage.showData(data);
+            setConnection("Online", "status-online");
+        });
+        task.setOnFailed(event -> explorerPage.showError(entry, task.getException()));
+        EXECUTOR.execute(task);
+    }
+
+    private void setConnection(String text, String styleClass) {
+        connectionStatus.setText(text);
+        connectionStatus.getStyleClass().removeAll("status-neutral", "status-online", "status-warning");
+        connectionStatus.getStyleClass().add(styleClass);
+    }
+}

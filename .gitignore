@@ -1,0 +1,7 @@
+/target/
+/dist/
+/.settings/
+/.classpath
+/.project
+*.log
+/packaging/app-icon.ico
