@@ -5,7 +5,9 @@ import it.casiraghi.swiftbat.model.FieldDefinition;
 import it.casiraghi.swiftbat.model.GrbData;
 import it.casiraghi.swiftbat.model.MetadataItem;
 import it.casiraghi.swiftbat.model.SummaryItem;
+import it.casiraghi.swiftbat.model.SkyBurst;
 import it.casiraghi.swiftbat.model.TabularData;
+import it.casiraghi.swiftbat.service.ExcelExportService;
 import it.casiraghi.swiftbat.ui.components.ThreeDChartPane;
 import javafx.application.HostServices;
 import javafx.beans.property.ReadOnlyStringWrapper;
@@ -25,6 +27,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -69,10 +72,14 @@ public final class ExplorerPage extends BorderPane {
     private final HostServices hostServices;
     private final BiConsumer<CatalogEntry, Boolean> loadRequest;
     private final Predicate<CatalogEntry> cacheLookup;
+    private final ExcelExportService excelExportService = new ExcelExportService();
     private final ObservableList<CatalogEntry> catalog = FXCollections.observableArrayList();
     private final FilteredList<CatalogEntry> filteredCatalog = new FilteredList<>(catalog, ignored -> true);
     private final ListView<CatalogEntry> catalogList = new ListView<>(filteredCatalog);
     private final TextField catalogSearch = new TextField();
+    private final ComboBox<String> durationFilter = new ComboBox<>();
+    private final ComboBox<String> redshiftFilter = new ComboBox<>();
+    private final Map<String, SkyBurst> scientificMetadata = new LinkedHashMap<>();
     private final Label catalogCount = UiFactory.label("Catalogo in caricamento…", "sidebar-caption");
     private final StackPane workspace = new StackPane();
     private CatalogEntry selectedEntry;
@@ -94,7 +101,19 @@ public final class ExplorerPage extends BorderPane {
 
     public void setCatalog(List<CatalogEntry> entries, boolean fallback) {
         catalog.setAll(entries);
+        applyCatalogFilters();
         catalogCount.setText(entries.size() + (fallback ? " GRB di emergenza" : " GRB nel catalogo online"));
+    }
+
+    public void setScientificMetadata(List<SkyBurst> bursts) {
+        scientificMetadata.clear();
+        if (bursts != null) {
+            for (SkyBurst burst : bursts) {
+                scientificMetadata.put(burst.grbName().toUpperCase(Locale.ROOT), burst);
+            }
+        }
+        applyCatalogFilters();
+        catalogList.refresh();
     }
 
     public void setSelectedEntry(CatalogEntry entry) {
@@ -177,6 +196,14 @@ public final class ExplorerPage extends BorderPane {
         Label title = UiFactory.label("GRB", "panel-title");
         catalogSearch.setPromptText("Cerca GRB o Trigger ID…");
         catalogSearch.getStyleClass().add("search-field");
+        durationFilter.setItems(FXCollections.observableArrayList(
+                "Tutte le durate", "Short · T90 ≤ 2 s", "Long · T90 > 2 s", "T90 non disponibile"));
+        durationFilter.setValue("Tutte le durate");
+        durationFilter.getStyleClass().add("choice-box-modern");
+        redshiftFilter.setItems(FXCollections.observableArrayList(
+                "Con e senza redshift", "Solo con redshift", "Solo senza redshift"));
+        redshiftFilter.setValue("Con e senza redshift");
+        redshiftFilter.getStyleClass().add("choice-box-modern");
         catalogList.getStyleClass().add("catalog-list");
         catalogList.setCellFactory(ignored -> new CatalogCell());
         catalogList.setMinHeight(140);
@@ -188,7 +215,8 @@ public final class ExplorerPage extends BorderPane {
         Label hint = UiFactory.wrappedLabel(
                 "Gli eventi già aperti restano in memoria per tutta la sessione.",
                 "sidebar-hint");
-        sidebar.getChildren().addAll(title, catalogSearch, catalogCount, catalogList, separator, hint);
+        sidebar.getChildren().addAll(title, catalogSearch, durationFilter, redshiftFilter,
+                catalogCount, catalogList, separator, hint);
 
         workspace.getStyleClass().add("workspace-host");
         workspace.setMinWidth(0);
@@ -202,18 +230,39 @@ public final class ExplorerPage extends BorderPane {
 
     private void wireCatalog() {
         catalogSearch.textProperty().addListener((observable, oldValue, newValue) -> {
-            String query = newValue == null ? "" : newValue.trim().toLowerCase(Locale.ROOT);
-            filteredCatalog.setPredicate(entry -> query.isBlank()
-                    || entry.grbName().toLowerCase(Locale.ROOT).contains(query)
-                    || entry.triggerId().toLowerCase(Locale.ROOT).contains(query));
-            catalogCount.setText(filteredCatalog.size() + " GRB visualizzati");
+            applyCatalogFilters();
         });
+        durationFilter.setOnAction(event -> applyCatalogFilters());
+        redshiftFilter.setOnAction(event -> applyCatalogFilters());
         catalogList.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue != null && newValue != selectedEntry) {
                 selectedEntry = newValue;
                 loadRequest.accept(newValue, false);
             }
         });
+    }
+
+    private void applyCatalogFilters() {
+        String query = catalogSearch.getText() == null ? "" : catalogSearch.getText().trim().toLowerCase(Locale.ROOT);
+        String duration = durationFilter.getValue() == null ? "Tutte le durate" : durationFilter.getValue();
+        String redshift = redshiftFilter.getValue() == null ? "Con e senza redshift" : redshiftFilter.getValue();
+        filteredCatalog.setPredicate(entry -> {
+            if (!query.isBlank()
+                    && !entry.grbName().toLowerCase(Locale.ROOT).contains(query)
+                    && !entry.triggerId().toLowerCase(Locale.ROOT).contains(query)) {
+                return false;
+            }
+            SkyBurst burst = scientificMetadata.get(entry.grbName().toUpperCase(Locale.ROOT));
+            if (burst == null) {
+                return duration.equals("Tutte le durate") && !redshift.equals("Solo con redshift");
+            }
+            if (duration.startsWith("Short") && !burst.isShort()) return false;
+            if (duration.startsWith("Long") && !burst.isLong()) return false;
+            if (duration.equals("T90 non disponibile") && burst.hasT90()) return false;
+            if (redshift.equals("Solo con redshift") && !burst.redshift().available()) return false;
+            return !redshift.equals("Solo senza redshift") || !burst.redshift().available();
+        });
+        catalogCount.setText(filteredCatalog.size() + " GRB visualizzati");
     }
 
     private void showEmptyState() {
@@ -232,12 +281,15 @@ public final class ExplorerPage extends BorderPane {
     private Node buildDashboard(GrbData data) {
         VBox dashboard = new VBox(18);
         dashboard.getStyleClass().add("dashboard");
+        SkyBurst scientific = scientificMetadata.get(data.grbName().toUpperCase(Locale.ROOT));
+        String scientificLine = scientific == null ? ""
+                : " · " + scientific.durationClass() + " · " + scientific.redshift().displayValue();
 
         HBox eventHeader = new HBox(14);
         eventHeader.setAlignment(Pos.CENTER_LEFT);
         VBox identity = new VBox(4,
                 UiFactory.label(data.grbName(), "grb-title"),
-                UiFactory.label("Trigger " + data.triggerId() + " · in memoria nella sessione", "grb-subtitle"));
+                UiFactory.label("Trigger " + data.triggerId() + scientificLine + " · in memoria nella sessione", "grb-subtitle"));
         HBox.setHgrow(identity, Priority.ALWAYS);
         Label status = UiFactory.label(data.availability().statusText(), "status-pill",
                 data.availability().asciiAvailable() && data.availability().fitsAvailable() ? "status-online" : "status-warning");
@@ -254,6 +306,12 @@ public final class ExplorerPage extends BorderPane {
                 metric(data, "PEAK_SNR", "Segnale / errore", "indicatore descrittivo"),
                 metric(data, "FULL_EXPOSURE_FRACTION", "Esposizione completa", "bin con FRACEXP ≈ 1"),
                 metric(data, "HARDNESS_PROXY", "Durezza", "proxy alte / basse energie"));
+        if (scientific != null) {
+            metrics.getChildren().addAll(
+                    UiFactory.metricCard("T90", scientific.formattedT90(), scientific.durationClass()),
+                    UiFactory.metricCard("Redshift", scientific.redshift().available()
+                            ? scientific.redshift().rawValue() : "n.d.", "z cosmologico · valore BAT"));
+        }
 
         TabPane tabs = new TabPane();
         tabs.getStyleClass().add("main-tabs");
@@ -393,7 +451,14 @@ public final class ExplorerPage extends BorderPane {
         fieldChoice.getStyleClass().add("choice-box-modern");
         fieldChoice.setPrefWidth(260);
 
-        HBox toolbar = new HBox(10, sourceChoice, filter, UiFactory.spacer(), UiFactory.label("Spiega:", "toolbar-label"), fieldChoice);
+        Button exportAscii = UiFactory.button("ASCII → Excel", "ghost-button");
+        exportAscii.setDisable(data.asciiData().isEmpty());
+        exportAscii.setOnAction(event -> exportExcel(data, true));
+        Button exportFits = UiFactory.button("FITS + metadati → Excel", "ghost-button");
+        exportFits.setDisable(data.fitsData().isEmpty());
+        exportFits.setOnAction(event -> exportExcel(data, false));
+        HBox toolbar = new HBox(10, sourceChoice, filter, exportAscii, exportFits,
+                UiFactory.spacer(), UiFactory.label("Spiega:", "toolbar-label"), fieldChoice);
         toolbar.setAlignment(Pos.CENTER_LEFT);
         pane.setTop(toolbar);
         BorderPane.setMargin(toolbar, new Insets(0, 0, 14, 0));
@@ -791,6 +856,32 @@ public final class ExplorerPage extends BorderPane {
         }
     }
 
+    private void exportExcel(GrbData data, boolean asciiOnly) {
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle(asciiOnly ? "Esporta ASCII in Excel" : "Esporta FITS e metadati in Excel");
+        chooser.setInitialFileName(data.grbName() + (asciiOnly ? "_ASCII_4CH_1S.xlsx" : "_FITS_METADATI.xlsx"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Cartella Excel", "*.xlsx"));
+        File file = chooser.showSaveDialog(getScene().getWindow());
+        if (file == null) {
+            return;
+        }
+        if (!file.getName().toLowerCase(Locale.ROOT).endsWith(".xlsx")) {
+            file = new File(file.getParentFile(), file.getName() + ".xlsx");
+        }
+        try {
+            if (asciiOnly) {
+                excelExportService.exportAscii(data, file.toPath());
+            } else {
+                excelExportService.exportFitsAndMetadata(data, file.toPath());
+            }
+            new Alert(Alert.AlertType.INFORMATION,
+                    "File creato correttamente:\n" + file.getAbsolutePath()).showAndWait();
+        } catch (IOException error) {
+            new Alert(Alert.AlertType.ERROR,
+                    "Esportazione Excel non riuscita: " + error.getMessage()).showAndWait();
+        }
+    }
+
     private void setWorkspace(Node node) {
         workspace.getChildren().setAll(node);
         StackPane.setAlignment(node, Pos.CENTER);
@@ -866,6 +957,11 @@ public final class ExplorerPage extends BorderPane {
             VBox copy = new VBox(2,
                     UiFactory.label(item.grbName(), "catalog-name"),
                     UiFactory.label("Trigger " + item.triggerId(), "catalog-trigger"));
+            SkyBurst burst = scientificMetadata.get(item.grbName().toUpperCase(Locale.ROOT));
+            if (burst != null) {
+                copy.getChildren().add(UiFactory.label(
+                        burst.formattedT90() + " · " + burst.redshift().displayValue(), "catalog-science"));
+            }
             HBox.setHgrow(copy, Priority.ALWAYS);
             row.getChildren().addAll(star, copy);
             if (cacheLookup.test(item)) {

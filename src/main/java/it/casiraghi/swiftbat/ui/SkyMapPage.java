@@ -58,10 +58,13 @@ public final class SkyMapPage extends BorderPane {
 
     private final TextField search = new TextField();
     private final ComboBox<String> durationFilter = new ComboBox<>();
+    private final ComboBox<String> redshiftFilter = new ComboBox<>();
     private final TextField raMin = compactField("0");
     private final TextField raMax = compactField("360");
     private final TextField decMin = compactField("-90");
     private final TextField decMax = compactField("90");
+    private final TextField zMin = compactField("0");
+    private final TextField zMax = compactField("10");
     private final CheckBox galacticPlane = new CheckBox("Piano galattico");
 
     private final Label selectedName = UiFactory.label("Nessun GRB selezionato", "sky-selected-title");
@@ -70,6 +73,7 @@ public final class SkyMapPage extends BorderPane {
     private final Label selectedDec = UiFactory.label("—", "info-value");
     private final Label selectedT90 = UiFactory.label("—", "info-value");
     private final Label selectedClass = UiFactory.wrappedLabel("—", "info-value");
+    private final Label selectedRedshift = UiFactory.wrappedLabel("—", "info-value");
     private final Label selectedCatalog = UiFactory.wrappedLabel("Seleziona un punto sulla mappa.", "sky-detail-note");
     private final Button openButton = UiFactory.button("Apri curve di luce →", "primary-button");
 
@@ -105,6 +109,11 @@ public final class SkyMapPage extends BorderPane {
 
     public void showError(String message) {
         status.setText(message == null || message.isBlank() ? "Coordinate non disponibili" : message);
+        setStatusStyle("status-warning");
+    }
+
+    public void showWarning(String message) {
+        status.setText(message == null || message.isBlank() ? "Dati scientifici caricati parzialmente" : message);
         setStatusStyle("status-warning");
     }
 
@@ -198,6 +207,12 @@ public final class SkyMapPage extends BorderPane {
         durationFilter.getStyleClass().add("choice-box-modern");
         durationFilter.setPrefWidth(190);
 
+        redshiftFilter.setItems(FXCollections.observableArrayList(
+                "Con e senza redshift", "Solo con redshift", "Solo senza redshift"));
+        redshiftFilter.setValue("Con e senza redshift");
+        redshiftFilter.getStyleClass().add("choice-box-modern");
+        redshiftFilter.setPrefWidth(185);
+
         galacticPlane.getStyleClass().add("modern-check");
         ToggleButton advanced = new ToggleButton("RA / DEC");
         advanced.getStyleClass().add("sky-toggle");
@@ -207,7 +222,8 @@ public final class SkyMapPage extends BorderPane {
         reset.setOnAction(event -> resetFilters());
         search.setOnAction(event -> applyFilters());
         durationFilter.setOnAction(event -> applyFilters());
-        firstRow.getChildren().addAll(search, durationFilter, galacticPlane,
+        redshiftFilter.setOnAction(event -> applyFilters());
+        firstRow.getChildren().addAll(search, durationFilter, redshiftFilter, galacticPlane,
                 UiFactory.spacer(), advanced, apply, reset);
 
         HBox rangeRow = new HBox(9);
@@ -215,11 +231,13 @@ public final class SkyMapPage extends BorderPane {
         rangeRow.setAlignment(Pos.CENTER_LEFT);
         Label raLabel = UiFactory.label("RA", "filter-label");
         Label decLabel = UiFactory.label("DEC", "filter-label");
-        Label help = UiFactory.wrappedLabel("Intervalli in gradi. RA può attraversare 0°.", "sky-filter-help");
+        Label zLabel = UiFactory.label("z", "filter-label");
+        Label help = UiFactory.wrappedLabel("RA può attraversare 0°. Limiti/intervalli di z sono inclusi se compatibili.", "sky-filter-help");
         HBox.setHgrow(help, Priority.ALWAYS);
         rangeRow.getChildren().addAll(
                 raLabel, raMin, UiFactory.label("–", "filter-label"), raMax,
                 decLabel, decMin, UiFactory.label("–", "filter-label"), decMax,
+                zLabel, zMin, UiFactory.label("–", "filter-label"), zMax,
                 help);
         rangeRow.setVisible(false);
         rangeRow.setManaged(false);
@@ -281,7 +299,8 @@ public final class SkyMapPage extends BorderPane {
                 detailRow("RA (J2000)", selectedRa),
                 detailRow("DEC (J2000)", selectedDec),
                 detailRow("T90", selectedT90),
-                detailRow("Classe descrittiva", selectedClass));
+                detailRow("Classe descrittiva", selectedClass),
+                detailRow("Redshift", selectedRedshift));
 
         Label scientificNote = UiFactory.wrappedLabel(
                 "La soglia a 2 s è mostrata soltanto come riferimento descrittivo tradizionale. La mappa non assegna da sola una classificazione scientifica definitiva.",
@@ -339,10 +358,13 @@ public final class SkyMapPage extends BorderPane {
     private void resetFilters() {
         search.clear();
         durationFilter.setValue(FILTER_ALL);
+        redshiftFilter.setValue("Con e senza redshift");
         raMin.setText("0");
         raMax.setText("360");
         decMin.setText("-90");
         decMax.setText("90");
+        zMin.setText("0");
+        zMax.setText("10");
         galacticPlane.setSelected(true);
         applyFilters();
     }
@@ -359,6 +381,20 @@ public final class SkyMapPage extends BorderPane {
 
         String query = search.getText() == null ? "" : search.getText().trim().toUpperCase(Locale.ROOT);
         String duration = durationFilter.getValue() == null ? FILTER_ALL : durationFilter.getValue();
+        String redshift = redshiftFilter.getValue() == null ? "Con e senza redshift" : redshiftFilter.getValue();
+        double minimumZ;
+        double maximumZ;
+        try {
+            minimumZ = parseField(zMin, 0.0, "Redshift minimo");
+            maximumZ = parseField(zMax, 10.0, "Redshift massimo");
+            if (minimumZ < 0.0 || minimumZ > maximumZ) {
+                throw new IllegalArgumentException("Controlla il range del redshift.");
+            }
+        } catch (IllegalArgumentException exception) {
+            status.setText(exception.getMessage());
+            setStatusStyle("status-warning");
+            return;
+        }
         List<SkyBurst> filtered = new ArrayList<>();
         for (SkyBurst burst : allBursts) {
             if (!query.isEmpty() && !burst.grbName().contains(query) && !burst.triggerId().contains(query)) {
@@ -371,6 +407,16 @@ public final class SkyMapPage extends BorderPane {
                 continue;
             }
             if (duration.equals(FILTER_UNKNOWN) && burst.hasT90()) {
+                continue;
+            }
+            boolean hasRedshift = burst.redshift().available();
+            if (redshift.equals("Solo con redshift") && !hasRedshift) {
+                continue;
+            }
+            if (redshift.equals("Solo senza redshift") && hasRedshift) {
+                continue;
+            }
+            if (hasRedshift && !burst.redshift().matches(minimumZ, maximumZ)) {
                 continue;
             }
             if (!range.containsRa(burst.raDeg()) || burst.decDeg() < range.decMin() || burst.decDeg() > range.decMax()) {
@@ -435,6 +481,7 @@ public final class SkyMapPage extends BorderPane {
             selectedDec.setText("—");
             selectedT90.setText("—");
             selectedClass.setText("—");
+            selectedRedshift.setText("—");
             selectedCatalog.setText("Seleziona un punto sulla mappa.");
             openButton.setDisable(true);
             return;
@@ -447,6 +494,7 @@ public final class SkyMapPage extends BorderPane {
                 + "  ·  " + SkyCoordinates.decToDms(selectedBurst.decDeg()));
         selectedT90.setText(selectedBurst.formattedT90());
         selectedClass.setText(selectedBurst.durationClass());
+        selectedRedshift.setText(selectedBurst.redshift().detail());
         CatalogEntry entry = baseCatalog.get(selectedBurst.grbName().toUpperCase(Locale.ROOT));
         if (entry != null) {
             selectedCatalog.setText("Questo evento è presente nel catalogo Swift/BAT usato dall'app: puoi aprire direttamente curve, FITS e metadati.");

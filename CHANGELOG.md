@@ -1,5 +1,19 @@
 # Changelog
 
+## In sviluppo — Analisi di popolazione e qualità
+
+- integrazione della tabella ufficiale BAT dei redshift, mantenendo testo originale, metodo, incertezza e riferimento;
+- filtri espliciti per GRB short/long, disponibilità del redshift e intervallo di `z`;
+- filtri redshift aggiunti anche alla mappa celeste e scheda dettaglio del punto selezionato;
+- nuova pagina **Analisi cumulativa** con filtri T90, redshift, RA/DEC e finestra temporale;
+- sovrapposizione delle curve totali allineate al trigger e normalizzate sul proprio picco;
+- profili di 25° percentile, mediana e 75° percentile, senza sommare direttamente rate di eventi diversi;
+- doppio cursore 0–100% sulla copertura completa derivata da `FRACEXP`;
+- istogrammi di copertura, T90 e redshift e flag automatico per la coda bassa (10° percentile);
+- esportazione autonoma del prodotto ASCII in `.xlsx`;
+- esportazione congiunta dei dati FITS e dei metadati in un unico `.xlsx`;
+- test dedicati a redshift, qualità FRACEXP, profilo cumulativo ed esportazioni Excel.
+
 ## 1.2.0 — Event Horizon UI
 
 - nuova Home pensata come vera schermata iniziale dell'app;

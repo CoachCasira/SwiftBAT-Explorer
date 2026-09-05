@@ -1487,3 +1487,55 @@
     -fx-control-inner-background: #090d15;
     -fx-control-inner-background-alt: #0b1019;
 }
+
+/* ---------- Analisi cumulativa ---------- */
+.catalog-science {
+    -fx-text-fill: #9a83c8;
+    -fx-font-size: 8px;
+}
+
+.filter-value {
+    -fx-text-fill: #ffbd75;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-min-width: 82px;
+}
+
+.slider .track {
+    -fx-background-color: rgba(255, 255, 255, 0.09);
+    -fx-background-radius: 999px;
+}
+
+.slider .thumb {
+    -fx-background-color: linear-gradient(to bottom right, #ffae4a, #a66bdd);
+    -fx-effect: dropshadow(gaussian, rgba(255, 174, 74, 0.20), 8, 0.15, 0, 2);
+}
+
+.population-chart .chart-series-line {
+    -fx-stroke-line-cap: round;
+}
+
+.bar-chart {
+    -fx-background-color: rgba(8, 13, 25, 0.50);
+    -fx-background-radius: 12px;
+}
+
+.bar-chart .chart-plot-background {
+    -fx-background-color: rgba(8, 14, 28, 0.72);
+}
+
+.bar-chart .chart-vertical-grid-lines,
+.bar-chart .chart-horizontal-grid-lines {
+    -fx-stroke: rgba(128, 148, 186, 0.12);
+}
+
+.bar-chart .axis,
+.bar-chart .axis-label {
+    -fx-tick-label-fill: #71819f;
+    -fx-text-fill: #91a1bf;
+}
+
+.bar-chart .chart-bar {
+    -fx-bar-fill: linear-gradient(to top, #7b56c9, #4fd5ef);
+    -fx-background-radius: 5px 5px 0 0;
+}

@@ -26,11 +26,14 @@ Le istruzioni complete si trovano in `BUILD_ESEGUIBILI.md`.
 La versione **Event Horizon** mantiene tutte le funzioni scientifiche della 1.1.1 ma presenta una UI più semplice:
 
 - Home con grafica procedurale ispirata a un buco nero;
-- cinque aree principali: **Home, Esplora, Mappa celeste, Confronta, Info**;
+- sei aree principali: **Home, Esplora, Mappa celeste, Analisi cumulativa, Confronta, Info**;
 - tema scuro nero/antracite con accenti ambra e viola;
 - filtri avanzati RA/DEC nascosti finché non vengono richiesti;
 - tab dell'evento rinominate in **Curva 2D, Vista 3D, Dati, Metadati, Guida**;
 - Dizionario raggiungibile dalla pagina Info.
+
+Questa revisione aggiunge inoltre metadati e filtri T90/redshift, analisi di gruppi di GRB,
+controlli di qualità basati su `FRACEXP` ed esportazioni Excel.
 
 Tutti i fix della 1.1.1 restano inclusi: zoom/pan Mollweide, sfera 3D, scroll dell'Explorer, metadati leggibili e vista tempo–energia fullscreen.
 
@@ -93,6 +96,10 @@ L'app legge la tabella pubblica Swift/BAT e permette di cercare per:
 - nome del GRB;
 - Trigger ID.
 
+Il catalogo è arricchito con coordinate, T90 e redshift dalle tabelle riepilogative
+ufficiali BAT. I valori di redshift non esatti (limiti, intervalli, alternative o
+valori dubbi) conservano sempre la notazione originale.
+
 Dopo la selezione segue automaticamente il percorso:
 
 `Data Product → *-results → lc`
@@ -128,9 +135,26 @@ Il grafico permette di scegliere:
 Sono disponibili finestre temporali attorno al trigger e una media mobile a 5 bin.
 Il grafico può essere esportato in PNG.
 
+### Analisi cumulativa
+
+La pagina **Analisi cumulativa** permette di selezionare gruppi mediante:
+
+- classe di durata short/long e disponibilità del T90;
+- presenza e intervallo del redshift `z`;
+- area di cielo tramite RA e DEC;
+- intervallo 0–100% della copertura completa derivata da `FRACEXP`;
+- finestra temporale e numero massimo di eventi da esaminare.
+
+Le curve totali vengono allineate al trigger e ogni curva è divisa per il proprio
+picco. L'app mostra le singole curve e i profili di 25° percentile, mediana e 75°
+percentile. Non somma direttamente i rate di GRB differenti.
+
+Sono inclusi istogrammi di copertura, T90 e redshift. Il flag “coda bassa” indica
+gli eventi sotto il 10° percentile della copertura fra quelli effettivamente letti.
+
 ### Mappa celeste
 
-La pagina **Mappa celeste** visualizza la distribuzione dei GRB usando le coordinate BAT J2000 pubblicate online. Offre una proiezione Mollweide 2D e una sfera celeste 3D, filtri RA/DEC, piano galattico e collegamento diretto al GRB selezionato.
+La pagina **Mappa celeste** visualizza la distribuzione dei GRB usando le coordinate BAT J2000 pubblicate online. Offre una proiezione Mollweide 2D e una sfera celeste 3D, filtri T90/redshift/RA/DEC, piano galattico e collegamento diretto al GRB selezionato.
 
 ### Vista prospettica tempo–energia
 
@@ -152,6 +176,11 @@ Ogni campo può essere selezionato nel pannello `Spiega`, che mostra:
 - descrizione tecnica;
 - utilità del campo;
 - errori di interpretazione da evitare.
+
+Dalla stessa scheda è possibile creare due file distinti:
+
+- un `.xlsx` contenente soltanto la tabella ASCII a quattro canali;
+- un `.xlsx` contenente insieme tabella FITS e metadati FITS.
 
 ### Metadati FITS
 
@@ -185,6 +214,7 @@ Le dipendenze sono gestite da Maven:
 - OpenJFX 17, incluso il modulo `javafx-swing` per il renderer Java2D;
 - jsoup;
 - nom-tam-fits;
+- Apache POI per le esportazioni `.xlsx`;
 - JUnit per i test.
 
 ## Privacy e memoria
@@ -200,7 +230,8 @@ L'applicazione:
 ## Nota scientifica
 
 L'app produce indicatori **descrittivi** per l'esplorazione.
-Non calcola automaticamente il T90 ufficiale e non assegna una classificazione short/long validata.
+Non calcola automaticamente T90 o redshift: li legge dalle tabelle ufficiali BAT.
+La soglia short/long a 2 secondi è usata come raggruppamento descrittivo tradizionale, non come classificazione automatica definitiva.
 La durezza mostrata è un proxy interno, non una misura ufficiale di catalogo.
 
 ## Struttura del progetto

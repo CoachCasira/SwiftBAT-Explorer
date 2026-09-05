@@ -57,7 +57,10 @@ public final class AboutPage extends ScrollPane {
         catalog.setOnAction(event -> hostServices.showDocument("https://swift.gsfc.nasa.gov/results/batgrbcat/"));
         Button fits = UiFactory.button("FITS / nom-tam-fits  ↗", "ghost-button");
         fits.setOnAction(event -> hostServices.showDocument("https://nom-tam-fits.github.io/nom-tam-fits/"));
-        actions.getChildren().addAll(catalog, fits);
+        Button redshift = UiFactory.button("Tabella redshift BAT  ↗", "ghost-button");
+        redshift.setOnAction(event -> hostServices.showDocument(
+                "https://swift.gsfc.nasa.gov/results/batgrbcat/summary_cflux/summary_general_info/GRBlist_redshift_BAT.txt"));
+        actions.getChildren().addAll(catalog, redshift, fits);
 
         page.getChildren().addAll(hero, cards, scope, actions);
         return page;
