@@ -197,13 +197,31 @@ public final class ExplorerPage extends BorderPane {
         catalogSearch.setPromptText("Cerca GRB o Trigger ID…");
         catalogSearch.getStyleClass().add("search-field");
         durationFilter.setItems(FXCollections.observableArrayList(
-                "Tutte le durate", "Short · T90 ≤ 2 s", "Long · T90 > 2 s", "T90 non disponibile"));
-        durationFilter.setValue("Tutte le durate");
+                "Tutte", "Short ≤ 2 s", "Long > 2 s", "T90 n.d."));
+        durationFilter.setValue("Tutte");
         durationFilter.getStyleClass().add("choice-box-modern");
         redshiftFilter.setItems(FXCollections.observableArrayList(
-                "Con e senza redshift", "Solo con redshift", "Solo senza redshift"));
-        redshiftFilter.setValue("Con e senza redshift");
+                "Tutti", "Con z", "Senza z"));
+        redshiftFilter.setValue("Tutti");
         redshiftFilter.getStyleClass().add("choice-box-modern");
+        durationFilter.setMaxWidth(Double.MAX_VALUE);
+        redshiftFilter.setMaxWidth(Double.MAX_VALUE);
+
+        GridPane filterGrid = new GridPane();
+        filterGrid.getStyleClass().add("explorer-filter-grid");
+        filterGrid.setHgap(8);
+        filterGrid.setVgap(5);
+        filterGrid.add(UiFactory.label("Durata", "filter-label"), 0, 0);
+        filterGrid.add(UiFactory.label("Redshift", "filter-label"), 1, 0);
+        filterGrid.add(durationFilter, 0, 1);
+        filterGrid.add(redshiftFilter, 1, 1);
+        var firstColumn = new javafx.scene.layout.ColumnConstraints();
+        firstColumn.setPercentWidth(50);
+        firstColumn.setHgrow(Priority.ALWAYS);
+        var secondColumn = new javafx.scene.layout.ColumnConstraints();
+        secondColumn.setPercentWidth(50);
+        secondColumn.setHgrow(Priority.ALWAYS);
+        filterGrid.getColumnConstraints().addAll(firstColumn, secondColumn);
         catalogList.getStyleClass().add("catalog-list");
         catalogList.setCellFactory(ignored -> new CatalogCell());
         catalogList.setMinHeight(140);
@@ -213,9 +231,9 @@ public final class ExplorerPage extends BorderPane {
         Separator separator = new Separator(Orientation.HORIZONTAL);
         separator.getStyleClass().add("soft-separator");
         Label hint = UiFactory.wrappedLabel(
-                "Gli eventi già aperti restano in memoria per tutta la sessione.",
+                "Dopo il primo download, ASCII e FITS restano nella cache locale anche ai successivi avvii.",
                 "sidebar-hint");
-        sidebar.getChildren().addAll(title, catalogSearch, durationFilter, redshiftFilter,
+        sidebar.getChildren().addAll(title, catalogSearch, filterGrid,
                 catalogCount, catalogList, separator, hint);
 
         workspace.getStyleClass().add("workspace-host");
@@ -244,8 +262,8 @@ public final class ExplorerPage extends BorderPane {
 
     private void applyCatalogFilters() {
         String query = catalogSearch.getText() == null ? "" : catalogSearch.getText().trim().toLowerCase(Locale.ROOT);
-        String duration = durationFilter.getValue() == null ? "Tutte le durate" : durationFilter.getValue();
-        String redshift = redshiftFilter.getValue() == null ? "Con e senza redshift" : redshiftFilter.getValue();
+        String duration = durationFilter.getValue() == null ? "Tutte" : durationFilter.getValue();
+        String redshift = redshiftFilter.getValue() == null ? "Tutti" : redshiftFilter.getValue();
         filteredCatalog.setPredicate(entry -> {
             if (!query.isBlank()
                     && !entry.grbName().toLowerCase(Locale.ROOT).contains(query)
@@ -254,13 +272,13 @@ public final class ExplorerPage extends BorderPane {
             }
             SkyBurst burst = scientificMetadata.get(entry.grbName().toUpperCase(Locale.ROOT));
             if (burst == null) {
-                return duration.equals("Tutte le durate") && !redshift.equals("Solo con redshift");
+                return duration.equals("Tutte") && !redshift.equals("Con z");
             }
             if (duration.startsWith("Short") && !burst.isShort()) return false;
             if (duration.startsWith("Long") && !burst.isLong()) return false;
-            if (duration.equals("T90 non disponibile") && burst.hasT90()) return false;
-            if (redshift.equals("Solo con redshift") && !burst.redshift().available()) return false;
-            return !redshift.equals("Solo senza redshift") || !burst.redshift().available();
+            if (duration.equals("T90 n.d.") && burst.hasT90()) return false;
+            if (redshift.equals("Con z") && !burst.redshift().available()) return false;
+            return !redshift.equals("Senza z") || !burst.redshift().available();
         });
         catalogCount.setText(filteredCatalog.size() + " GRB visualizzati");
     }
@@ -965,7 +983,7 @@ public final class ExplorerPage extends BorderPane {
             HBox.setHgrow(copy, Priority.ALWAYS);
             row.getChildren().addAll(star, copy);
             if (cacheLookup.test(item)) {
-                Label cached = UiFactory.label("IN MEMORIA", "cache-badge");
+                Label cached = UiFactory.label("IN CACHE", "cache-badge");
                 row.getChildren().add(cached);
             }
             setGraphic(row);

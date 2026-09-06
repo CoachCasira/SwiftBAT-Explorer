@@ -11,22 +11,19 @@ Il progetto è configurato per:
 - dati letti direttamente dal catalogo NASA/GSFC;
 - nessun caricamento manuale di Excel, DAT o FITS.
 
-## Applicazioni standalone
+## Verifica e applicazioni standalone
 
-Il workflow GitHub Actions incluso genera automaticamente le applicazioni per
-macOS Apple Silicon, macOS Intel e Windows x64. Per Windows produce sia un
-installer `.exe` autosufficiente sia una versione portabile. I pacchetti
-includono Java 17, JavaFX e tutte le dipendenze: chi usa l'app non deve
-installare alcun ambiente di sviluppo o scaricare componenti al primo avvio.
-
-Le istruzioni complete si trovano in `BUILD_ESEGUIBILI.md`.
+Sul branch di sviluppo il workflow GitHub Actions esegue soltanto la verifica
+Maven (`test` e `package`) e non pubblica installer o pacchetti. La creazione
+degli eseguibili standalone per macOS e Windows resta una fase finale separata,
+descritta in `BUILD_ESEGUIBILI.md`.
 
 ## Interfaccia 1.2.0
 
 La versione **Event Horizon** mantiene tutte le funzioni scientifiche della 1.1.1 ma presenta una UI più semplice:
 
 - Home con grafica procedurale ispirata a un buco nero;
-- sei aree principali: **Home, Esplora, Mappa celeste, Analisi cumulativa, Confronta, Info**;
+- sei aree principali: **Home, Esplora, Mappa celeste, Analisi di popolazione, Confronta, Info**;
 - tema scuro nero/antracite con accenti ambra e viola;
 - filtri avanzati RA/DEC nascosti finché non vengono richiesti;
 - tab dell'evento rinominate in **Curva 2D, Vista 3D, Dati, Metadati, Guida**;
@@ -46,7 +43,8 @@ Tutti i fix della 1.1.1 restano inclusi: zoom/pan Mollweide, sfera 3D, scroll de
 - Interazioni disponibili: trascinamento per cambiare prospettiva, rotella per lo zoom, doppio clic o pulsante per centrare.
 - Passando il mouse vicino a un punto vengono mostrati banda, tempo e rate.
 - È possibile cambiare la finestra fra ±20 s, ±60 s, ±120 s e intera osservazione.
-- La cache RAM continua a mantenere i GRB già aperti senza nuovi download.
+- La cache usa prima la RAM e poi una copia locale persistente dei prodotti ufficiali,
+  evitando nuovi download anche dopo aver chiuso e riaperto l'app.
 - Inclusa la guida Word completa in `docs/Guida_completa_dati_SwiftBAT_e_presentazione.docx`.
 
 
@@ -135,9 +133,9 @@ Il grafico permette di scegliere:
 Sono disponibili finestre temporali attorno al trigger e una media mobile a 5 bin.
 Il grafico può essere esportato in PNG.
 
-### Analisi cumulativa
+### Analisi di popolazione
 
-La pagina **Analisi cumulativa** permette di selezionare gruppi mediante:
+La pagina **Analisi di popolazione** permette di selezionare gruppi mediante:
 
 - classe di durata short/long e disponibilità del T90;
 - presenza e intervallo del redshift `z`;
@@ -149,8 +147,20 @@ Le curve totali vengono allineate al trigger e ogni curva è divisa per il propr
 picco. L'app mostra le singole curve e i profili di 25° percentile, mediana e 75°
 percentile. Non somma direttamente i rate di GRB differenti.
 
-Sono inclusi istogrammi di copertura, T90 e redshift. Il flag “coda bassa” indica
+Sono inclusi istogrammi spiegati di copertura, T90 e redshift. Il flag “coda bassa” indica
 gli eventi sotto il 10° percentile della copertura fra quelli effettivamente letti.
+I candidati vengono caricati in parallelo con concorrenza limitata; lo stato finale
+indica anche l'intervallo FRACEXP osservato quando nessun evento supera il filtro.
+
+### Cache locale e aggiornamento del catalogo
+
+Il catalogo generale, T90, coordinate e redshift continuano a essere richiesti alle
+tabelle online a ogni avvio o aggiornamento manuale. Le nuove GRB pubblicate con la
+struttura standard vengono quindi rilevate senza modificare il codice.
+
+Per ogni evento l'app cerca i dati nell'ordine `RAM → cache locale → NASA/GSFC`.
+La cache conserva i byte originali ASCII/FITS e li reinterpreta con il parser corrente;
+il comando **Ricarica online** forza comunque un nuovo download.
 
 ### Mappa celeste
 
@@ -224,7 +234,7 @@ L'applicazione:
 - non richiede account;
 - non invia dati personali;
 - legge soltanto pagine e file pubblici del catalogo Swift/BAT;
-- mantiene i GRB aperti nella RAM della sessione e li riapre istantaneamente;
+- mantiene in RAM gli eventi aperti e conserva localmente i prodotti ASCII/FITS già scaricati;
 - non modifica i prodotti scientifici online.
 
 ## Nota scientifica

@@ -30,11 +30,13 @@ import javafx.scene.control.TabPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
-import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 import java.io.IOException;
@@ -43,7 +45,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Comparator;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorCompletionService;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.function.Consumer;
 
 /** Analisi di gruppi di GRB con filtri scientifici e profilo mediano. */
@@ -57,7 +64,8 @@ public final class PopulationPage extends BorderPane {
     private static final String WITHOUT_Z = "Solo senza redshift";
 
     private final DataLoader loader;
-    private final Executor executor;
+    private final Executor taskExecutor;
+    private final ExecutorService loaderExecutor;
     private final ObservableMap<String, GrbData> sessionData;
     private final CumulativeAnalysisService analysisService = new CumulativeAnalysisService();
     private final Map<String, CatalogEntry> catalog = new LinkedHashMap<>();
@@ -73,11 +81,13 @@ public final class PopulationPage extends BorderPane {
     private final TextField decMax = field("90");
     private final Slider exposureMin = slider(0);
     private final Slider exposureMax = slider(100);
-    private final Label exposureValue = UiFactory.label("0% – 100%", "filter-value");
+    private final Label exposureMinValue = UiFactory.label("0%", "filter-value");
+    private final Label exposureMaxValue = UiFactory.label("100%", "filter-value");
     private final ChoiceBox<String> window = new ChoiceBox<>();
-    private final ChoiceBox<Integer> limit = new ChoiceBox<>();
+    private final ChoiceBox<String> limit = new ChoiceBox<>();
     private final Button analyze = UiFactory.button("Analizza il gruppo", "primary-button");
     private final Button cancel = UiFactory.button("Annulla", "ghost-button");
+    private final Label candidatePreview = UiFactory.label("Filtri in preparazione…", "population-preview");
     private final Label status = UiFactory.label("Attendo catalogo e metadati", "status-pill", "status-neutral");
     private final ProgressBar progress = new ProgressBar(0);
 
@@ -91,13 +101,17 @@ public final class PopulationPage extends BorderPane {
     private final TabPane resultTabs = new TabPane();
     private Task<AnalysisResult> runningTask;
 
-    public PopulationPage(DataLoader loader, Executor executor, ObservableMap<String, GrbData> sessionData) {
+    public PopulationPage(DataLoader loader, Executor taskExecutor, ExecutorService loaderExecutor,
+                          ObservableMap<String, GrbData> sessionData) {
         this.loader = loader;
-        this.executor = executor;
+        this.taskExecutor = taskExecutor;
+        this.loaderExecutor = loaderExecutor;
         this.sessionData = sessionData;
         getStyleClass().add("page-root");
         configureControls();
         setCenter(buildPage());
+        sessionData.addListener((javafx.collections.MapChangeListener<String, GrbData>) change ->
+                updateCandidatePreview());
     }
 
     public void setCatalog(List<CatalogEntry> entries) {
@@ -128,9 +142,9 @@ public final class PopulationPage extends BorderPane {
         HBox title = new HBox(14);
         title.setAlignment(Pos.CENTER_LEFT);
         VBox copy = new VBox(5,
-                UiFactory.label("Analisi cumulativa", "page-title"),
+                UiFactory.label("Analisi di popolazione", "page-title"),
                 UiFactory.wrappedLabel(
-                        "Confronta un gruppo di GRB: curve totali allineate al trigger, normalizzate sul proprio picco e riassunte dalla mediana.",
+                        "Confronta la forma temporale di un gruppo di GRB e descrivi durata, distanza e qualità del campione.",
                         "page-subtitle"));
         HBox.setHgrow(copy, Priority.ALWAYS);
         title.getChildren().addAll(copy, status);
@@ -142,8 +156,8 @@ public final class PopulationPage extends BorderPane {
         resultTabs.getStyleClass().add("main-tabs");
         resultTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         resultTabs.getTabs().addAll(
-                new Tab("Curve + mediana", chartCard()),
-                new Tab("Distribuzioni", distributionPane()),
+                new Tab("Profilo temporale", chartCard()),
+                new Tab("Distribuzioni del campione", distributionPane()),
                 new Tab("GRB inclusi", resultTable));
         resultTabs.setMinHeight(620);
         VBox.setVgrow(resultTabs, Priority.ALWAYS);
@@ -163,51 +177,72 @@ public final class PopulationPage extends BorderPane {
         redshiftAvailability.setValue(ALL_Z);
         window.setItems(FXCollections.observableArrayList("±20 s", "±60 s", "±120 s"));
         window.setValue("±60 s");
-        limit.setItems(FXCollections.observableArrayList(10, 25, 50, 100));
-        limit.setValue(25);
+        limit.setItems(FXCollections.observableArrayList("10", "25", "50", "100", "Tutti"));
+        limit.setValue("25");
         for (ChoiceBox<?> choice : List.of(duration, redshiftAvailability, window, limit)) {
             choice.getStyleClass().add("choice-box-modern");
         }
 
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        grid.add(UiFactory.label("Durata", "filter-label"), 0, 0);
-        grid.add(duration, 1, 0);
-        grid.add(UiFactory.label("Disponibilità z", "filter-label"), 2, 0);
-        grid.add(redshiftAvailability, 3, 0);
-        grid.add(UiFactory.label("Range z", "filter-label"), 4, 0);
-        grid.add(range(zMin, zMax), 5, 0);
+        FlowPane primary = new FlowPane(12, 12);
+        primary.getStyleClass().add("population-filter-grid");
+        primary.getChildren().addAll(
+                filterGroup("Durata T90", "Seleziona la classe temporale", duration, 210),
+                filterGroup("Redshift", "Presenza della misura z", redshiftAvailability, 210),
+                filterGroup("Finestra temporale", "Secondi attorno al trigger", window, 170),
+                filterGroup("Campione massimo", "GRB più recenti dopo i filtri", limit, 170));
 
-        grid.add(UiFactory.label("RA (°)", "filter-label"), 0, 1);
-        grid.add(range(raMin, raMax), 1, 1);
-        grid.add(UiFactory.label("DEC (°)", "filter-label"), 2, 1);
-        grid.add(range(decMin, decMax), 3, 1);
-        grid.add(UiFactory.label("Finestra", "filter-label"), 4, 1);
-        grid.add(window, 5, 1);
+        FlowPane advancedContent = new FlowPane(12, 12);
+        advancedContent.getStyleClass().addAll("population-filter-grid", "advanced-filter-row");
+        advancedContent.getChildren().addAll(
+                filterGroup("Intervallo redshift z", "Applicato ai GRB che hanno z", range(zMin, zMax), 220),
+                filterGroup("Ascensione retta RA", "Intervallo 0°–360°", range(raMin, raMax), 220),
+                filterGroup("Declinazione DEC", "Intervallo −90°–+90°", range(decMin, decMax), 220));
+        advancedContent.setVisible(false);
+        advancedContent.setManaged(false);
 
-        VBox exposureBox = new VBox(5,
-                UiFactory.label("Copertura completa derivata da FRACEXP", "filter-label"),
-                new HBox(8, exposureMin, exposureMax, exposureValue));
-        HBox.setHgrow(exposureMin, Priority.ALWAYS);
-        HBox.setHgrow(exposureMax, Priority.ALWAYS);
+        ToggleButton advanced = new ToggleButton("Filtri avanzati: z e area di cielo");
+        advanced.getStyleClass().add("sky-toggle");
+        advanced.selectedProperty().addListener((obs, oldValue, selected) -> {
+            advancedContent.setVisible(selected);
+            advancedContent.setManaged(selected);
+            advanced.setText(selected ? "Nascondi filtri avanzati" : "Filtri avanzati: z e area di cielo");
+        });
+
+        VBox minimum = exposureControl("Minimo ammesso", exposureMin, exposureMinValue);
+        VBox maximum = exposureControl("Massimo ammesso", exposureMax, exposureMaxValue);
+        FlowPane exposureControls = new FlowPane(22, 10, minimum, maximum);
+        exposureControls.setAlignment(Pos.CENTER_LEFT);
+        VBox exposureBox = new VBox(8,
+                UiFactory.label("Qualità della copertura FRACEXP", "population-section-title"),
+                UiFactory.wrappedLabel(
+                        "Per ogni GRB viene calcolata la percentuale di bin con FRACEXP ≥ 0,999. Imposta qui l'intervallo accettato.",
+                        "sky-filter-help"),
+                exposureControls);
+        exposureBox.getStyleClass().add("population-filter-section");
 
         HBox actions = new HBox(10);
         actions.setAlignment(Pos.CENTER_LEFT);
-        progress.setPrefWidth(260);
+        progress.setPrefWidth(230);
         progress.setVisible(false);
         progress.setManaged(false);
         cancel.setDisable(true);
         analyze.setOnAction(event -> startAnalysis());
         cancel.setOnAction(event -> cancelAnalysis());
+        Button reset = UiFactory.button("Ripristina filtri", "ghost-button");
+        reset.setOnAction(event -> resetFilters());
         actions.getChildren().addAll(
-                UiFactory.label("Eventi da esaminare", "filter-label"), limit,
-                analyze, cancel, progress, UiFactory.spacer(),
-                UiFactory.wrappedLabel("Il filtro FRACEXP è applicato dopo la lettura del FITS; i file già aperti sono riusati dalla cache.", "sky-filter-help"));
+                analyze, cancel, reset, progress);
 
-        VBox card = new VBox(12, grid, exposureBox, actions);
+        VBox footer = new VBox(4,
+                candidatePreview,
+                UiFactory.wrappedLabel(
+                        "Prima vengono applicati T90, redshift e coordinate; FRACEXP richiede il FITS. I file scaricati restano nella cache locale anche dopo la chiusura.",
+                        "sky-filter-help"));
+
+        VBox card = new VBox(14, primary, advanced, advancedContent, exposureBox, actions, footer);
         card.getStyleClass().add("card");
-        card.setPadding(new Insets(15));
+        card.getStyleClass().add("population-filter-card");
+        card.setPadding(new Insets(17));
         return card;
     }
 
@@ -215,7 +250,9 @@ public final class PopulationPage extends BorderPane {
         VBox box = new VBox(10);
         box.setPadding(new Insets(16));
         Label note = UiFactory.wrappedLabel(
-                "Ogni linea sottile è un GRB diviso per il proprio picco. Le tre linee marcate sono 25° percentile, mediana e 75° percentile; non viene eseguita una somma fisicamente fuorviante tra eventi diversi.",
+                "Linee azzurre: singole GRB allineate al trigger e divise per il proprio picco. "
+                        + "Linea arancione: valore mediano del gruppo in ogni secondo. Linee viola: 25° e 75° percentile. "
+                        + "Si confronta la forma temporale relativa, non la luminosità assoluta e non la somma dei segnali.",
                 "explanation-text");
         VBox.setVgrow(curveChart, Priority.ALWAYS);
         box.getChildren().addAll(note, curveChart);
@@ -226,9 +263,12 @@ public final class PopulationPage extends BorderPane {
         FlowPane flow = new FlowPane(14, 14);
         flow.setPadding(new Insets(16));
         flow.getChildren().addAll(
-                histogramCard("Copertura completa", "Percentuale di bin con FRACEXP ≥ 0,999", exposureHistogram),
-                histogramCard("T90", "Distribuzione descrittiva delle durate", t90Histogram),
-                histogramCard("Redshift", "Valore rappresentativo; limiti e intervalli restano segnalati in tabella", redshiftHistogram));
+                histogramCard("Qualità FRACEXP",
+                        "Quanti GRB hanno una determinata percentuale di bin completamente esposti", exposureHistogram),
+                histogramCard("Durata T90",
+                        "Quanti GRB inclusi ricadono in ciascun intervallo di durata", t90Histogram),
+                histogramCard("Distanza cosmologica",
+                        "Distribuzione del redshift dei GRB inclusi; n.d. indica un valore assente", redshiftHistogram));
         return flow;
     }
 
@@ -251,13 +291,21 @@ public final class PopulationPage extends BorderPane {
                 exposureMin.setValue(exposureMax.getValue());
             }
             updateExposureLabel();
+            updateCandidatePreview();
         });
         exposureMax.valueProperty().addListener((obs, oldValue, value) -> {
             if (value.doubleValue() < exposureMin.getValue()) {
                 exposureMax.setValue(exposureMin.getValue());
             }
             updateExposureLabel();
+            updateCandidatePreview();
         });
+        duration.valueProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
+        redshiftAvailability.valueProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
+        limit.valueProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
+        for (TextField field : List.of(zMin, zMax, raMin, raMax, decMin, decMax)) {
+            field.textProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
+        }
     }
 
     private void configureChart() {
@@ -272,6 +320,9 @@ public final class PopulationPage extends BorderPane {
 
     private void configureTable() {
         resultTable.getStyleClass().add("data-table");
+        resultTable.setPlaceholder(UiFactory.wrappedLabel(
+                "Nessun GRB incluso. Controlla i filtri oppure esegui una nuova analisi.",
+                "empty-message"));
         resultTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         resultTable.getColumns().addAll(
                 column("GRB", PopulationEvent::grbName),
@@ -316,29 +367,52 @@ public final class PopulationPage extends BorderPane {
                 List<PopulationEvent> measured = new ArrayList<>();
                 Map<String, GrbData> loaded = new LinkedHashMap<>();
                 int failures = 0;
+                ExecutorCompletionService<LoadedCandidate> completion =
+                        new ExecutorCompletionService<>(loaderExecutor);
+                List<Future<LoadedCandidate>> pending = new ArrayList<>();
                 for (int index = 0; index < selected.size(); index++) {
-                    if (isCancelled()) {
-                        break;
-                    }
+                    int candidateIndex = index;
                     Candidate candidate = selected.get(index);
-                    int current = index + 1;
-                    updateProgress(index, selected.size());
-                    updateMessage("Leggo " + candidate.entry().grbName() + " · " + current + "/" + selected.size());
-                    try {
-                        GrbData data = loader.load(candidate.entry(), update -> { });
-                        loaded.put(data.grbName(), data);
-                        double quality = QualityMetrics.fullExposurePercent(data);
-                        if (!Double.isFinite(quality)) {
+                    pending.add(completion.submit(() -> loadCandidate(candidateIndex, candidate)));
+                }
+
+                List<LoadedCandidate> outcomes = new ArrayList<>();
+                try {
+                    for (int completed = 0; completed < selected.size() && !isCancelled(); completed++) {
+                        updateMessage("Caricamento parallelo · " + completed + "/" + selected.size());
+                        try {
+                            outcomes.add(completion.take().get());
+                        } catch (ExecutionException error) {
                             failures++;
-                            continue;
                         }
-                        PopulationEvent event = new PopulationEvent(data.grbName(), candidate.burst(), quality, "");
-                        measured.add(event);
-                        if (quality >= filter.exposureMin() && quality <= filter.exposureMax()) {
-                            accepted.add(event);
-                        }
-                    } catch (IOException | RuntimeException error) {
+                        updateProgress(completed + 1, selected.size());
+                    }
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    if (isCancelled() || outcomes.size() < selected.size()) {
+                        pending.forEach(future -> future.cancel(true));
+                    }
+                }
+
+                outcomes.sort(Comparator.comparingInt(LoadedCandidate::index));
+                for (LoadedCandidate outcome : outcomes) {
+                    if (outcome.data() == null) {
                         failures++;
+                        continue;
+                    }
+                    GrbData data = outcome.data();
+                    loaded.put(data.grbName(), data);
+                    double quality = QualityMetrics.fullExposurePercent(data);
+                    if (!Double.isFinite(quality)) {
+                        failures++;
+                        continue;
+                    }
+                    PopulationEvent event = new PopulationEvent(
+                            data.grbName(), outcome.candidate().burst(), quality, "");
+                    measured.add(event);
+                    if (quality >= filter.exposureMin() && quality <= filter.exposureMax()) {
+                        accepted.add(event);
                     }
                 }
                 double lowTail = QualityMetrics.percentile(
@@ -358,7 +432,8 @@ public final class PopulationPage extends BorderPane {
                 CumulativeAnalysisService.PopulationProfile profile = analysisService.profile(curves, filter.halfWindow());
                 updateProgress(selected.size(), selected.size());
                 return new AnalysisResult(flagged, measured, loaded, curves, profile, failures,
-                        selected.size(), lowTail, filter.halfWindow());
+                        selected.size(), lowTail, filter.halfWindow(),
+                        filter.exposureMin(), filter.exposureMax());
             }
         };
         progress.progressProperty().bind(runningTask.progressProperty());
@@ -367,7 +442,15 @@ public final class PopulationPage extends BorderPane {
         runningTask.setOnSucceeded(event -> finishAnalysis(runningTask.getValue()));
         runningTask.setOnCancelled(event -> finishCancelled());
         runningTask.setOnFailed(event -> finishFailed(runningTask.getException()));
-        executor.execute(runningTask);
+        taskExecutor.execute(runningTask);
+    }
+
+    private LoadedCandidate loadCandidate(int index, Candidate candidate) {
+        try {
+            return new LoadedCandidate(index, candidate, loader.load(candidate.entry(), update -> { }));
+        } catch (IOException | RuntimeException error) {
+            return new LoadedCandidate(index, candidate, null);
+        }
     }
 
     private void finishAnalysis(AnalysisResult result) {
@@ -377,9 +460,27 @@ public final class PopulationPage extends BorderPane {
         populateCurveChart(result);
         resultTable.setItems(FXCollections.observableArrayList(result.accepted()));
         populateHistograms(result);
-        setStatus(result.accepted().size() + " GRB inclusi su " + result.examined()
-                + " esaminati" + (result.failures() > 0 ? " · " + result.failures() + " non leggibili" : ""),
+        StringBuilder message = new StringBuilder()
+                .append(result.accepted().size()).append(" GRB inclusi su ")
+                .append(result.examined()).append(" esaminati");
+        if (!result.measured().isEmpty()) {
+            double observedMinimum = result.measured().stream()
+                    .mapToDouble(PopulationEvent::exposurePercent).min().orElse(Double.NaN);
+            double observedMaximum = result.measured().stream()
+                    .mapToDouble(PopulationEvent::exposurePercent).max().orElse(Double.NaN);
+            message.append(String.format(Locale.ITALY, " · copertura rilevata %.1f%%–%.1f%%",
+                    observedMinimum, observedMaximum));
+            if (result.accepted().isEmpty()) {
+                message.append(String.format(Locale.ITALY, " fuori dal filtro %.0f%%–%.0f%%",
+                        result.exposureMinimum(), result.exposureMaximum()));
+            }
+        }
+        if (result.failures() > 0) {
+            message.append(" · ").append(result.failures()).append(" non leggibili");
+        }
+        setStatus(message.toString(),
                 result.accepted().isEmpty() ? "status-warning" : "status-online");
+        updateCandidatePreview();
         setRunning(false);
         runningTask = null;
     }
@@ -476,7 +577,15 @@ public final class PopulationPage extends BorderPane {
     private void setBars(BarChart<String, Number> chart, Map<String, Integer> counts) {
         if (chart == null) return;
         XYChart.Series<String, Number> series = new XYChart.Series<>();
-        counts.forEach((label, count) -> series.getData().add(new XYChart.Data<>(label, count)));
+        counts.forEach((label, count) -> {
+            XYChart.Data<String, Number> bar = new XYChart.Data<>(label, count);
+            bar.nodeProperty().addListener((obs, oldNode, node) -> {
+                if (node != null) {
+                    Tooltip.install(node, new Tooltip(label + ": " + count + " GRB"));
+                }
+            });
+            series.getData().add(bar);
+        });
         chart.getData().setAll(series);
     }
 
@@ -522,9 +631,12 @@ public final class PopulationPage extends BorderPane {
         if (minRa < 0 || minRa > 360 || maxRa < 0 || maxRa > 360) throw new IllegalArgumentException("RA deve essere fra 0° e 360°.");
         if (minDec < -90 || maxDec > 90 || minDec > maxDec) throw new IllegalArgumentException("DEC deve essere fra −90° e +90°.");
         double halfWindow = window.getValue().startsWith("±20") ? 20 : window.getValue().startsWith("±120") ? 120 : 60;
+        int maximumEvents = "Tutti".equals(limit.getValue())
+                ? Integer.MAX_VALUE
+                : Integer.parseInt(limit.getValue());
         return new Filter(duration.getValue(), redshiftAvailability.getValue(), minZ, maxZ,
                 minRa, maxRa, minDec, maxDec, exposureMin.getValue(), exposureMax.getValue(),
-                halfWindow, limit.getValue());
+                halfWindow, maximumEvents);
     }
 
     private double number(TextField field, String label) {
@@ -538,6 +650,7 @@ public final class PopulationPage extends BorderPane {
     private void updateReadyState() {
         boolean ready = !catalog.isEmpty() && !metadata.isEmpty();
         analyze.setDisable(!ready || runningTask != null);
+        updateCandidatePreview();
         if (ready && runningTask == null) {
             setStatus(metadata.size() + " GRB con T90/coordinate · redshift integrato", "status-online");
         }
@@ -559,10 +672,53 @@ public final class PopulationPage extends BorderPane {
     private void clearResults() {
         curveChart.getData().clear();
         resultTable.getItems().clear();
+        exposureHistogram.getData().clear();
+        t90Histogram.getData().clear();
+        redshiftHistogram.getData().clear();
+        curveChart.setTitle("Nessuna analisi eseguita");
     }
 
     private void updateExposureLabel() {
-        exposureValue.setText(String.format(Locale.ITALY, "%.0f%% – %.0f%%", exposureMin.getValue(), exposureMax.getValue()));
+        exposureMinValue.setText(String.format(Locale.ITALY, "%.0f%%", exposureMin.getValue()));
+        exposureMaxValue.setText(String.format(Locale.ITALY, "%.0f%%", exposureMax.getValue()));
+    }
+
+    private void updateCandidatePreview() {
+        if (catalog.isEmpty() || metadata.isEmpty() || duration.getValue() == null
+                || redshiftAvailability.getValue() == null || limit.getValue() == null
+                || window.getValue() == null) {
+            candidatePreview.setText("Attendo catalogo e metadati scientifici…");
+            return;
+        }
+        try {
+            Filter filter = readFilter();
+            List<Candidate> matches = candidates(filter);
+            int selected = Math.min(filter.limit(), matches.size());
+            long inMemory = matches.stream()
+                    .limit(selected)
+                    .filter(candidate -> sessionData.containsKey(candidate.entry().grbName()))
+                    .count();
+            candidatePreview.setText(matches.size() + " GRB corrispondono ai filtri preliminari · "
+                    + selected + " saranno esaminati · " + inMemory + " già in RAM");
+        } catch (IllegalArgumentException error) {
+            candidatePreview.setText(error.getMessage());
+        }
+    }
+
+    private void resetFilters() {
+        duration.setValue(ALL_T90);
+        redshiftAvailability.setValue(ALL_Z);
+        zMin.setText("0");
+        zMax.setText("10");
+        raMin.setText("0");
+        raMax.setText("360");
+        decMin.setText("-90");
+        decMax.setText("90");
+        exposureMin.setValue(0);
+        exposureMax.setValue(100);
+        window.setValue("±60 s");
+        limit.setValue("25");
+        updateCandidatePreview();
     }
 
     private static TextField field(String value) {
@@ -576,8 +732,34 @@ public final class PopulationPage extends BorderPane {
         Slider slider = new Slider(0, 100, value);
         slider.setBlockIncrement(1);
         slider.setMajorTickUnit(25);
-        slider.setPrefWidth(210);
+        slider.setMinorTickCount(24);
+        slider.setSnapToTicks(true);
+        slider.setPrefWidth(240);
+        slider.setMinWidth(180);
+        slider.setMaxWidth(260);
         return slider;
+    }
+
+    private static VBox exposureControl(String label, Slider slider, Label value) {
+        HBox heading = new HBox(8, UiFactory.label(label, "filter-label"), UiFactory.spacer(), value);
+        heading.setAlignment(Pos.CENTER_LEFT);
+        VBox box = new VBox(4, heading, slider);
+        box.setPrefWidth(260);
+        box.setMaxWidth(280);
+        return box;
+    }
+
+    private static VBox filterGroup(String title, String detail, Node control, double width) {
+        Label caption = UiFactory.label(title, "filter-label");
+        Label note = UiFactory.label(detail, "filter-detail");
+        if (control instanceof Region value) {
+            value.setPrefWidth(width);
+            value.setMaxWidth(width);
+        }
+        VBox box = new VBox(5, caption, control, note);
+        box.getStyleClass().add("population-filter-group");
+        box.setPrefWidth(width);
+        return box;
     }
 
     private static HBox range(TextField minimum, TextField maximum) {
@@ -587,6 +769,9 @@ public final class PopulationPage extends BorderPane {
     }
 
     private record Candidate(CatalogEntry entry, SkyBurst burst) {
+    }
+
+    private record LoadedCandidate(int index, Candidate candidate, GrbData data) {
     }
 
     private record Filter(String duration, String redshiftAvailability, double zMin, double zMax,
@@ -617,7 +802,8 @@ public final class PopulationPage extends BorderPane {
                                   Map<String, GrbData> loaded,
                                   List<CumulativeAnalysisService.NormalizedCurve> curves,
                                   CumulativeAnalysisService.PopulationProfile profile,
-                                  int failures, int examined, double lowTail, double halfWindow) {
+                                  int failures, int examined, double lowTail, double halfWindow,
+                                  double exposureMinimum, double exposureMaximum) {
     }
 
     @FunctionalInterface

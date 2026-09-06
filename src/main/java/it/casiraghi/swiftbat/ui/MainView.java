@@ -33,8 +33,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainView {
-    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4, runnable -> {
+    private static final ExecutorService BACKGROUND_EXECUTOR = Executors.newFixedThreadPool(3, runnable -> {
         Thread thread = new Thread(runnable, "swiftbat-worker");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private static final ExecutorService DOWNLOAD_EXECUTOR = Executors.newFixedThreadPool(4, runnable -> {
+        Thread thread = new Thread(runnable, "swiftbat-download");
         thread.setDaemon(true);
         return thread;
     });
@@ -67,11 +72,13 @@ public final class MainView {
     public MainView(HostServices hostServices, Stage owner) {
         this.hostServices = hostServices;
         this.owner = owner;
-        explorerPage = new ExplorerPage(hostServices, this::loadGrb, entry -> sessionData.containsKey(entry.grbName()));
+        explorerPage = new ExplorerPage(hostServices, this::loadGrb,
+                entry -> grbService.cachedLocally(entry.grbName()));
         glossaryPage = new GlossaryPage();
         comparePage = new ComparePage(sessionData);
         populationPage = new PopulationPage(
-                (entry, progress) -> grbService.load(entry, false, progress), EXECUTOR, sessionData);
+                (entry, progress) -> grbService.load(entry, false, progress),
+                BACKGROUND_EXECUTOR, DOWNLOAD_EXECUTOR, sessionData);
         skyMapPage = new SkyMapPage(entry -> loadGrb(entry, false));
         aboutPage = new AboutPage(hostServices, () -> navigate("glossary"));
         homePage = new HomePage(
@@ -81,9 +88,10 @@ public final class MainView {
                 () -> navigate("about"));
         buildLayout();
         sessionData.addListener((javafx.collections.MapChangeListener<String, GrbData>) change -> {
-            sessionStatus.setText(sessionData.size() + " in memoria");
+            updateCacheStatus();
             explorerPage.refreshCacheIndicators();
         });
+        updateCacheStatus();
     }
 
     public BorderPane getRoot() {
@@ -96,7 +104,8 @@ public final class MainView {
     }
 
     public static void shutdownSharedExecutor() {
-        EXECUTOR.shutdownNow();
+        BACKGROUND_EXECUTOR.shutdownNow();
+        DOWNLOAD_EXECUTOR.shutdownNow();
     }
 
     private void buildLayout() {
@@ -125,7 +134,7 @@ public final class MainView {
         Button home = navButton("⌂", "Home", "home");
         Button explorer = navButton("✦", "Esplora", "explorer");
         Button sky = navButton("◎", "Mappa celeste", "sky");
-        Button population = navButton("≋", "Analisi cumulativa", "population");
+        Button population = navButton("≋", "Analisi di popolazione", "population");
         Button compare = navButton("⇄", "Confronta", "compare");
         Button about = navButton("i", "Info", "about");
 
@@ -246,7 +255,7 @@ public final class MainView {
             setConnection("Offline parziale", "status-warning");
             loadSkyCatalog();
         });
-        EXECUTOR.execute(task);
+        BACKGROUND_EXECUTOR.execute(task);
     }
 
     private void loadSkyCatalog() {
@@ -285,7 +294,7 @@ public final class MainView {
                     : "Mappa non disponibile: " + error.getMessage();
             skyMapPage.showError(detail);
         });
-        EXECUTOR.execute(task);
+        BACKGROUND_EXECUTOR.execute(task);
     }
 
     private void loadGrb(CatalogEntry entry, boolean forceRefresh) {
@@ -321,7 +330,12 @@ public final class MainView {
             setConnection("Online", "status-online");
         });
         task.setOnFailed(event -> explorerPage.showError(entry, task.getException()));
-        EXECUTOR.execute(task);
+        DOWNLOAD_EXECUTOR.execute(task);
+    }
+
+    private void updateCacheStatus() {
+        sessionStatus.setText(sessionData.size() + " RAM · "
+                + grbService.persistentCachedCount() + " locali");
     }
 
     private void setConnection(String text, String styleClass) {
