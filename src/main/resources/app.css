@@ -1721,7 +1721,6 @@
 }
 
 .bar-chart .chart-bar {
-    -fx-bar-fill: #67cee9;
     -fx-background-color: linear-gradient(to top, #7b56c9, #4fd5ef);
     -fx-background-radius: 5px 5px 0 0;
 }
@@ -1937,3 +1936,84 @@
 .sky-metric-row .sky-metric-card {
     -fx-padding: 13px 18px;
 }
+
+/* ---------- Rifiniture leggibilità / fullscreen ---------- */
+.info-static-card {
+    -fx-background-color: linear-gradient(to bottom right, rgba(14, 17, 25, 0.96), rgba(9, 12, 19, 0.98));
+    -fx-border-color: rgba(255, 255, 255, 0.075);
+    -fx-background-radius: 18px;
+    -fx-border-radius: 18px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.24), 17, 0.10, 0, 6);
+}
+
+.population-insight-expanded {
+    -fx-padding: 22px;
+}
+
+.population-insight-expanded .population-insight-title {
+    -fx-font-size: 20px;
+}
+
+.population-insight-expanded .population-insight-badge {
+    -fx-font-size: 10px;
+}
+
+.population-insight-expanded .population-insight-headline {
+    -fx-font-size: 15px;
+    -fx-line-spacing: 3px;
+}
+
+.population-insight-expanded .population-insight-text {
+    -fx-font-size: 13px;
+    -fx-line-spacing: 3px;
+}
+
+.population-insight-expanded .population-insight-dot,
+.population-insight-expanded .population-insight-warning {
+    -fx-font-size: 14px;
+}
+
+.population-insight-expanded .population-insight-caution-title {
+    -fx-font-size: 13px;
+}
+
+.population-insight-expanded .population-insight-footnote {
+    -fx-font-size: 10px;
+    -fx-line-spacing: 2px;
+}
+
+.sky-fullscreen-details .sky-selected-title {
+    -fx-font-size: 24px;
+}
+
+.sky-fullscreen-details .card-subtitle {
+    -fx-font-size: 11px;
+}
+
+.sky-fullscreen-details .info-key {
+    -fx-font-size: 11px;
+}
+
+.sky-fullscreen-details .info-value {
+    -fx-font-size: 13px;
+    -fx-line-spacing: 2px;
+}
+
+.sky-fullscreen-details .sky-detail-note,
+.sky-fullscreen-details .sky-fullscreen-note {
+    -fx-font-size: 12px;
+    -fx-line-spacing: 3px;
+}
+
+.three-d-zoom-label,
+.sky-zoom-label {
+    -fx-background-color: rgba(8, 15, 29, 0.82);
+    -fx-text-fill: #8fa8ca;
+    -fx-background-radius: 8px;
+    -fx-border-color: rgba(116, 151, 215, 0.18);
+    -fx-border-radius: 8px;
+    -fx-padding: 5 8;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+

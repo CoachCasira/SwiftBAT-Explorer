@@ -168,7 +168,7 @@ public final class SkyMapPage extends BorderPane {
             mollweide.resetView();
             sphere.resetView();
         });
-        Button fullscreen = UiFactory.button("Schermo intero  ⛶", "secondary-button");
+        Button fullscreen = UiFactory.button("Schermo intero  ⛶", "primary-button");
         fullscreen.setOnAction(event -> openMapFullscreen());
         HBox mapHead = new HBox(10,
                 UiFactory.label("Cielo", "card-title"),
@@ -367,7 +367,7 @@ public final class SkyMapPage extends BorderPane {
         open.setDisable(true);
         final SkyBurst[] current = new SkyBurst[1];
 
-        VBox rows = new VBox(10,
+        VBox rows = new VBox(14,
                 detailRow("Trigger", trigger),
                 detailRow("RA (J2000)", ra),
                 detailRow("DEC (J2000)", dec),
@@ -375,18 +375,19 @@ public final class SkyMapPage extends BorderPane {
                 detailRow("Classe descrittiva", clazz),
                 detailRow("Redshift", redshift));
         Label note = UiFactory.wrappedLabel(
-                "Seleziona un GRB direttamente nella vista a schermo intero: i dettagli restano visibili qui e puoi aprire subito le relative curve di luce.",
-                "sky-science-note");
-        VBox panel = new VBox(14,
+                "Seleziona un GRB direttamente nella vista a schermo intero. RA e DEC descrivono la direzione sulla volta celeste; T90 riassume la durata dell'evento e il redshift, quando disponibile, fornisce l'informazione cosmologica. I dettagli rimangono visibili mentre esplori la mappa e puoi aprire subito le relative curve di luce.",
+                "sky-science-note", "sky-fullscreen-note");
+        VBox panel = new VBox(18,
                 UiFactory.label("GRB selezionato", "card-subtitle"),
                 name, rows, catalogInfo, open,
-                UiFactory.label("Vista interattiva", "card-title"), note);
-        panel.getStyleClass().add("card");
-        panel.setPadding(new Insets(18));
-        panel.setMinWidth(300);
-        panel.setPrefWidth(330);
-        panel.setMaxWidth(360);
+                UiFactory.label("Come leggere la selezione", "card-title"), note);
+        panel.getStyleClass().addAll("card", "sky-fullscreen-details");
+        panel.setPadding(new Insets(22));
+        panel.setMinWidth(360);
+        panel.setPrefWidth(410);
+        panel.setMaxWidth(450);
         panel.setMinHeight(0);
+        panel.setMaxHeight(Double.MAX_VALUE);
 
         Consumer<SkyBurst> updater = burst -> {
             current[0] = burst;

@@ -11,6 +11,7 @@ import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
+import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -72,7 +73,15 @@ public final class ThreeDChartPane extends BorderPane {
 
         SwingUtilities.invokeLater(() -> swingNode.setContent(renderer));
 
-        StackPane viewer = new StackPane(swingNode);
+        Label zoomLabel = UiFactory.label("Zoom 100%", "three-d-zoom-label");
+        zoomLabel.setMouseTransparent(true);
+        renderer.setZoomListener(value -> Platform.runLater(
+                () -> zoomLabel.setText("Zoom " + Math.round(value * 100.0) + "%")));
+
+        StackPane viewer = new StackPane(swingNode, zoomLabel);
+        StackPane.setAlignment(zoomLabel, Pos.BOTTOM_LEFT);
+        StackPane.setMargin(zoomLabel, new Insets(0, 0, 12, 12));
+        viewer.addEventHandler(ScrollEvent.SCROLL, event -> event.consume());
         viewer.getStyleClass().add("three-d-viewer");
         viewer.setMinHeight(330);
         viewer.setPrefHeight(390);

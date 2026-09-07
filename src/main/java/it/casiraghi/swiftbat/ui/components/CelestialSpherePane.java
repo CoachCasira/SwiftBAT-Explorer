@@ -11,6 +11,7 @@ import javafx.scene.PerspectiveCamera;
 import javafx.scene.PointLight;
 import javafx.scene.SceneAntialiasing;
 import javafx.scene.SubScene;
+import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.Pane;
@@ -44,6 +45,7 @@ public final class CelestialSpherePane extends Pane {
     private final Rotate rotateY = new Rotate(-24, Rotate.Y_AXIS);
     private final PerspectiveCamera camera = new PerspectiveCamera(true);
     private final SubScene subScene;
+    private final Label zoomLabel = new Label("Zoom 100%");
 
     private final PhongMaterial longMaterial = material("#50d8ff", 0.95);
     private final PhongMaterial shortMaterial = material("#ffae4a", 0.98);
@@ -99,7 +101,9 @@ public final class CelestialSpherePane extends Pane {
         camera.setTranslateZ(DEFAULT_CAMERA_Z);
         subScene.setCamera(camera);
 
-        getChildren().add(subScene);
+        zoomLabel.getStyleClass().add("sky-zoom-label");
+        zoomLabel.setMouseTransparent(true);
+        getChildren().addAll(subScene, zoomLabel);
         subScene.widthProperty().bind(widthProperty());
         subScene.heightProperty().bind(heightProperty());
 
@@ -148,6 +152,20 @@ public final class CelestialSpherePane extends Pane {
         rotateX.setAngle(-14.0);
         rotateY.setAngle(-24.0);
         camera.setTranslateZ(DEFAULT_CAMERA_Z);
+        updateZoomLabel();
+    }
+
+    @Override
+    protected void layoutChildren() {
+        super.layoutChildren();
+        zoomLabel.autosize();
+        double y = Math.max(12.0, getHeight() - zoomLabel.prefHeight(-1) - 14.0);
+        zoomLabel.relocate(14.0, y);
+    }
+
+    private void updateZoomLabel() {
+        double factor = Math.abs(DEFAULT_CAMERA_Z / camera.getTranslateZ());
+        zoomLabel.setText("Zoom " + Math.round(factor * 100.0) + "%");
     }
 
     private void rebuildMarkers() {
@@ -276,6 +294,7 @@ public final class CelestialSpherePane extends Pane {
             // Delta positivo = avvicinamento, negativo = allontanamento.
             double next = camera.getTranslateZ() + event.getDeltaY() * 0.85;
             camera.setTranslateZ(clamp(next, -1550.0, -470.0));
+            updateZoomLabel();
             event.consume();
         });
         subScene.setOnMouseClicked(event -> {

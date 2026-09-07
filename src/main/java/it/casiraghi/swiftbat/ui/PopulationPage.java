@@ -304,7 +304,7 @@ public final class PopulationPage extends BorderPane {
         HBox.setHgrow(note, Priority.ALWAYS);
         profile3D.setDisable(true);
         profile3D.setOnAction(event -> openProfile3D());
-        Button fullscreen = UiFactory.button("Schermo intero  ⛶", "secondary-button");
+        Button fullscreen = UiFactory.button("Schermo intero  ⛶", "primary-button");
         fullscreen.setOnAction(event -> openProfileFullscreen());
         HBox actions = new HBox(8, profile3D, fullscreen);
         actions.setAlignment(Pos.CENTER_RIGHT);
@@ -323,7 +323,9 @@ public final class PopulationPage extends BorderPane {
     private VBox insightCard() {
         insightHeadline.setMinWidth(0);
         insightHeadline.setMaxWidth(Double.MAX_VALUE);
-        insightHeadline.setTextOverrun(OverrunStyle.CLIP);
+        insightHeadline.setWrapText(false);
+        insightHeadline.setTextOverrun(OverrunStyle.ELLIPSIS);
+        UiFactory.autoTooltip(insightHeadline);
         insightObservations.getStyleClass().add("population-insight-list");
         insightCautions.getStyleClass().add("population-insight-cautions");
         VBox content = new VBox(10,
@@ -385,8 +387,11 @@ public final class PopulationPage extends BorderPane {
         VBox.setVgrow(enlarged, Priority.ALWAYS);
         HBox.setHgrow(chartColumn, Priority.ALWAYS);
 
-        HBox content = new HBox(18, chartColumn, insightSnapshotCard(true));
+        VBox assistant = insightSnapshotCard(true);
+        assistant.setMaxHeight(Double.MAX_VALUE);
+        HBox content = new HBox(18, chartColumn, assistant);
         content.setAlignment(Pos.TOP_LEFT);
+        content.setFillHeight(true);
         content.getStyleClass().add("population-fullscreen-content");
         InPlaceFullscreen.show(this, "Profilo temporale della popolazione", content);
     }
@@ -424,10 +429,12 @@ public final class PopulationPage extends BorderPane {
                         "Il testo deriva solo dalle statistiche del grafico e non sostituisce l'interpretazione scientifica.",
                         "population-insight-footnote"));
         card.getStyleClass().add("population-insight-card");
+        if (expanded) card.getStyleClass().add("population-insight-expanded");
         card.setFillWidth(true);
-        card.setMinWidth(expanded ? 350 : 270);
-        card.setPrefWidth(expanded ? 430 : 330);
-        card.setMaxWidth(expanded ? 520 : 370);
+        card.setMinWidth(expanded ? 390 : 270);
+        card.setPrefWidth(expanded ? 480 : 330);
+        card.setMaxWidth(expanded ? 560 : 370);
+        card.setMaxHeight(Double.MAX_VALUE);
         return card;
     }
 
@@ -441,8 +448,11 @@ public final class PopulationPage extends BorderPane {
         pane.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(pane, Priority.ALWAYS);
 
-        HBox content = new HBox(18, pane, insightSnapshotCard(true));
+        VBox assistant = insightSnapshotCard(true);
+        assistant.setMaxHeight(Double.MAX_VALUE);
+        HBox content = new HBox(18, pane, assistant);
         content.setAlignment(Pos.TOP_LEFT);
+        content.setFillHeight(true);
         content.getStyleClass().add("population-fullscreen-content");
         InPlaceFullscreen.show(this, "Profilo di popolazione 3D", content);
     }
@@ -883,16 +893,21 @@ public final class PopulationPage extends BorderPane {
 
     private HBox insightLine(String marker, String text, String markerStyle, boolean expanded) {
         Label bullet = UiFactory.label(marker, markerStyle);
-        Label copy = UiFactory.wrappedLabel(text, "population-insight-text");
+        bullet.setMinWidth(14);
+        bullet.setAlignment(Pos.CENTER);
+        Label copy = expanded
+                ? UiFactory.wrappedLabel(text, "population-insight-text")
+                : UiFactory.label(text, "population-insight-text");
+        copy.setWrapText(expanded);
         copy.setMinWidth(0);
         copy.setMaxWidth(Double.MAX_VALUE);
-        copy.setTextOverrun(OverrunStyle.CLIP);
-        if (expanded) copy.setStyle("-fx-font-size: 12px; -fx-line-spacing: 2.5px;");
+        copy.setTextOverrun(expanded ? OverrunStyle.CLIP : OverrunStyle.ELLIPSIS);
+        if (expanded) copy.setStyle("-fx-font-size: 13px; -fx-line-spacing: 3px;");
         HBox.setHgrow(copy, Priority.ALWAYS);
         HBox row = new HBox(8, bullet, copy);
         row.setMinWidth(0);
         row.setMaxWidth(Double.MAX_VALUE);
-        row.setAlignment(Pos.TOP_LEFT);
+        row.setAlignment(expanded ? Pos.TOP_LEFT : Pos.CENTER_LEFT);
         return row;
     }
 

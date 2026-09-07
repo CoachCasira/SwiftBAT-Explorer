@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.DoubleConsumer;
 
 /**
  * Renderer scientifico 2.5D basato su Java2D.
@@ -63,6 +64,7 @@ public final class Java2DWaterfallPanel extends JPanel {
     private double dragStartYaw;
     private double dragStartPitch;
     private HoverPoint hover;
+    private DoubleConsumer zoomListener = value -> { };
 
     public Java2DWaterfallPanel() {
         setOpaque(true);
@@ -118,6 +120,7 @@ public final class Java2DWaterfallPanel extends JPanel {
             public void mouseWheelMoved(MouseWheelEvent event) {
                 zoom = clamp(zoom * Math.pow(1.08, -event.getPreciseWheelRotation()), 0.68, 1.55);
                 hover = null;
+                zoomListener.accept(zoom);
                 repaint();
             }
         };
@@ -147,11 +150,17 @@ public final class Java2DWaterfallPanel extends JPanel {
         repaint();
     }
 
+    public void setZoomListener(DoubleConsumer listener) {
+        zoomListener = listener == null ? value -> { } : listener;
+        zoomListener.accept(zoom);
+    }
+
     public void resetView() {
         yaw = 0.32;
         pitch = 0.72;
         zoom = 1.0;
         hover = null;
+        zoomListener.accept(zoom);
         repaint();
     }
 
