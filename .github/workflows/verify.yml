@@ -28,7 +28,10 @@ jobs:
           cache: maven
 
       - name: Applica correzioni visuali
-        run: python3 .github/scripts/apply_visual_fixes.py
+        shell: bash
+        run: |
+          python3 .github/scripts/apply_visual_fixes.py
+          python3 .github/scripts/fix_visual_compile.py
 
       - name: Verifica Maven
         run: mvn --batch-mode --no-transfer-progress verify
