@@ -221,12 +221,13 @@ public final class PopulationPage extends BorderPane {
         primary.setMinWidth(650);
         primary.setPrefWrapLength(690);
 
-        FlowPane advancedContent = new FlowPane(10, 7);
-        advancedContent.getStyleClass().addAll("population-filter-grid", "advanced-filter-row");
+        HBox advancedContent = new HBox(10);
+        advancedContent.setAlignment(Pos.TOP_LEFT);
         advancedContent.getChildren().addAll(
                 filterGroup("Intervallo redshift z", "Applicato ai GRB con z", range(zMin, zMax), 205),
                 filterGroup("Ascensione retta RA", "Intervallo 0°–360°", range(raMin, raMax), 205),
                 filterGroup("Declinazione DEC", "Intervallo −90°–+90°", range(decMin, decMax), 205));
+        advancedContent.setMaxWidth(635);
         advancedContent.setVisible(false);
         advancedContent.setManaged(false);
 

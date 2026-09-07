@@ -9,6 +9,7 @@ import it.casiraghi.swiftbat.model.SkyBurst;
 import it.casiraghi.swiftbat.model.TabularData;
 import it.casiraghi.swiftbat.service.ExcelExportService;
 import it.casiraghi.swiftbat.ui.components.ThreeDChartPane;
+import javafx.animation.PauseTransition;
 import javafx.application.HostServices;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
@@ -53,6 +54,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
+import javafx.util.Duration;
 
 import javax.imageio.ImageIO;
 import java.io.File;
@@ -90,6 +92,7 @@ public final class ExplorerPage extends BorderPane {
     private final StackPane workspace = new StackPane();
     private CatalogEntry selectedEntry;
     private GrbData currentData;
+    private final PauseTransition catalogFilterDebounce = new PauseTransition(Duration.millis(900));
 
     public ExplorerPage(HostServices hostServices, BiConsumer<CatalogEntry, Boolean> loadRequest,
                         Predicate<CatalogEntry> cacheLookup) {
@@ -299,12 +302,13 @@ public final class ExplorerPage extends BorderPane {
     }
 
     private void wireCatalog() {
-        catalogSearch.textProperty().addListener((observable, oldValue, newValue) -> applyCatalogFilters());
-        durationFilter.setOnAction(event -> applyCatalogFilters());
-        redshiftFilter.setOnAction(event -> applyCatalogFilters());
-        cacheFilter.setOnAction(event -> applyCatalogFilters());
+        catalogFilterDebounce.setOnFinished(event -> applyCatalogFilters());
+        catalogSearch.textProperty().addListener((observable, oldValue, newValue) -> scheduleCatalogFilters());
+        durationFilter.valueProperty().addListener((obs, oldValue, newValue) -> scheduleCatalogFilters());
+        redshiftFilter.valueProperty().addListener((obs, oldValue, newValue) -> scheduleCatalogFilters());
+        cacheFilter.valueProperty().addListener((obs, oldValue, newValue) -> scheduleCatalogFilters());
         for (TextField field : List.of(t90MinFilter, t90MaxFilter, redshiftMinFilter, redshiftMaxFilter)) {
-            field.textProperty().addListener((obs, oldValue, newValue) -> applyCatalogFilters());
+            field.textProperty().addListener((obs, oldValue, newValue) -> scheduleCatalogFilters());
         }
         catalogList.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue != null && newValue != selectedEntry) {
@@ -312,6 +316,11 @@ public final class ExplorerPage extends BorderPane {
                 loadRequest.accept(newValue, false);
             }
         });
+    }
+
+    private void scheduleCatalogFilters() {
+        catalogFilterDebounce.stop();
+        catalogFilterDebounce.playFromStart();
     }
 
     private void applyCatalogFilters() {

@@ -37,6 +37,16 @@ public final class InPlaceFullscreen {
         new Session(scene, stage, owner, title, content).open();
     }
 
+    public static void close(Node owner) {
+        if (owner == null || owner.getScene() == null) {
+            return;
+        }
+        Object activeSession = owner.getScene().getProperties().get(ACTIVE_SESSION);
+        if (activeSession instanceof Session session) {
+            session.close(false);
+        }
+    }
+
     private static final class Session {
         private final Scene scene;
         private final Stage stage;
