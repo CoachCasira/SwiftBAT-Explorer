@@ -92,7 +92,7 @@ public final class ThreeDChartPane extends BorderPane {
                 () -> zoomLabel.setText("Zoom " + Math.round(value * 100.0) + "%")));
 
         viewer = new StackPane(swingNode);
-        viewer.addEventFilter(ScrollEvent.SCROLL, event -> event.consume());
+        viewer.addEventHandler(ScrollEvent.SCROLL, event -> event.consume());
         viewer.getStyleClass().add("three-d-viewer");
         viewer.setMinHeight(allowFullscreen ? 330 : 0);
         viewer.setPrefHeight(allowFullscreen ? 390 : 650);
