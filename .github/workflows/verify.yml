@@ -28,7 +28,9 @@ jobs:
           cache: maven
 
       - name: Applica rifiniture layout
-        run: python3 .github/scripts/apply_layout_refinements.py
+        run: |
+          python3 .github/scripts/apply_layout_refinements.py
+          python3 .github/scripts/fix_layout_string.py
 
       - name: Verifica Maven
         run: mvn --batch-mode --no-transfer-progress verify
