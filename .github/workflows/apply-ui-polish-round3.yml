@@ -28,7 +28,7 @@ jobs:
           cache: maven
 
       - name: Applica rifiniture UI
-        run: python3 .github/scripts/apply_ui_polish_round3.py
+        run: python3 .github/scripts/apply_ui_polish_round3b.py
 
       - name: Verifica Maven
         run: mvn --batch-mode --no-transfer-progress verify
