@@ -147,6 +147,11 @@ Le curve totali vengono allineate al trigger e ogni curva è divisa per il propr
 picco. L'app mostra le singole curve e i profili di 25° percentile, mediana e 75°
 percentile. Non somma direttamente i rate di GRB differenti.
 
+Il profilo temporale usa un'altezza compatta nella pagina e include una legenda
+dedicata per curve individuali, mediana e percentili. Il pulsante **Schermo intero**
+espande il grafico nella finestra principale e ripristina la pagina con `ESC` o
+**Torna all'app**, senza aprire finestre secondarie.
+
 Sono inclusi istogrammi spiegati di copertura, T90 e redshift. Il flag “coda bassa” indica
 gli eventi sotto il 10° percentile della copertura fra quelli effettivamente letti.
 I candidati vengono caricati in parallelo con concorrenza limitata; lo stato finale
@@ -176,6 +181,8 @@ La scheda “Vista 3D” usa un renderer Java2D dedicato e mostra:
 
 Le curve sono disegnate come un paesaggio a cascata, molto più leggibile delle precedenti barre solide. È possibile cambiare prospettiva trascinando il mouse, usare la rotella per lo zoom, fare doppio clic per centrare e leggere i valori passando vicino ai punti. La finestra iniziale usa ±60 s dal trigger.
 La profondità è soltanto un espediente visivo: non è una coordinata spaziale del GRB.
+Anche questa vista usa il fullscreen integrato nella finestra principale, senza creare
+una seconda finestra dell'applicazione.
 
 ### Tabelle spiegate
 

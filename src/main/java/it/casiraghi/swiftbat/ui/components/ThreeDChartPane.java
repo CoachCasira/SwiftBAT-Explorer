@@ -1,13 +1,13 @@
 package it.casiraghi.swiftbat.ui.components;
 
 import it.casiraghi.swiftbat.model.TabularData;
+import it.casiraghi.swiftbat.ui.InPlaceFullscreen;
 import it.casiraghi.swiftbat.ui.UiFactory;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.embed.swing.SwingNode;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
@@ -18,8 +18,6 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
-import javafx.stage.Window;
 
 import javax.swing.SwingUtilities;
 import java.awt.Color;
@@ -33,7 +31,9 @@ import java.util.Map;
  * Contenitore JavaFX per il renderer scientifico Java2D tempo-energia.
  *
  * <p>Il grafico viene disegnato con Java2D dentro uno SwingNode. La vista normale
- * e quella a schermo intero usano lo stesso dataset e le stesse interazioni.</p>
+ * e quella a schermo intero usano lo stesso dataset e le stesse interazioni.
+ * Lo schermo intero sostituisce temporaneamente il contenuto della finestra
+ * principale, senza creare finestre secondarie.</p>
  */
 public final class ThreeDChartPane extends BorderPane {
     private static final List<Band> BANDS = List.of(
@@ -232,7 +232,7 @@ public final class ThreeDChartPane extends BorderPane {
 
         footer.getChildren().addAll(note, spacer, windowLabel, windowChoice, reset);
         if (allowFullscreen) {
-            Button fullscreen = UiFactory.button("Schermo intero ↗", "primary-button");
+            Button fullscreen = UiFactory.button("Schermo intero  ⛶", "primary-button");
             fullscreen.setOnAction(event -> openFullscreen());
             footer.getChildren().add(fullscreen);
         }
@@ -248,33 +248,7 @@ public final class ThreeDChartPane extends BorderPane {
         enlarged.windowChoice.setValue(windowChoice.getValue());
         enlarged.setData(sourceData);
 
-        Button back = UiFactory.button("← Torna all'app", "secondary-button");
-        Label title = UiFactory.label("Vista 3D · " + contextName, "page-title");
-        HBox toolbar = new HBox(14, back, title);
-        toolbar.setAlignment(Pos.CENTER_LEFT);
-        toolbar.getStyleClass().add("fullscreen-toolbar");
-        toolbar.setPadding(new Insets(12, 18, 12, 18));
-
-        BorderPane root = new BorderPane(enlarged);
-        root.getStyleClass().add("app-root");
-        root.setTop(toolbar);
-        BorderPane.setMargin(enlarged, new Insets(12, 18, 18, 18));
-
-        Scene scene = new Scene(root, 1500, 900);
-        scene.getStylesheets().addAll(getScene().getStylesheets());
-        Stage stage = new Stage();
-        Window owner = getScene().getWindow();
-        if (owner != null) {
-            stage.initOwner(owner);
-        }
-        stage.setTitle("SwiftBAT Explorer — Vista 3D " + contextName);
-        stage.setScene(scene);
-        stage.setMinWidth(1000);
-        stage.setMinHeight(700);
-        back.setOnAction(event -> stage.close());
-        stage.show();
-        stage.setFullScreenExitHint("");
-        stage.setFullScreen(true);
+        InPlaceFullscreen.show(this, "Vista 3D · " + contextName, enlarged);
     }
 
     private void syncRendererSize(StackPane viewer) {

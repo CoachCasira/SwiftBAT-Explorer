@@ -38,6 +38,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Line;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -159,8 +160,9 @@ public final class PopulationPage extends BorderPane {
                 new Tab("Profilo temporale", chartCard()),
                 new Tab("Distribuzioni del campione", distributionPane()),
                 new Tab("GRB inclusi", resultTable));
-        resultTabs.setMinHeight(620);
-        VBox.setVgrow(resultTabs, Priority.ALWAYS);
+        resultTabs.setMinHeight(480);
+        resultTabs.setPrefHeight(520);
+        resultTabs.setMaxHeight(570);
 
         page.getChildren().addAll(title, filterCard, resultTabs);
         ScrollPane scroll = new ScrollPane(page);
@@ -248,15 +250,97 @@ public final class PopulationPage extends BorderPane {
 
     private Node chartCard() {
         VBox box = new VBox(10);
-        box.setPadding(new Insets(16));
+        box.setPadding(new Insets(14, 16, 16, 16));
+        box.getStyleClass().add("population-chart-card");
+
         Label note = UiFactory.wrappedLabel(
-                "Linee azzurre: singole GRB allineate al trigger e divise per il proprio picco. "
-                        + "Linea arancione: valore mediano del gruppo in ogni secondo. Linee viola: 25° e 75° percentile. "
-                        + "Si confronta la forma temporale relativa, non la luminosità assoluta e non la somma dei segnali.",
+                "Asse X: secondi dal trigger. Asse Y: rate relativo, con il picco di ogni GRB posto uguale a 1. "
+                        + "Il grafico confronta la forma temporale e non somma i segnali.",
                 "explanation-text");
-        VBox.setVgrow(curveChart, Priority.ALWAYS);
-        box.getChildren().addAll(note, curveChart);
+        HBox.setHgrow(note, Priority.ALWAYS);
+        Button fullscreen = UiFactory.button("Schermo intero  ⛶", "secondary-button");
+        fullscreen.setOnAction(event -> openProfileFullscreen());
+        HBox header = new HBox(12, note, fullscreen);
+        header.setAlignment(Pos.CENTER_LEFT);
+
+        box.getChildren().addAll(header, profileLegend(), curveChart);
         return box;
+    }
+
+    private FlowPane profileLegend() {
+        FlowPane legend = new FlowPane(10, 8);
+        legend.getStyleClass().add("population-profile-legend");
+        legend.getChildren().addAll(
+                profileLegendItem("population-legend-single", "Singoli GRB",
+                        "linee normalizzate e allineate al trigger"),
+                profileLegendItem("population-legend-median", "Mediana",
+                        "comportamento centrale del gruppo a ogni secondo"),
+                profileLegendItem("population-legend-quartile", "25° e 75° percentile",
+                        "intervallo che contiene la metà centrale dei valori"));
+        return legend;
+    }
+
+    private HBox profileLegendItem(String lineStyle, String title, String detail) {
+        Line sample = new Line(0, 0, 32, 0);
+        sample.getStyleClass().addAll("population-legend-line", lineStyle);
+        VBox text = new VBox(1,
+                UiFactory.label(title, "population-legend-title"),
+                UiFactory.label(detail, "population-legend-detail"));
+        HBox item = new HBox(9, sample, text);
+        item.setAlignment(Pos.CENTER_LEFT);
+        item.getStyleClass().add("population-legend-item");
+        return item;
+    }
+
+    private void openProfileFullscreen() {
+        LineChart<Number, Number> enlarged = copyProfileChart();
+        enlarged.setMinHeight(0);
+        enlarged.setPrefHeight(760);
+        enlarged.setMaxHeight(Double.MAX_VALUE);
+        VBox content = new VBox(12, profileLegend(), enlarged);
+        content.getStyleClass().add("population-fullscreen-content");
+        VBox.setVgrow(enlarged, Priority.ALWAYS);
+        InPlaceFullscreen.show(this, "Profilo temporale della popolazione", content);
+    }
+
+    private LineChart<Number, Number> copyProfileChart() {
+        NumberAxis xAxis = new NumberAxis();
+        NumberAxis yAxis = new NumberAxis();
+        LineChart<Number, Number> copy = new LineChart<>(xAxis, yAxis);
+        configureChart(copy, xAxis, yAxis);
+        copy.setTitle(curveChart.getTitle());
+        copyAxis(curveXAxis, xAxis);
+        copyAxis(curveYAxis, yAxis);
+
+        for (XYChart.Series<Number, Number> source : curveChart.getData()) {
+            XYChart.Series<Number, Number> target = new XYChart.Series<>();
+            target.setName(source.getName());
+            for (XYChart.Data<Number, Number> point : source.getData()) {
+                target.getData().add(new XYChart.Data<>(point.getXValue(), point.getYValue()));
+            }
+            copy.getData().add(target);
+            styleSeries(target, profileSeriesStyle(target.getName()));
+        }
+        return copy;
+    }
+
+    private void copyAxis(NumberAxis source, NumberAxis target) {
+        target.setAutoRanging(source.isAutoRanging());
+        if (!source.isAutoRanging()) {
+            target.setLowerBound(source.getLowerBound());
+            target.setUpperBound(source.getUpperBound());
+            target.setTickUnit(source.getTickUnit());
+        }
+    }
+
+    private String profileSeriesStyle(String name) {
+        if ("Mediana".equals(name)) {
+            return "-fx-stroke: #ffae4a; -fx-stroke-width: 4px;";
+        }
+        if (name != null && name.contains("percentile")) {
+            return "-fx-stroke: #aa78db; -fx-stroke-width: 2px; -fx-stroke-dash-array: 7 5;";
+        }
+        return "-fx-stroke: rgba(84, 215, 255, 0.20); -fx-stroke-width: 1px;";
     }
 
     private Node distributionPane() {
@@ -309,13 +393,20 @@ public final class PopulationPage extends BorderPane {
     }
 
     private void configureChart() {
-        curveXAxis.setLabel("Tempo dal trigger (s)");
-        curveYAxis.setLabel("Rate normalizzato (picco = 1)");
-        curveChart.setAnimated(false);
-        curveChart.setCreateSymbols(false);
-        curveChart.setLegendVisible(false);
+        configureChart(curveChart, curveXAxis, curveYAxis);
         curveChart.setTitle("Nessuna analisi eseguita");
-        curveChart.getStyleClass().addAll("lightcurve-chart", "population-chart");
+        curveChart.setMinHeight(300);
+        curveChart.setPrefHeight(350);
+        curveChart.setMaxHeight(390);
+    }
+
+    private void configureChart(LineChart<Number, Number> chart, NumberAxis xAxis, NumberAxis yAxis) {
+        xAxis.setLabel("Tempo dal trigger (s)");
+        yAxis.setLabel("Rate normalizzato (picco = 1)");
+        chart.setAnimated(false);
+        chart.setCreateSymbols(false);
+        chart.setLegendVisible(false);
+        chart.getStyleClass().addAll("lightcurve-chart", "population-chart");
     }
 
     private void configureTable() {

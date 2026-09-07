@@ -2,6 +2,9 @@
 
 ## In sviluppo — Analisi di popolazione e qualità
 
+- profilo temporale ridimensionato, con legenda esplicativa sempre visibile;
+- fullscreen del profilo temporale integrato nella finestra principale;
+- fullscreen della Vista 3D corretto per non aprire più una seconda finestra;
 - pagina rinominata **Analisi di popolazione**, con spiegazioni esplicite di curve,
   mediana, quartili e distribuzioni;
 - filtri riorganizzati in sezioni compatte, controlli FRACEXP separati e leggibili,
