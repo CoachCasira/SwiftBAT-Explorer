@@ -445,6 +445,7 @@ public final class ExplorerPage extends BorderPane {
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         tabs.setMinHeight(520);
         tabs.setPrefHeight(610);
+        tabs.setMaxHeight(Double.MAX_VALUE);
         tabs.getTabs().addAll(
                 tab("Curva 2D", buildOverview(data)),
                 tab("Vista 3D", buildThreeD(data)),
@@ -460,6 +461,8 @@ public final class ExplorerPage extends BorderPane {
         scroll.setFitToWidth(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scroll.setPannable(false);
+        scroll.viewportBoundsProperty().addListener((obs, oldBounds, bounds) ->
+                dashboard.setMinHeight(Math.max(0, bounds.getHeight())));
         return scroll;
     }
 
@@ -605,6 +608,10 @@ public final class ExplorerPage extends BorderPane {
             sourceChoice.getItems().add("FITS — un canale e qualità");
         }
         sourceChoice.getStyleClass().add("choice-box-modern");
+        sourceChoice.setMinWidth(190);
+        sourceChoice.setPrefWidth(215);
+        sourceChoice.setMaxWidth(250);
+        UiFactory.autoTooltip(sourceChoice);
         if (!sourceChoice.getItems().isEmpty()) {
             sourceChoice.setValue(sourceChoice.getItems().get(0));
         }
@@ -612,11 +619,16 @@ public final class ExplorerPage extends BorderPane {
         TextField filter = new TextField();
         filter.setPromptText("Filtra le righe per valore testuale…");
         filter.getStyleClass().add("search-field");
-        filter.setPrefWidth(300);
+        filter.setMinWidth(170);
+        filter.setPrefWidth(360);
+        filter.setMaxWidth(Double.MAX_VALUE);
 
         ChoiceBox<String> fieldChoice = new ChoiceBox<>();
         fieldChoice.getStyleClass().add("choice-box-modern");
-        fieldChoice.setPrefWidth(260);
+        fieldChoice.setMinWidth(215);
+        fieldChoice.setPrefWidth(285);
+        fieldChoice.setMaxWidth(340);
+        UiFactory.autoTooltip(fieldChoice);
 
         Button exportAscii = UiFactory.button("ASCII → Excel", "ghost-button");
         exportAscii.setDisable(data.asciiData().isEmpty());
@@ -624,9 +636,19 @@ public final class ExplorerPage extends BorderPane {
         Button exportFits = UiFactory.button("FITS + metadati → Excel", "ghost-button");
         exportFits.setDisable(data.fitsData().isEmpty());
         exportFits.setOnAction(event -> exportExcel(data, false));
-        HBox toolbar = new HBox(10, sourceChoice, filter, exportAscii, exportFits,
-                UiFactory.spacer(), UiFactory.label("Spiega:", "toolbar-label"), fieldChoice);
-        toolbar.setAlignment(Pos.CENTER_LEFT);
+        HBox sourceRow = new HBox(10, sourceChoice, filter);
+        sourceRow.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(filter, Priority.ALWAYS);
+
+        HBox explainControl = new HBox(8,
+                UiFactory.label("Spiega il campo:", "toolbar-label"), fieldChoice);
+        explainControl.setAlignment(Pos.CENTER_LEFT);
+        FlowPane actionRow = new FlowPane(10, 8);
+        actionRow.setAlignment(Pos.CENTER_LEFT);
+        actionRow.getChildren().addAll(exportAscii, exportFits, explainControl);
+
+        VBox toolbar = new VBox(8, sourceRow, actionRow);
+        toolbar.getStyleClass().add("data-toolbar");
         pane.setTop(toolbar);
         BorderPane.setMargin(toolbar, new Insets(0, 0, 14, 0));
 

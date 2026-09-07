@@ -5,9 +5,12 @@ import it.casiraghi.swiftbat.ui.InPlaceFullscreen;
 import it.casiraghi.swiftbat.ui.UiFactory;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
+import javafx.embed.swing.SwingFXUtils;
 import javafx.embed.swing.SwingNode;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.SnapshotParameters;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
@@ -18,11 +21,16 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
+import javafx.scene.image.WritableImage;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 
+import javax.imageio.ImageIO;
 import javax.swing.SwingUtilities;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -51,7 +59,9 @@ public final class ThreeDChartPane extends BorderPane {
     private final SwingNode swingNode = new SwingNode();
     private final Java2DWaterfallPanel renderer = new Java2DWaterfallPanel();
     private final Label contextLabel = UiFactory.label("GRB", "three-d-context");
+    private final Label zoomLabel = UiFactory.label("Zoom 100%", "three-d-zoom-inline");
     private final boolean allowFullscreen;
+    private final StackPane viewer;
 
     private TabularData sourceData = TabularData.empty();
     private String contextName = "GRB";
@@ -63,8 +73,12 @@ public final class ThreeDChartPane extends BorderPane {
     private ThreeDChartPane(boolean allowFullscreen) {
         this.allowFullscreen = allowFullscreen;
         getStyleClass().add("three-d-panel");
-        setMinHeight(430);
-        setPrefHeight(500);
+        if (!allowFullscreen) {
+            getStyleClass().add("three-d-panel-fullscreen");
+        }
+        setMinHeight(allowFullscreen ? 430 : 0);
+        setPrefHeight(allowFullscreen ? 500 : 760);
+        setMaxHeight(Double.MAX_VALUE);
 
         windowChoice.getStyleClass().add("choice-box-modern");
         windowChoice.setValue(DEFAULT_WINDOW);
@@ -73,18 +87,16 @@ public final class ThreeDChartPane extends BorderPane {
 
         SwingUtilities.invokeLater(() -> swingNode.setContent(renderer));
 
-        Label zoomLabel = UiFactory.label("Zoom 100%", "three-d-zoom-label");
         zoomLabel.setMouseTransparent(true);
         renderer.setZoomListener(value -> Platform.runLater(
                 () -> zoomLabel.setText("Zoom " + Math.round(value * 100.0) + "%")));
 
-        StackPane viewer = new StackPane(swingNode, zoomLabel);
-        StackPane.setAlignment(zoomLabel, Pos.BOTTOM_LEFT);
-        StackPane.setMargin(zoomLabel, new Insets(0, 0, 12, 12));
-        viewer.addEventHandler(ScrollEvent.SCROLL, event -> event.consume());
+        viewer = new StackPane(swingNode);
+        viewer.addEventFilter(ScrollEvent.SCROLL, event -> event.consume());
         viewer.getStyleClass().add("three-d-viewer");
-        viewer.setMinHeight(330);
-        viewer.setPrefHeight(390);
+        viewer.setMinHeight(allowFullscreen ? 330 : 0);
+        viewer.setPrefHeight(allowFullscreen ? 390 : 650);
+        viewer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         viewer.widthProperty().addListener((obs, oldValue, newValue) -> syncRendererSize(viewer));
         viewer.heightProperty().addListener((obs, oldValue, newValue) -> syncRendererSize(viewer));
 
@@ -197,9 +209,12 @@ public final class ThreeDChartPane extends BorderPane {
     }
 
     private VBox buildHeader() {
-        VBox header = new VBox(8);
+        VBox header = new VBox(allowFullscreen ? 8 : 12);
         header.getStyleClass().add("three-d-header");
-        header.setPadding(new Insets(10, 14, 9, 14));
+        if (!allowFullscreen) {
+            header.getStyleClass().add("three-d-header-fullscreen");
+        }
+        header.setPadding(allowFullscreen ? new Insets(10, 14, 9, 14) : new Insets(18, 22, 16, 22));
 
         HBox titleRow = new HBox(10);
         titleRow.setAlignment(Pos.CENTER_LEFT);
@@ -240,7 +255,10 @@ public final class ThreeDChartPane extends BorderPane {
         Button reset = UiFactory.button("Centra vista", "secondary-button");
         reset.setOnAction(event -> SwingUtilities.invokeLater(renderer::resetView));
 
-        footer.getChildren().addAll(note, spacer, windowLabel, windowChoice, reset);
+        Button export = UiFactory.button("Esporta PNG", "ghost-button");
+        export.setOnAction(event -> exportViewerPng());
+
+        footer.getChildren().addAll(zoomLabel, note, spacer, windowLabel, windowChoice, reset, export);
         if (allowFullscreen) {
             Button fullscreen = UiFactory.button("Schermo intero  ⛶", "primary-button");
             fullscreen.setOnAction(event -> openFullscreen());
@@ -257,8 +275,34 @@ public final class ThreeDChartPane extends BorderPane {
         enlarged.setContextName(contextName);
         enlarged.windowChoice.setValue(windowChoice.getValue());
         enlarged.setData(sourceData);
+        enlarged.setMinSize(0, 0);
+        enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
         InPlaceFullscreen.show(this, "Vista 3D · " + contextName, enlarged);
+    }
+
+    private void exportViewerPng() {
+        if (getScene() == null || viewer.getWidth() <= 1 || viewer.getHeight() <= 1) {
+            return;
+        }
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Esporta vista 3D");
+        chooser.setInitialFileName(contextName.replaceAll("[^A-Za-z0-9._-]", "_") + "_vista_3D.png");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Immagine PNG", "*.png"));
+        File file = chooser.showSaveDialog(getScene().getWindow());
+        if (file == null) {
+            return;
+        }
+        if (!file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".png")) {
+            file = new File(file.getParentFile(), file.getName() + ".png");
+        }
+        try {
+            WritableImage image = viewer.snapshot(new SnapshotParameters(), null);
+            ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", file);
+        } catch (IOException | RuntimeException error) {
+            new Alert(Alert.AlertType.ERROR,
+                    "Esportazione PNG non riuscita: " + error.getMessage()).showAndWait();
+        }
     }
 
     private void syncRendererSize(StackPane viewer) {

@@ -2017,3 +2017,54 @@
     -fx-font-weight: bold;
 }
 
+
+
+/* ---------- Rifiniture tabelle / zoom / fullscreen round 3 ---------- */
+.table-view .corner,
+.data-table .corner {
+    -fx-background-color: #090d15;
+}
+
+.scroll-pane .corner {
+    -fx-background-color: transparent;
+}
+
+.sky-zoom-label,
+.three-d-zoom-inline {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-text-fill: #7187aa;
+    -fx-padding: 0;
+    -fx-font-size: 10px;
+    -fx-font-weight: normal;
+}
+
+.three-d-panel-fullscreen .overlay-title {
+    -fx-font-size: 22px;
+}
+
+.three-d-panel-fullscreen .overlay-caption {
+    -fx-font-size: 13px;
+    -fx-line-spacing: 3px;
+}
+
+.three-d-panel-fullscreen .legend-item {
+    -fx-font-size: 12px;
+}
+
+.three-d-panel-fullscreen .three-d-context {
+    -fx-font-size: 13px;
+    -fx-padding: 6 10;
+}
+
+.three-d-panel-fullscreen .three-d-zoom-inline {
+    -fx-font-size: 12px;
+}
+
+.data-toolbar {
+    -fx-background-color: rgba(255, 255, 255, 0.018);
+    -fx-border-color: rgba(255, 255, 255, 0.055);
+    -fx-background-radius: 11px;
+    -fx-border-radius: 11px;
+    -fx-padding: 10px;
+}

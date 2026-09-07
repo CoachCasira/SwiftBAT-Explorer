@@ -392,6 +392,8 @@ public final class PopulationPage extends BorderPane {
         HBox content = new HBox(18, chartColumn, assistant);
         content.setAlignment(Pos.TOP_LEFT);
         content.setFillHeight(true);
+        content.setMinSize(0, 0);
+        content.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         content.getStyleClass().add("population-fullscreen-content");
         InPlaceFullscreen.show(this, "Profilo temporale della popolazione", content);
     }
@@ -453,6 +455,8 @@ public final class PopulationPage extends BorderPane {
         HBox content = new HBox(18, pane, assistant);
         content.setAlignment(Pos.TOP_LEFT);
         content.setFillHeight(true);
+        content.setMinSize(0, 0);
+        content.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         content.getStyleClass().add("population-fullscreen-content");
         InPlaceFullscreen.show(this, "Profilo di popolazione 3D", content);
     }
