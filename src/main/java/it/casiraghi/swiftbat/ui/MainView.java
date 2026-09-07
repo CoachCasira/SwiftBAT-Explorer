@@ -2,7 +2,10 @@ package it.casiraghi.swiftbat.ui;
 
 import it.casiraghi.swiftbat.model.CatalogEntry;
 import it.casiraghi.swiftbat.model.GrbData;
+import it.casiraghi.swiftbat.model.RedshiftInfo;
+import it.casiraghi.swiftbat.model.SkyBurst;
 import it.casiraghi.swiftbat.service.OnlineGrbService;
+import it.casiraghi.swiftbat.service.RedshiftCatalogService;
 import it.casiraghi.swiftbat.service.SkyCatalogService;
 import it.casiraghi.swiftbat.service.SwiftCatalogService;
 import javafx.application.HostServices;
@@ -25,12 +28,18 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainView {
-    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4, runnable -> {
+    private static final ExecutorService BACKGROUND_EXECUTOR = Executors.newFixedThreadPool(3, runnable -> {
         Thread thread = new Thread(runnable, "swiftbat-worker");
+        thread.setDaemon(true);
+        return thread;
+    });
+    private static final ExecutorService DOWNLOAD_EXECUTOR = Executors.newFixedThreadPool(4, runnable -> {
+        Thread thread = new Thread(runnable, "swiftbat-download");
         thread.setDaemon(true);
         return thread;
     });
@@ -40,6 +49,7 @@ public final class MainView {
     private final Stage owner;
     private final SwiftCatalogService catalogService = new SwiftCatalogService();
     private final SkyCatalogService skyCatalogService = new SkyCatalogService();
+    private final RedshiftCatalogService redshiftCatalogService = new RedshiftCatalogService();
     private final OnlineGrbService grbService = new OnlineGrbService();
     private final ObservableMap<String, GrbData> sessionData = FXCollections.observableHashMap();
 
@@ -53,6 +63,7 @@ public final class MainView {
     private final HomePage homePage;
     private final GlossaryPage glossaryPage;
     private final ComparePage comparePage;
+    private final PopulationPage populationPage;
     private final SkyMapPage skyMapPage;
     private final AboutPage aboutPage;
     private final VBox navigation = new VBox(7);
@@ -61,9 +72,13 @@ public final class MainView {
     public MainView(HostServices hostServices, Stage owner) {
         this.hostServices = hostServices;
         this.owner = owner;
-        explorerPage = new ExplorerPage(hostServices, this::loadGrb, entry -> sessionData.containsKey(entry.grbName()));
+        explorerPage = new ExplorerPage(hostServices, this::loadGrb,
+                entry -> grbService.cachedLocally(entry.grbName()));
         glossaryPage = new GlossaryPage();
         comparePage = new ComparePage(sessionData);
+        populationPage = new PopulationPage(
+                (entry, progress) -> grbService.load(entry, false, progress),
+                BACKGROUND_EXECUTOR, DOWNLOAD_EXECUTOR, sessionData);
         skyMapPage = new SkyMapPage(entry -> loadGrb(entry, false));
         aboutPage = new AboutPage(hostServices, () -> navigate("glossary"));
         homePage = new HomePage(
@@ -73,9 +88,10 @@ public final class MainView {
                 () -> navigate("about"));
         buildLayout();
         sessionData.addListener((javafx.collections.MapChangeListener<String, GrbData>) change -> {
-            sessionStatus.setText(sessionData.size() + " in memoria");
+            updateCacheStatus();
             explorerPage.refreshCacheIndicators();
         });
+        updateCacheStatus();
     }
 
     public BorderPane getRoot() {
@@ -88,7 +104,8 @@ public final class MainView {
     }
 
     public static void shutdownSharedExecutor() {
-        EXECUTOR.shutdownNow();
+        BACKGROUND_EXECUTOR.shutdownNow();
+        DOWNLOAD_EXECUTOR.shutdownNow();
     }
 
     private void buildLayout() {
@@ -117,6 +134,7 @@ public final class MainView {
         Button home = navButton("⌂", "Home", "home");
         Button explorer = navButton("✦", "Esplora", "explorer");
         Button sky = navButton("◎", "Mappa celeste", "sky");
+        Button population = navButton("≋", "Analisi di popolazione", "population");
         Button compare = navButton("⇄", "Confronta", "compare");
         Button about = navButton("i", "Info", "about");
 
@@ -130,7 +148,7 @@ public final class MainView {
         source.setMaxWidth(Double.MAX_VALUE);
         source.setOnAction(event -> hostServices.showDocument(SwiftCatalogService.CATALOG_URL));
 
-        navigation.getChildren().addAll(brand, home, explorer, sky, compare, about,
+        navigation.getChildren().addAll(brand, home, explorer, sky, population, compare, about,
                 spacer, separator, online, source);
         return navigation;
     }
@@ -183,6 +201,7 @@ public final class MainView {
         Node node = switch (page) {
             case "explorer" -> explorerPage;
             case "compare" -> comparePage;
+            case "population" -> populationPage;
             case "sky" -> skyMapPage;
             case "glossary" -> glossaryPage;
             case "about" -> aboutPage;
@@ -222,6 +241,7 @@ public final class MainView {
             List<CatalogEntry> entries = task.getValue();
             explorerPage.setCatalog(entries, false);
             skyMapPage.setBaseCatalog(entries);
+            populationPage.setCatalog(entries);
             catalogStatus.setText(entries.size() + " GRB");
             setConnection("Online", "status-online");
             loadSkyCatalog();
@@ -230,22 +250,43 @@ public final class MainView {
             List<CatalogEntry> fallback = catalogService.fallbackCatalog();
             explorerPage.setCatalog(fallback, true);
             skyMapPage.setBaseCatalog(fallback);
+            populationPage.setCatalog(fallback);
             catalogStatus.setText(fallback.size() + " GRB ridotti");
             setConnection("Offline parziale", "status-warning");
             loadSkyCatalog();
         });
-        EXECUTOR.execute(task);
+        BACKGROUND_EXECUTOR.execute(task);
     }
 
     private void loadSkyCatalog() {
         skyMapPage.showLoading("Coordinate celesti…");
-        Task<List<it.casiraghi.swiftbat.model.SkyBurst>> task = new Task<>() {
+        Task<ScientificCatalog> task = new Task<>() {
             @Override
-            protected List<it.casiraghi.swiftbat.model.SkyBurst> call() throws Exception {
-                return skyCatalogService.fetchSkyCatalog();
+            protected ScientificCatalog call() throws Exception {
+                List<SkyBurst> sky = skyCatalogService.fetchSkyCatalog();
+                try {
+                    Map<String, RedshiftInfo> redshifts = redshiftCatalogService.fetchRedshifts();
+                    List<SkyBurst> merged = sky.stream()
+                            .map(burst -> burst.withRedshift(redshifts.getOrDefault(
+                                    burst.grbName(), RedshiftInfo.missing())))
+                            .toList();
+                    return new ScientificCatalog(merged, true);
+                } catch (InterruptedException interrupted) {
+                    throw interrupted;
+                } catch (Exception redshiftError) {
+                    return new ScientificCatalog(sky, false);
+                }
             }
         };
-        task.setOnSucceeded(event -> skyMapPage.setSkyBursts(task.getValue()));
+        task.setOnSucceeded(event -> {
+            ScientificCatalog scientific = task.getValue();
+            skyMapPage.setSkyBursts(scientific.bursts());
+            explorerPage.setScientificMetadata(scientific.bursts());
+            populationPage.setBursts(scientific.bursts());
+            if (!scientific.redshiftAvailable()) {
+                skyMapPage.showWarning("Coordinate e T90 caricati; redshift temporaneamente non disponibile");
+            }
+        });
         task.setOnFailed(event -> {
             Throwable error = task.getException();
             String detail = error == null || error.getMessage() == null
@@ -253,7 +294,7 @@ public final class MainView {
                     : "Mappa non disponibile: " + error.getMessage();
             skyMapPage.showError(detail);
         });
-        EXECUTOR.execute(task);
+        BACKGROUND_EXECUTOR.execute(task);
     }
 
     private void loadGrb(CatalogEntry entry, boolean forceRefresh) {
@@ -289,12 +330,20 @@ public final class MainView {
             setConnection("Online", "status-online");
         });
         task.setOnFailed(event -> explorerPage.showError(entry, task.getException()));
-        EXECUTOR.execute(task);
+        DOWNLOAD_EXECUTOR.execute(task);
+    }
+
+    private void updateCacheStatus() {
+        sessionStatus.setText(sessionData.size() + " RAM · "
+                + grbService.persistentCachedCount() + " locali");
     }
 
     private void setConnection(String text, String styleClass) {
         connectionStatus.setText(text);
         connectionStatus.getStyleClass().removeAll("status-neutral", "status-online", "status-warning");
         connectionStatus.getStyleClass().add(styleClass);
+    }
+
+    private record ScientificCatalog(List<SkyBurst> bursts, boolean redshiftAvailable) {
     }
 }

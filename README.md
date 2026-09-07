@@ -11,26 +11,26 @@ Il progetto è configurato per:
 - dati letti direttamente dal catalogo NASA/GSFC;
 - nessun caricamento manuale di Excel, DAT o FITS.
 
-## Applicazioni standalone
+## Verifica e applicazioni standalone
 
-Il workflow GitHub Actions incluso genera automaticamente le applicazioni per
-macOS Apple Silicon, macOS Intel e Windows x64. Per Windows produce sia un
-installer `.exe` autosufficiente sia una versione portabile. I pacchetti
-includono Java 17, JavaFX e tutte le dipendenze: chi usa l'app non deve
-installare alcun ambiente di sviluppo o scaricare componenti al primo avvio.
-
-Le istruzioni complete si trovano in `BUILD_ESEGUIBILI.md`.
+Sul branch di sviluppo il workflow GitHub Actions esegue soltanto la verifica
+Maven (`test` e `package`) e non pubblica installer o pacchetti. La creazione
+degli eseguibili standalone per macOS e Windows resta una fase finale separata,
+descritta in `BUILD_ESEGUIBILI.md`.
 
 ## Interfaccia 1.2.0
 
 La versione **Event Horizon** mantiene tutte le funzioni scientifiche della 1.1.1 ma presenta una UI più semplice:
 
 - Home con grafica procedurale ispirata a un buco nero;
-- cinque aree principali: **Home, Esplora, Mappa celeste, Confronta, Info**;
+- sei aree principali: **Home, Esplora, Mappa celeste, Analisi di popolazione, Confronta, Info**;
 - tema scuro nero/antracite con accenti ambra e viola;
 - filtri avanzati RA/DEC nascosti finché non vengono richiesti;
 - tab dell'evento rinominate in **Curva 2D, Vista 3D, Dati, Metadati, Guida**;
 - Dizionario raggiungibile dalla pagina Info.
+
+Questa revisione aggiunge inoltre metadati e filtri T90/redshift, analisi di gruppi di GRB,
+controlli di qualità basati su `FRACEXP` ed esportazioni Excel.
 
 Tutti i fix della 1.1.1 restano inclusi: zoom/pan Mollweide, sfera 3D, scroll dell'Explorer, metadati leggibili e vista tempo–energia fullscreen.
 
@@ -43,7 +43,8 @@ Tutti i fix della 1.1.1 restano inclusi: zoom/pan Mollweide, sfera 3D, scroll de
 - Interazioni disponibili: trascinamento per cambiare prospettiva, rotella per lo zoom, doppio clic o pulsante per centrare.
 - Passando il mouse vicino a un punto vengono mostrati banda, tempo e rate.
 - È possibile cambiare la finestra fra ±20 s, ±60 s, ±120 s e intera osservazione.
-- La cache RAM continua a mantenere i GRB già aperti senza nuovi download.
+- La cache usa prima la RAM e poi una copia locale persistente dei prodotti ufficiali,
+  evitando nuovi download anche dopo aver chiuso e riaperto l'app.
 - Inclusa la guida Word completa in `docs/Guida_completa_dati_SwiftBAT_e_presentazione.docx`.
 
 
@@ -93,6 +94,10 @@ L'app legge la tabella pubblica Swift/BAT e permette di cercare per:
 - nome del GRB;
 - Trigger ID.
 
+Il catalogo è arricchito con coordinate, T90 e redshift dalle tabelle riepilogative
+ufficiali BAT. I valori di redshift non esatti (limiti, intervalli, alternative o
+valori dubbi) conservano sempre la notazione originale.
+
 Dopo la selezione segue automaticamente il percorso:
 
 `Data Product → *-results → lc`
@@ -128,9 +133,58 @@ Il grafico permette di scegliere:
 Sono disponibili finestre temporali attorno al trigger e una media mobile a 5 bin.
 Il grafico può essere esportato in PNG.
 
+### Analisi di popolazione
+
+La pagina **Analisi di popolazione** permette di selezionare gruppi mediante:
+
+- classe di durata short/long e disponibilità del T90;
+- presenza e intervallo del redshift `z`;
+- area di cielo tramite RA e DEC;
+- intervallo 0–100% della copertura completa derivata da `FRACEXP`;
+- finestra temporale e numero massimo di eventi da esaminare.
+
+Le curve totali vengono allineate al trigger e ogni curva è divisa per il proprio
+picco. L'app mostra le singole curve e i profili di 25° percentile, mediana e 75°
+percentile. Non somma direttamente i rate di GRB differenti.
+
+Il profilo temporale usa un'altezza compatta nella pagina e include una legenda
+dedicata per curve individuali, mediana e percentili. Il pulsante **Schermo intero**
+espande il grafico nella finestra principale e ripristina la pagina con `ESC` o
+**Torna all'app**, senza aprire finestre secondarie.
+
+Accanto al profilo compare un **Assistente di lettura** interamente locale e
+riproducibile. Il commento viene rigenerato per il campione corrente e riassume:
+tempo del massimo della mediana, larghezza sopra metà massimo, prevalenza del segnale
+prima o dopo il trigger, distanza media fra i quartili, composizione short/long,
+disponibilità del redshift e copertura FRACEXP. Non chiama API esterne e non formula
+una diagnosi astrofisica: ogni frase deriva da statistiche visibili nel grafico.
+
+Il pulsante **Vista 3D interattiva** apre, nella stessa finestra, una rappresentazione
+con tempo sull'asse X, rate normalizzato sull'asse Y e singoli GRB in profondità,
+ordinati per T90 e colorati per classe di durata. Tutte le curve restano eventi
+distinti e possono essere ispezionate passando il mouse sui punti.
+
+Sono inclusi istogrammi spiegati di copertura, T90 e redshift. Il flag “coda bassa” indica
+gli eventi sotto il 10° percentile della copertura fra quelli effettivamente letti.
+Ogni istogramma offre inoltre una vista 3D interattiva: la profondità rappresenta una
+seconda suddivisione reale del campione (classe T90 per copertura/redshift e presenza
+del redshift per la distribuzione T90), non una semplice estrusione grafica.
+I candidati vengono caricati in parallelo con concorrenza limitata; lo stato finale
+indica anche l'intervallo FRACEXP osservato quando nessun evento supera il filtro.
+
+### Cache locale e aggiornamento del catalogo
+
+Il catalogo generale, T90, coordinate e redshift continuano a essere richiesti alle
+tabelle online a ogni avvio o aggiornamento manuale. Le nuove GRB pubblicate con la
+struttura standard vengono quindi rilevate senza modificare il codice.
+
+Per ogni evento l'app cerca i dati nell'ordine `RAM → cache locale → NASA/GSFC`.
+La cache conserva i byte originali ASCII/FITS e li reinterpreta con il parser corrente;
+il comando **Ricarica online** forza comunque un nuovo download.
+
 ### Mappa celeste
 
-La pagina **Mappa celeste** visualizza la distribuzione dei GRB usando le coordinate BAT J2000 pubblicate online. Offre una proiezione Mollweide 2D e una sfera celeste 3D, filtri RA/DEC, piano galattico e collegamento diretto al GRB selezionato.
+La pagina **Mappa celeste** visualizza la distribuzione dei GRB usando le coordinate BAT J2000 pubblicate online. Offre una proiezione Mollweide 2D e una sfera celeste 3D, filtri T90/redshift/RA/DEC, piano galattico e collegamento diretto al GRB selezionato.
 
 ### Vista prospettica tempo–energia
 
@@ -142,6 +196,8 @@ La scheda “Vista 3D” usa un renderer Java2D dedicato e mostra:
 
 Le curve sono disegnate come un paesaggio a cascata, molto più leggibile delle precedenti barre solide. È possibile cambiare prospettiva trascinando il mouse, usare la rotella per lo zoom, fare doppio clic per centrare e leggere i valori passando vicino ai punti. La finestra iniziale usa ±60 s dal trigger.
 La profondità è soltanto un espediente visivo: non è una coordinata spaziale del GRB.
+Anche questa vista usa il fullscreen integrato nella finestra principale, senza creare
+una seconda finestra dell'applicazione.
 
 ### Tabelle spiegate
 
@@ -152,6 +208,11 @@ Ogni campo può essere selezionato nel pannello `Spiega`, che mostra:
 - descrizione tecnica;
 - utilità del campo;
 - errori di interpretazione da evitare.
+
+Dalla stessa scheda è possibile creare due file distinti:
+
+- un `.xlsx` contenente soltanto la tabella ASCII a quattro canali;
+- un `.xlsx` contenente insieme tabella FITS e metadati FITS.
 
 ### Metadati FITS
 
@@ -185,6 +246,7 @@ Le dipendenze sono gestite da Maven:
 - OpenJFX 17, incluso il modulo `javafx-swing` per il renderer Java2D;
 - jsoup;
 - nom-tam-fits;
+- Apache POI per le esportazioni `.xlsx`;
 - JUnit per i test.
 
 ## Privacy e memoria
@@ -194,13 +256,14 @@ L'applicazione:
 - non richiede account;
 - non invia dati personali;
 - legge soltanto pagine e file pubblici del catalogo Swift/BAT;
-- mantiene i GRB aperti nella RAM della sessione e li riapre istantaneamente;
+- mantiene in RAM gli eventi aperti e conserva localmente i prodotti ASCII/FITS già scaricati;
 - non modifica i prodotti scientifici online.
 
 ## Nota scientifica
 
 L'app produce indicatori **descrittivi** per l'esplorazione.
-Non calcola automaticamente il T90 ufficiale e non assegna una classificazione short/long validata.
+Non calcola automaticamente T90 o redshift: li legge dalle tabelle ufficiali BAT.
+La soglia short/long a 2 secondi è usata come raggruppamento descrittivo tradizionale, non come classificazione automatica definitiva.
 La durezza mostrata è un proxy interno, non una misura ufficiale di catalogo.
 
 ## Struttura del progetto

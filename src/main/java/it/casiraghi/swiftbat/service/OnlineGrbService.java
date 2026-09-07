@@ -38,12 +38,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 /**
  * Scarica e interpreta direttamente online i prodotti Swift/BAT a binning di 1 secondo.
- * I dati sono conservati soltanto nella cache RAM della sessione.
+ * I dati vengono mantenuti in RAM durante la sessione e, dopo il primo download,
+ * anche in una cache locale persistente.
  */
 public final class OnlineGrbService {
     private static final String USER_AGENT = "SwiftBAT-Explorer/1.2.0 (academic thesis application; JavaFX)";
@@ -51,6 +53,7 @@ public final class OnlineGrbService {
     private static final int FILE_TIMEOUT_MS = (int) Duration.ofSeconds(90).toMillis();
     private static final Pattern RESULTS_DIRECTORY = Pattern.compile("^\\d+-results/$", Pattern.CASE_INSENSITIVE);
     private static final Pattern FITS_1CHAN_1S = Pattern.compile(".*_1chan_1s\\.lc$", Pattern.CASE_INSENSITIVE);
+    private static final int MAX_PARALLEL_HTTP_REQUESTS = 4;
 
     public static final List<String> ASCII_HEADERS = List.of(
             "TIME_FROM_TRIGGER_CENTER_S",
@@ -75,11 +78,18 @@ public final class OnlineGrbService {
             "FRACEXP");
 
     private final Map<String, GrbData> sessionCache = new ConcurrentHashMap<>();
-    private final DecimalFormat numberFormat;
+    private final PersistentGrbCache persistentCache;
+    private final Semaphore httpSlots = new Semaphore(MAX_PARALLEL_HTTP_REQUESTS, true);
+    private final ThreadLocal<DecimalFormat> numberFormat;
 
     public OnlineGrbService() {
+        this(new PersistentGrbCache());
+    }
+
+    OnlineGrbService(PersistentGrbCache persistentCache) {
+        this.persistentCache = persistentCache;
         DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(Locale.US);
-        numberFormat = new DecimalFormat("0.###############", symbols);
+        numberFormat = ThreadLocal.withInitial(() -> new DecimalFormat("0.###############", symbols));
     }
 
     public GrbData load(CatalogEntry entry, boolean forceRefresh, Consumer<LoadUpdate> progress) throws IOException {
@@ -91,6 +101,27 @@ public final class OnlineGrbService {
             if (cached != null) {
                 notifier.accept(new LoadUpdate(1.0, "Dati pronti", "Evento recuperato dalla cache della sessione."));
                 return cached;
+            }
+
+            try {
+                Optional<PersistentGrbCache.CachedProducts> local = persistentCache.read(entry);
+                if (local.isPresent()) {
+                    notifier.accept(new LoadUpdate(0.18, "Cache locale", "Leggo ASCII e FITS già salvati sul dispositivo."));
+                    PersistentGrbCache.CachedProducts products = local.get();
+                    ProductLinks links = new ProductLinks(
+                            products.dataProductUrl(),
+                            products.resultsUrl(),
+                            products.lightCurveDirectoryUrl(),
+                            products.asciiUrl(),
+                            products.fitsUrl());
+                    GrbData result = buildData(entry, links, products.asciiBytes(), products.fitsBytes(),
+                            products.savedAt(), "NASA/GSFC · cache locale");
+                    sessionCache.put(cacheKey, result);
+                    notifier.accept(new LoadUpdate(1.0, "Dati pronti", "Evento recuperato dalla cache locale."));
+                    return result;
+                }
+            } catch (IOException localError) {
+                notifier.accept(new LoadUpdate(0.05, "Cache non leggibile", "Procedo con il download online."));
             }
         }
 
@@ -133,6 +164,27 @@ public final class OnlineGrbService {
         }
 
         notifier.accept(new LoadUpdate(0.70, "Interpretazione", "Converto le curve in tabelle utilizzabili."));
+        Instant downloadedAt = Instant.now();
+        GrbData result = buildData(entry, links, asciiBytes, fitsBytes, downloadedAt, "NASA/GSFC online");
+        try {
+            persistentCache.write(entry, new PersistentGrbCache.CachedProducts(
+                    asciiBytes, fitsBytes,
+                    links.dataProductUrl(), links.resultsUrl(), links.lightCurveDirectoryUrl(),
+                    links.asciiUrl(), links.fitsUrl(), downloadedAt));
+        } catch (IOException ignored) {
+            // Un problema della cache locale non deve rendere inutilizzabili dati online validi.
+        }
+        sessionCache.put(cacheKey, result);
+        notifier.accept(new LoadUpdate(1.0, "Dati pronti", "Curve, metadati e spiegazioni sono disponibili."));
+        return result;
+    }
+
+    public GrbData load(CatalogEntry entry, boolean forceRefresh) throws IOException {
+        return load(entry, forceRefresh, null);
+    }
+
+    private GrbData buildData(CatalogEntry entry, ProductLinks links, byte[] asciiBytes, byte[] fitsBytes,
+                              Instant loadedAt, String dataSource) throws IOException {
         TabularData ascii = TabularData.empty();
         FitsResult fits = FitsResult.empty();
         IOException asciiParseError = null;
@@ -173,28 +225,18 @@ public final class OnlineGrbService {
                 links.dataProductUrl(),
                 links.resultsUrl(),
                 links.lightCurveDirectoryUrl());
+        List<SummaryItem> summary = buildSummary(entry, availability, ascii, fits, dataSource);
 
-        notifier.accept(new LoadUpdate(0.86, "Analisi descrittiva", "Calcolo picco, qualità e indicatori di sintesi."));
-        List<SummaryItem> summary = buildSummary(entry, availability, ascii, fits);
-
-        GrbData result = new GrbData(
+        return new GrbData(
                 entry.grbName().toUpperCase(Locale.ROOT),
                 entry.triggerId(),
-                Instant.now(),
+                loadedAt,
                 availability,
                 List.copyOf(summary),
                 ascii,
                 fits.table(),
                 fits.metadata(),
                 dictionary());
-
-        sessionCache.put(cacheKey, result);
-        notifier.accept(new LoadUpdate(1.0, "Dati pronti", "Curve, metadati e spiegazioni sono disponibili."));
-        return result;
-    }
-
-    public GrbData load(CatalogEntry entry, boolean forceRefresh) throws IOException {
-        return load(entry, forceRefresh, null);
     }
 
     public void evict(String grbName) {
@@ -205,6 +247,15 @@ public final class OnlineGrbService {
 
     public int cachedCount() {
         return sessionCache.size();
+    }
+
+    public int persistentCachedCount() {
+        return persistentCache.count();
+    }
+
+    public boolean cachedLocally(String grbName) {
+        return grbName != null && (sessionCache.containsKey(grbName.toUpperCase(Locale.ROOT))
+                || persistentCache.contains(grbName));
     }
 
     public Set<String> cachedNames() {
@@ -247,25 +298,43 @@ public final class OnlineGrbService {
     }
 
     private Document fetchDocument(String url) throws IOException {
-        return Jsoup.connect(url)
+        return withHttpSlot(() -> Jsoup.connect(url)
                 .userAgent(USER_AGENT)
                 .timeout(HTML_TIMEOUT_MS)
                 .followRedirects(true)
-                .get();
+                .get());
     }
 
     private byte[] fetchBytes(String url) throws IOException {
-        Connection.Response response = Jsoup.connect(url)
-                .userAgent(USER_AGENT)
-                .timeout(FILE_TIMEOUT_MS)
-                .followRedirects(true)
-                .ignoreContentType(true)
-                .maxBodySize(0)
-                .execute();
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IOException("Download non riuscito (HTTP " + response.statusCode() + "): " + url);
+        return withHttpSlot(() -> {
+            Connection.Response response = Jsoup.connect(url)
+                    .userAgent(USER_AGENT)
+                    .timeout(FILE_TIMEOUT_MS)
+                    .followRedirects(true)
+                    .ignoreContentType(true)
+                    .maxBodySize(0)
+                    .execute();
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new IOException("Download non riuscito (HTTP " + response.statusCode() + "): " + url);
+            }
+            return response.bodyAsBytes();
+        });
+    }
+
+    private <T> T withHttpSlot(IoSupplier<T> action) throws IOException {
+        boolean acquired = false;
+        try {
+            httpSlots.acquire();
+            acquired = true;
+            return action.get();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Download interrotto.", interrupted);
+        } finally {
+            if (acquired) {
+                httpSlots.release();
+            }
         }
-        return response.bodyAsBytes();
     }
 
     private Optional<String> findLink(Document document, java.util.function.Predicate<String> predicate) {
@@ -414,12 +483,13 @@ public final class OnlineGrbService {
             CatalogEntry entry,
             ProductAvailability availability,
             TabularData ascii,
-            FitsResult fits) {
+            FitsResult fits,
+            String dataSource) {
         List<SummaryItem> result = new ArrayList<>();
         result.add(item("GRB_NAME", "Evento", entry.grbName(), "", "Nome identificativo del Gamma-Ray Burst."));
         result.add(item("TRIGGER_ID", "Trigger ID", entry.triggerId(), "", "Identificativo dell'allerta automatica Swift/BAT."));
         result.add(item("PRODUCT_STATUS", "Prodotti disponibili", availability.statusText(), "", "Indica quali prodotti a un secondo sono stati trovati online."));
-        result.add(item("DATA_SOURCE", "Fonte", "NASA/GSFC online", "", "I dati sono letti dal catalogo Swift/BAT durante la sessione."));
+        result.add(item("DATA_SOURCE", "Fonte", dataSource, "", "I dati provengono dai prodotti ufficiali Swift/BAT; la cache locale ne conserva una copia non modificata."));
         result.add(item("OBJECT", "Oggetto FITS", fits.objectName(), "", "Nome dell'oggetto registrato nell'intestazione FITS."));
         result.add(item("OBS_ID", "Observation ID", fits.observationId(), "", "Identificativo dell'osservazione Swift."));
         result.add(item("DATE_OBS", "Inizio osservazione", fits.dateObs(), "UTC", "Data e ora di inizio dell'osservazione."));
@@ -672,11 +742,11 @@ public final class OnlineGrbService {
     }
 
     private String format(double value) {
-        return finite(value) ? numberFormat.format(value) : "n.d.";
+        return finite(value) ? numberFormat.get().format(value) : "n.d.";
     }
 
     private String formatPercent(double fraction) {
-        return finite(fraction) ? numberFormat.format(fraction * 100.0) : "n.d.";
+        return finite(fraction) ? numberFormat.get().format(fraction * 100.0) : "n.d.";
     }
 
     private boolean finite(double value) {
@@ -783,6 +853,11 @@ public final class OnlineGrbService {
 
     private String nullSafe(String value) {
         return value == null ? "" : value;
+    }
+
+    @FunctionalInterface
+    private interface IoSupplier<T> {
+        T get() throws IOException;
     }
 
     private record ProductLinks(

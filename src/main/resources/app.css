@@ -1063,6 +1063,20 @@
 .fullscreen-toolbar {
     -fx-background-color: rgba(8, 13, 27, 0.96);
     -fx-border-color: transparent transparent rgba(118, 142, 190, 0.13) transparent;
+    -fx-alignment: center-left;
+    -fx-padding: 12 18;
+    -fx-min-height: 58px;
+}
+
+.fullscreen-title {
+    -fx-text-fill: #f5f7fb;
+    -fx-font-size: 19px;
+    -fx-font-weight: bold;
+}
+
+.in-place-fullscreen,
+.fullscreen-layout {
+    -fx-background-color: #050810;
 }
 
 /* ========================================================================== */
@@ -1486,4 +1500,280 @@
     -fx-background-color: transparent;
     -fx-control-inner-background: #090d15;
     -fx-control-inner-background-alt: #0b1019;
+}
+
+/* ---------- Analisi di popolazione ---------- */
+.catalog-science {
+    -fx-text-fill: #9a83c8;
+    -fx-font-size: 8px;
+}
+
+.filter-value {
+    -fx-text-fill: #ffbd75;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-min-width: 82px;
+}
+
+.population-filter-card {
+    -fx-spacing: 14px;
+}
+
+.population-filter-grid {
+    -fx-alignment: center-left;
+}
+
+.population-filter-group {
+    -fx-background-color: rgba(255, 255, 255, 0.025);
+    -fx-border-color: rgba(255, 255, 255, 0.055);
+    -fx-background-radius: 11px;
+    -fx-border-radius: 11px;
+    -fx-padding: 10px;
+}
+
+.filter-detail {
+    -fx-text-fill: #626d7f;
+    -fx-font-size: 9px;
+}
+
+.population-filter-section {
+    -fx-background-color: rgba(255, 174, 74, 0.035);
+    -fx-border-color: rgba(255, 174, 74, 0.10);
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+    -fx-padding: 12px;
+}
+
+.population-section-title {
+    -fx-text-fill: #e8ecf3;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.population-preview {
+    -fx-text-fill: #9adcbf;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.explorer-filter-grid {
+    -fx-background-color: rgba(255, 255, 255, 0.018);
+    -fx-border-color: rgba(255, 255, 255, 0.05);
+    -fx-background-radius: 11px;
+    -fx-border-radius: 11px;
+    -fx-padding: 9px;
+}
+
+.slider .track {
+    -fx-background-color: rgba(255, 255, 255, 0.09);
+    -fx-background-radius: 999px;
+}
+
+.slider .thumb {
+    -fx-background-color: linear-gradient(to bottom right, #ffae4a, #a66bdd);
+    -fx-effect: dropshadow(gaussian, rgba(255, 174, 74, 0.20), 8, 0.15, 0, 2);
+}
+
+.population-chart .chart-series-line {
+    -fx-stroke-line-cap: round;
+}
+
+.population-chart-card {
+    -fx-background-color: rgba(8, 13, 25, 0.42);
+}
+
+.population-insight-card {
+    -fx-background-color: linear-gradient(to bottom right, rgba(18, 31, 50, 0.92), rgba(20, 15, 35, 0.92));
+    -fx-border-color: rgba(93, 215, 238, 0.18), rgba(174, 117, 226, 0.11);
+    -fx-border-insets: 0, 1;
+    -fx-background-radius: 13px;
+    -fx-border-radius: 13px;
+    -fx-padding: 14px;
+}
+
+.population-insight-title {
+    -fx-text-fill: #edf5ff;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.population-insight-badge {
+    -fx-text-fill: #62dfba;
+    -fx-font-size: 8px;
+    -fx-font-weight: bold;
+}
+
+.population-insight-headline {
+    -fx-text-fill: #dbe9fb;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-line-spacing: 2px;
+}
+
+.population-insight-list,
+.population-insight-cautions {
+    -fx-padding: 2 0 0 0;
+}
+
+.population-insight-dot {
+    -fx-text-fill: #59d7f2;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.population-insight-warning {
+    -fx-text-fill: #ffb55e;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.population-insight-text {
+    -fx-text-fill: #9aaac3;
+    -fx-font-size: 9px;
+    -fx-line-spacing: 1.5px;
+}
+
+.population-insight-caution-title {
+    -fx-text-fill: #efb66d;
+    -fx-font-size: 9px;
+    -fx-font-weight: bold;
+}
+
+.population-insight-footnote {
+    -fx-text-fill: #68758d;
+    -fx-font-size: 8px;
+    -fx-font-style: italic;
+}
+
+.population-histogram-card {
+    -fx-min-width: 0;
+}
+
+.population-profile-legend {
+    -fx-alignment: center-left;
+    -fx-padding: 2 0 4 0;
+}
+
+.population-legend-item {
+    -fx-background-color: rgba(255, 255, 255, 0.025);
+    -fx-border-color: rgba(255, 255, 255, 0.055);
+    -fx-background-radius: 9px;
+    -fx-border-radius: 9px;
+    -fx-padding: 7 10;
+}
+
+.population-legend-line {
+    -fx-stroke-width: 3px;
+    -fx-stroke-line-cap: round;
+}
+
+.population-legend-single {
+    -fx-stroke: rgba(84, 215, 255, 0.72);
+}
+
+.population-legend-median {
+    -fx-stroke: #ffae4a;
+    -fx-stroke-width: 4px;
+}
+
+.population-legend-quartile {
+    -fx-stroke: #aa78db;
+    -fx-stroke-dash-array: 7 5;
+}
+
+.population-legend-title {
+    -fx-text-fill: #e9edf5;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.population-legend-detail {
+    -fx-text-fill: #74819a;
+    -fx-font-size: 9px;
+}
+
+.population-fullscreen-content {
+    -fx-background-color: rgba(7, 11, 21, 0.82);
+    -fx-background-radius: 14px;
+    -fx-border-color: rgba(108, 136, 192, 0.13);
+    -fx-border-radius: 14px;
+    -fx-padding: 14px;
+}
+
+.bar-chart {
+    -fx-background-color: rgba(8, 13, 25, 0.50);
+    -fx-background-radius: 12px;
+}
+
+.bar-chart .chart-plot-background {
+    -fx-background-color: rgba(8, 14, 28, 0.72);
+}
+
+.bar-chart .chart-vertical-grid-lines,
+.bar-chart .chart-horizontal-grid-lines {
+    -fx-stroke: rgba(128, 148, 186, 0.12);
+}
+
+.bar-chart .axis,
+.bar-chart .axis-label {
+    -fx-tick-label-fill: #71819f;
+    -fx-text-fill: #91a1bf;
+}
+
+.bar-chart .chart-bar {
+    -fx-bar-fill: #67cee9;
+    -fx-background-color: linear-gradient(to top, #7b56c9, #4fd5ef);
+    -fx-background-radius: 5px 5px 0 0;
+}
+
+
+/* FRACEXP numeric steppers */
+.percentage-control {
+    -fx-background-color: rgba(255, 255, 255, 0.025);
+    -fx-border-color: rgba(255, 174, 74, 0.10);
+    -fx-background-radius: 11px;
+    -fx-border-radius: 11px;
+    -fx-padding: 10 12;
+}
+
+.percentage-field {
+    -fx-background-color: rgba(6, 10, 17, 0.92);
+    -fx-text-fill: #fff2e2;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 9px;
+    -fx-border-radius: 9px;
+    -fx-border-color: rgba(255, 174, 74, 0.18);
+    -fx-padding: 8 10;
+}
+
+.percentage-field:focused {
+    -fx-border-color: rgba(255, 183, 101, 0.72);
+    -fx-effect: dropshadow(gaussian, rgba(255, 174, 74, 0.13), 10, 0.18, 0, 0);
+}
+
+.percentage-step-button {
+    -fx-background-color: rgba(255, 174, 74, 0.08);
+    -fx-text-fill: #ffc47e;
+    -fx-border-color: rgba(255, 174, 74, 0.15);
+    -fx-background-radius: 9px;
+    -fx-border-radius: 9px;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-min-width: 36px;
+    -fx-min-height: 36px;
+    -fx-padding: 5px;
+    -fx-cursor: hand;
+}
+
+.percentage-step-button:hover {
+    -fx-background-color: rgba(255, 174, 74, 0.15);
+    -fx-border-color: rgba(255, 190, 118, 0.30);
+}
+
+.percentage-unit {
+    -fx-text-fill: #ffbd75;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-min-width: 18px;
 }

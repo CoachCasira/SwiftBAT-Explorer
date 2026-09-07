@@ -17,6 +17,7 @@
         <jsoup.version>1.22.2</jsoup.version>
         <nom-tam-fits.version>1.22.1</nom-tam-fits.version>
         <junit.version>5.13.4</junit.version>
+        <poi.version>5.5.1</poi.version>
     </properties>
 
     <dependencies>
@@ -39,6 +40,11 @@
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
             <version>${jsoup.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>${poi.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
