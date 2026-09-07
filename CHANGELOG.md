@@ -2,6 +2,14 @@
 
 ## In sviluppo — Analisi di popolazione e qualità
 
+- nuova scheda **Spettroscopia** nell'Explorer con risultati ufficiali BAT per T100 e picco di 1 secondo;
+- selezione PL/CPL o modello preferito BAT, parametri del fit e limiti di confidenza al 90%;
+- grafici della forma fotonica del modello e dei flussi energetici nelle quattro bande non sovrapposte;
+- mappa 2D tempo–energia dei quattro rate ASCII e accesso alla vista 3D nella finestra principale;
+- assistente locale che commenta pendenza, Epeak, qualità del fit, banda dominante e intervallo temporale;
+- cache locale delle tabelle spettroscopiche con aggiornamento automatico e manuale;
+- distinzione esplicita fra mappa descrittiva dei rate e spettro calibrato BAT/XSPEC;
+- test del parser per modelli, parametri, flussi, valori mancanti e segnaposto ufficiali;
 - assistente di lettura locale che commenta picco della mediana, larghezza temporale,
   asimmetria pre/post-trigger, dispersione, composizione T90/redshift e qualità FRACEXP;
 - vista 3D interattiva del profilo con tempo, rate normalizzato e singoli GRB ordinati per T90;
