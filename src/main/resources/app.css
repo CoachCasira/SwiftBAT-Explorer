@@ -2068,3 +2068,82 @@
     -fx-border-radius: 11px;
     -fx-padding: 10px;
 }
+
+/* ---------- Spectroscopy ---------- */
+.spectroscopy-pane, .spectroscopy-content {
+    -fx-background-color: transparent;
+}
+
+.spectroscopy-controls {
+    -fx-background-color: rgba(11, 18, 33, 0.78);
+    -fx-background-radius: 15px;
+    -fx-border-color: rgba(105, 139, 201, 0.18);
+    -fx-border-radius: 15px;
+    -fx-padding: 12;
+}
+
+.spectroscopy-control-box {
+    -fx-min-width: 210px;
+}
+
+.spectroscopy-tabs {
+    -fx-background-color: transparent;
+}
+
+.spectroscopy-metric {
+    -fx-min-height: 104px;
+    -fx-background-color: linear-gradient(to bottom right, rgba(17, 30, 52, 0.94), rgba(12, 20, 37, 0.94));
+}
+
+.spectroscopy-chart-card {
+    -fx-min-width: 420px;
+    -fx-pref-width: 620px;
+}
+
+.spectroscopy-detail-card {
+    -fx-min-width: 300px;
+    -fx-pref-width: 410px;
+}
+
+.spectroscopy-assistant {
+    -fx-background-color: linear-gradient(to bottom right, rgba(18, 40, 60, 0.96), rgba(31, 23, 58, 0.96));
+    -fx-border-color: rgba(92, 212, 239, 0.24);
+}
+
+.spectroscopy-table {
+    -fx-background-color: rgba(8, 15, 28, 0.54);
+    -fx-background-radius: 10px;
+    -fx-padding: 10;
+}
+
+.spectroscopy-note {
+    -fx-text-fill: #90a3c5;
+    -fx-font-size: 11px;
+    -fx-background-color: rgba(29, 42, 70, 0.52);
+    -fx-background-radius: 10px;
+    -fx-padding: 10 12;
+}
+
+.spectroscopy-empty {
+    -fx-background-color: rgba(10, 18, 33, 0.72);
+    -fx-background-radius: 16px;
+    -fx-border-color: rgba(116, 145, 196, 0.20);
+    -fx-border-radius: 16px;
+}
+
+.time-energy-card {
+    -fx-min-height: 430px;
+}
+
+.spectral-model-chart .chart-series-line {
+    -fx-stroke: #ffad52;
+    -fx-stroke-width: 3px;
+    -fx-effect: dropshadow(gaussian, rgba(255, 157, 66, 0.25), 8, 0.25, 0, 0);
+}
+
+.spectral-flux-chart .default-color0.chart-bar {
+    -fx-bar-fill: linear-gradient(to top, #3bbada, #9b75ef);
+}
+
+.app-root {
+    -fx-background-color:
