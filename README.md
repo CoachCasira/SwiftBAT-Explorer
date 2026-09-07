@@ -26,7 +26,7 @@ La versione **Event Horizon** mantiene tutte le funzioni scientifiche della 1.1.
 - sei aree principali: **Home, Esplora, Mappa celeste, Analisi di popolazione, Confronta, Info**;
 - tema scuro nero/antracite con accenti ambra e viola;
 - filtri avanzati RA/DEC nascosti finché non vengono richiesti;
-- tab dell'evento rinominate in **Curva 2D, Vista 3D, Dati, Metadati, Guida**;
+- tab dell'evento organizzate in **Curva 2D, Vista 3D, Spettroscopia, Dati, Metadati, Guida**;
 - Dizionario raggiungibile dalla pagina Info.
 
 Questa revisione aggiunge inoltre metadati e filtri T90/redshift, analisi di gruppi di GRB,
@@ -175,7 +175,9 @@ indica anche l'intervallo FRACEXP osservato quando nessun evento supera il filtr
 ### Cache locale e aggiornamento del catalogo
 
 Il catalogo generale, T90, coordinate e redshift continuano a essere richiesti alle
-tabelle online a ogni avvio o aggiornamento manuale. Le nuove GRB pubblicate con la
+tabelle online a ogni avvio o aggiornamento manuale. Anche le tabelle spettroscopiche
+BAT vengono aggiornate automaticamente, con cache locale di sei ore e aggiornamento
+manuale forzato. Le nuove GRB pubblicate con la
 struttura standard vengono quindi rilevate senza modificare il codice.
 
 Per ogni evento l'app cerca i dati nell'ordine `RAM → cache locale → NASA/GSFC`.
@@ -198,6 +200,32 @@ Le curve sono disegnate come un paesaggio a cascata, molto più leggibile delle 
 La profondità è soltanto un espediente visivo: non è una coordinata spaziale del GRB.
 Anche questa vista usa il fullscreen integrato nella finestra principale, senza creare
 una seconda finestra dell'applicazione.
+
+### Spettroscopia BAT
+
+La scheda **Spettroscopia** integra i risultati pre-calcolati pubblicati dal catalogo
+Swift/BAT per due intervalli: **T100** e **picco di 1 secondo**. Per ciascuno rende
+consultabili:
+
+- modello migliore indicato dal catalogo (PL, CPL oppure N/A);
+- parametri dei fit Power Law e Cutoff Power Law, con limiti al 90%;
+- indice α, normalizzazione, Epeak quando realmente vincolato, χ², gradi di libertà
+  e probabilità nulla;
+- esposizione e inizio/fine dello spettro rispetto al trigger;
+- flusso energetico nelle bande non sovrapposte 15–25, 25–50, 50–100 e
+  100–150 keV, in erg cm⁻² s⁻¹;
+- curva continua del modello fotonico e assistente locale di lettura.
+
+La stessa scheda include una **mappa tempo–energia** costruita dai quattro rate ASCII
+a bin di 1 secondo e una vista prospettica 3D nella finestra principale. Questa mappa
+è descrittiva: non è uno spettro calibrato e non trasforma direttamente i conteggi in
+flusso. I fit ufficiali derivano invece dalla pipeline BAT/XSPEC, che usa spettro PHA,
+matrice di risposta e correzioni strumentali.
+
+Le dieci tabelle necessarie (PL/CPL, T100/picco) vengono aggiornate online e conservate
+in una cache locale per sei ore. Il pulsante globale di aggiornamento forza una nuova
+lettura, così una GRB aggiunta al catalogo può comparire senza modificare il codice.
+La prima versione non installa né esegue localmente HEASoft, CALDB o XSPEC.
 
 ### Tabelle spiegate
 
@@ -256,7 +284,7 @@ L'applicazione:
 - non richiede account;
 - non invia dati personali;
 - legge soltanto pagine e file pubblici del catalogo Swift/BAT;
-- mantiene in RAM gli eventi aperti e conserva localmente i prodotti ASCII/FITS già scaricati;
+- mantiene in RAM gli eventi aperti e conserva localmente i prodotti ASCII/FITS e le tabelle spettroscopiche già scaricati;
 - non modifica i prodotti scientifici online.
 
 ## Nota scientifica
@@ -265,6 +293,8 @@ L'app produce indicatori **descrittivi** per l'esplorazione.
 Non calcola automaticamente T90 o redshift: li legge dalle tabelle ufficiali BAT.
 La soglia short/long a 2 secondi è usata come raggruppamento descrittivo tradizionale, non come classificazione automatica definitiva.
 La durezza mostrata è un proxy interno, non una misura ufficiale di catalogo.
+I parametri PL/CPL e i flussi nella scheda Spettroscopia sono invece risultati ufficiali
+BAT: l'app li visualizza e li commenta in modo descrittivo, ma non esegue un nuovo fit.
 
 ## Struttura del progetto
 
