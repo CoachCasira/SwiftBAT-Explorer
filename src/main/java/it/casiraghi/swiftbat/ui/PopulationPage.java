@@ -211,13 +211,15 @@ public final class PopulationPage extends BorderPane {
             UiFactory.autoTooltip(choice);
         }
 
-        FlowPane primary = new FlowPane(10, 7);
+        FlowPane primary = new FlowPane(9, 7);
         primary.getStyleClass().add("population-filter-grid");
         primary.getChildren().addAll(
-                filterGroup("Durata T90", "Classe temporale", duration, 200),
-                filterGroup("Redshift", "Disponibilità della misura z", redshiftAvailability, 200),
-                filterGroup("Finestra temporale", "Secondi attorno al trigger", window, 160),
-                filterGroup("Campione massimo", "GRB più recenti dopo i filtri", limit, 160));
+                filterGroup("Durata T90", "Classe temporale", duration, 185),
+                filterGroup("Redshift", "Disponibilità della misura z", redshiftAvailability, 190),
+                filterGroup("Finestra temporale", "Secondi attorno al trigger", window, 150),
+                filterGroup("Campione massimo", "GRB più recenti dopo i filtri", limit, 150));
+        primary.setMinWidth(650);
+        primary.setPrefWrapLength(690);
 
         FlowPane advancedContent = new FlowPane(10, 7);
         advancedContent.getStyleClass().addAll("population-filter-grid", "advanced-filter-row");
@@ -238,22 +240,27 @@ public final class PopulationPage extends BorderPane {
 
         VBox minimum = exposureControl("Minimo ammesso", exposureMinSlider, exposureMin, true);
         VBox maximum = exposureControl("Massimo ammesso", exposureMaxSlider, exposureMax, false);
-        HBox exposureControls = new HBox(12, minimum, maximum);
+        HBox exposureControls = new HBox(8, minimum, maximum);
         exposureControls.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(minimum, Priority.ALWAYS);
         HBox.setHgrow(maximum, Priority.ALWAYS);
 
-        VBox exposureIntro = new VBox(3,
+        VBox exposureIntro = new VBox(2,
                 UiFactory.label("Qualità della copertura FRACEXP", "population-section-title"),
                 UiFactory.wrappedLabel(
                         "Percentuale di bin con FRACEXP ≥ 0,999. Trascina oppure scrivi il valore.",
                         "sky-filter-help"));
-        exposureIntro.setMinWidth(250);
-        exposureIntro.setPrefWidth(300);
-        HBox exposureBox = new HBox(14, exposureIntro, exposureControls);
-        exposureBox.setAlignment(Pos.CENTER_LEFT);
-        exposureBox.getStyleClass().addAll("population-filter-section", "population-filter-section-compact");
-        HBox.setHgrow(exposureControls, Priority.ALWAYS);
+        VBox exposureBox = new VBox(7, exposureIntro, exposureControls);
+        exposureBox.setAlignment(Pos.TOP_LEFT);
+        exposureBox.getStyleClass().addAll("population-filter-section", "population-filter-side");
+        exposureBox.setMinWidth(430);
+        exposureBox.setPrefWidth(500);
+        exposureBox.setMaxWidth(Double.MAX_VALUE);
+
+        HBox topFilters = new HBox(12, primary, exposureBox);
+        topFilters.setAlignment(Pos.TOP_LEFT);
+        HBox.setHgrow(primary, Priority.ALWAYS);
+        HBox.setHgrow(exposureBox, Priority.ALWAYS);
 
         HBox actions = new HBox(8);
         actions.setAlignment(Pos.CENTER_LEFT);
@@ -278,7 +285,7 @@ public final class PopulationPage extends BorderPane {
         HBox footer = new HBox(16, actions, preview);
         footer.setAlignment(Pos.CENTER_LEFT);
 
-        VBox card = new VBox(9, primary, advanced, advancedContent, exposureBox, footer);
+        VBox card = new VBox(9, topFilters, advanced, advancedContent, footer);
         card.getStyleClass().addAll("card", "population-filter-card", "population-filter-card-compact");
         card.setPadding(new Insets(12));
         return card;
@@ -1221,8 +1228,8 @@ public final class PopulationPage extends BorderPane {
         HBox.setHgrow(slider, Priority.ALWAYS);
         VBox box = new VBox(5, heading, slider);
         box.getStyleClass().add("percentage-control");
-        box.setMinWidth(260);
-        box.setPrefWidth(340);
+        box.setMinWidth(185);
+        box.setPrefWidth(215);
         box.setMaxWidth(Double.MAX_VALUE);
         return box;
     }

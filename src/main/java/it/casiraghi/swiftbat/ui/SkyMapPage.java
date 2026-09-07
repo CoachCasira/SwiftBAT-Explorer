@@ -45,6 +45,7 @@ public final class SkyMapPage extends BorderPane {
     private List<SkyBurst> allBursts = List.of();
     private List<SkyBurst> visibleBursts = List.of();
     private SkyBurst selectedBurst;
+    private boolean sphereView;
 
     private final MollweideSkyPane mollweide = new MollweideSkyPane();
     private final CelestialSpherePane sphere = new CelestialSpherePane();
@@ -139,12 +140,18 @@ public final class SkyMapPage extends BorderPane {
         HBox.setHgrow(titleText, Priority.ALWAYS);
         titleRow.getChildren().addAll(titleText, status);
 
-        FlowPane metrics = new FlowPane(12, 12);
-        metrics.getChildren().addAll(
-                skyMetric("VISIBILI", shownMetric, "dopo i filtri"),
-                skyMetric("SHORT", shortMetric, "T90 ≤ 2 s"),
-                skyMetric("LONG", longMetric, "T90 > 2 s"),
-                skyMetric("SENZA T90", noT90Metric, "durata non disponibile"));
+        HBox metrics = new HBox(12);
+        metrics.getStyleClass().add("sky-metric-row");
+        VBox visibleMetric = skyMetric("VISIBILI", shownMetric, "dopo i filtri");
+        VBox shortMetricCard = skyMetric("SHORT", shortMetric, "T90 ≤ 2 s");
+        VBox longMetricCard = skyMetric("LONG", longMetric, "T90 > 2 s");
+        VBox unknownMetricCard = skyMetric("SENZA T90", noT90Metric, "durata non disponibile");
+        for (VBox metric : List.of(visibleMetric, shortMetricCard, longMetricCard, unknownMetricCard)) {
+            metric.setMinWidth(0);
+            metric.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(metric, Priority.ALWAYS);
+        }
+        metrics.getChildren().addAll(visibleMetric, shortMetricCard, longMetricCard, unknownMetricCard);
 
         VBox filters = buildFilters();
         HBox viewSwitch = buildViewSwitch();
@@ -158,10 +165,13 @@ public final class SkyMapPage extends BorderPane {
             mollweide.resetView();
             sphere.resetView();
         });
-        HBox mapHead = new HBox(12,
+        Button fullscreen = UiFactory.button("Schermo intero  ⛶", "secondary-button");
+        fullscreen.setOnAction(event -> openMapFullscreen());
+        HBox mapHead = new HBox(10,
                 UiFactory.label("Cielo", "card-title"),
-                UiFactory.spacer(),
                 resetView,
+                fullscreen,
+                UiFactory.spacer(),
                 viewSwitch);
         mapHead.setAlignment(Pos.CENTER_LEFT);
         mapHost.getChildren().setAll(mollweide);
@@ -214,7 +224,7 @@ public final class SkyMapPage extends BorderPane {
         redshiftFilter.setPrefWidth(185);
 
         galacticPlane.getStyleClass().add("modern-check");
-        ToggleButton advanced = new ToggleButton("RA / DEC");
+        ToggleButton advanced = new ToggleButton("Filtri avanzati  ▾");
         advanced.getStyleClass().add("sky-toggle");
         Button apply = UiFactory.button("Applica", "secondary-button");
         Button reset = UiFactory.button("Reset", "ghost-button");
@@ -224,7 +234,11 @@ public final class SkyMapPage extends BorderPane {
         durationFilter.setOnAction(event -> applyFilters());
         redshiftFilter.setOnAction(event -> applyFilters());
         firstRow.getChildren().addAll(search, durationFilter, redshiftFilter, galacticPlane,
-                UiFactory.spacer(), advanced, apply, reset);
+                UiFactory.spacer(), apply, reset);
+
+        HBox advancedHeader = new HBox(8, advanced,
+                UiFactory.label("RA, DEC e intervallo di redshift", "sky-filter-help"));
+        advancedHeader.setAlignment(Pos.CENTER_LEFT);
 
         HBox rangeRow = new HBox(9);
         rangeRow.getStyleClass().add("advanced-filter-row");
@@ -244,9 +258,10 @@ public final class SkyMapPage extends BorderPane {
         advanced.selectedProperty().addListener((obs, oldValue, selected) -> {
             rangeRow.setVisible(selected);
             rangeRow.setManaged(selected);
+            advanced.setText(selected ? "Nascondi filtri avanzati  ▴" : "Filtri avanzati  ▾");
         });
 
-        card.getChildren().addAll(firstRow, rangeRow);
+        card.getChildren().addAll(firstRow, advancedHeader, rangeRow);
         return card;
     }
 
@@ -284,12 +299,36 @@ public final class SkyMapPage extends BorderPane {
                 return;
             }
             boolean showSphere = newToggle == sphereButton;
+            sphereView = showSphere;
             mapHost.getChildren().setAll(showSphere ? sphere : mollweide);
             javafx.application.Platform.runLater(() -> {
                 if (showSphere) sphere.resetView(); else mollweide.resetView();
             });
         });
         return new HBox(6, mollweideButton, sphereButton);
+    }
+
+    private void openMapFullscreen() {
+        if (getScene() == null) {
+            return;
+        }
+        if (sphereView) {
+            CelestialSpherePane enlarged = new CelestialSpherePane();
+            enlarged.setBursts(visibleBursts);
+            enlarged.setShowGalacticPlane(galacticPlane.isSelected());
+            enlarged.setOnSelect(this::selectBurst);
+            if (selectedBurst != null) enlarged.select(selectedBurst);
+            enlarged.setMinSize(700, 520);
+            InPlaceFullscreen.show(this, "Mappa celeste · Sfera 3D", enlarged);
+        } else {
+            MollweideSkyPane enlarged = new MollweideSkyPane();
+            enlarged.setBursts(visibleBursts);
+            enlarged.setShowGalacticPlane(galacticPlane.isSelected());
+            enlarged.setOnSelect(this::selectBurst);
+            if (selectedBurst != null) enlarged.select(selectedBurst);
+            enlarged.setMinSize(700, 520);
+            InPlaceFullscreen.show(this, "Mappa celeste · Mollweide 2D", enlarged);
+        }
     }
 
     private VBox buildDetailsPanel() {
@@ -307,8 +346,12 @@ public final class SkyMapPage extends BorderPane {
                 detailRow("Redshift", selectedRedshift));
 
         Label scientificNote = UiFactory.wrappedLabel(
-                "La soglia a 2 s è mostrata soltanto come riferimento descrittivo tradizionale. La mappa non assegna da sola una classificazione scientifica definitiva.",
+                "La soglia a 2 s è mostrata soltanto come riferimento descrittivo tradizionale. La mappa non assegna da sola una classificazione scientifica definitiva. "
+                        + "Seleziona un punto per leggere coordinate, T90, classe descrittiva e redshift. Le viste Mollweide 2D e Sfera 3D rappresentano lo stesso campione: cambia soltanto il modo in cui la distribuzione celeste viene esplorata.",
                 "sky-science-note");
+        scientificNote.setMaxWidth(Double.MAX_VALUE);
+        scientificNote.setMaxHeight(Double.MAX_VALUE);
+        scientificNote.setPrefHeight(155);
         openButton.setDisable(true);
         openButton.setMaxWidth(Double.MAX_VALUE);
 
@@ -335,7 +378,7 @@ public final class SkyMapPage extends BorderPane {
                 value,
                 UiFactory.label(detail, "sky-metric-detail"));
         box.getStyleClass().add("sky-metric-card");
-        box.setPrefWidth(190);
+        box.setPrefWidth(230);
         return box;
     }
 

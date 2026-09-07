@@ -1922,3 +1922,18 @@
 .three-d-footer {
     -fx-padding: 9px 12px;
 }
+
+
+/* ---------- Layout refinements population + sky ---------- */
+.population-filter-side {
+    -fx-padding: 9px 10px;
+}
+.population-filter-side .percentage-control {
+    -fx-padding: 7px 8px;
+}
+.sky-metric-row {
+    -fx-alignment: center-left;
+}
+.sky-metric-row .sky-metric-card {
+    -fx-padding: 13px 18px;
+}
