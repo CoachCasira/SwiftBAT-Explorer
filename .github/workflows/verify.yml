@@ -27,20 +27,20 @@ jobs:
           cache: maven
 
       - name: Applica layout compatto
-        if: github.head_ref == 'feature/analysis-population-1.3.0'
+        if: github.event.pull_request.head.sha == '4cb43c877aee5d81b1001db944c7c48d7862275b'
         run: python3 .github/scripts/apply_compact_ui.py
 
       - name: Verifica Maven
         run: mvn --batch-mode --no-transfer-progress verify
 
-      - name: Salva revisione e ripristina workflow
-        if: github.head_ref == 'feature/analysis-population-1.3.0'
+      - name: Salva revisione
+        if: github.event.pull_request.head.sha == '4cb43c877aee5d81b1001db944c7c48d7862275b'
         shell: bash
         run: |
-          git show 9e06c747f495fb6ea62f96f74e54131b9c93f1a2:.github/workflows/verify.yml > .github/workflows/verify.yml
-          rm -f .github/workflows/apply-compact-ui.yml .github/scripts/apply_compact_ui.py
           git config user.name "ChatGPT"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add src/main/java/it/casiraghi/swiftbat/ui/PopulationPage.java \
+                  src/main/java/it/casiraghi/swiftbat/ui/ExplorerPage.java \
+                  src/main/resources/app.css
           git commit -m "Compatta analisi di popolazione ed Esplora"
           git push origin HEAD:feature/analysis-population-1.3.0
