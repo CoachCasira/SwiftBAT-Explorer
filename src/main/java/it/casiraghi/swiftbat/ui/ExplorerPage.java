@@ -6,6 +6,7 @@ import it.casiraghi.swiftbat.model.GrbData;
 import it.casiraghi.swiftbat.model.MetadataItem;
 import it.casiraghi.swiftbat.model.SummaryItem;
 import it.casiraghi.swiftbat.model.SkyBurst;
+import it.casiraghi.swiftbat.model.SpectralData;
 import it.casiraghi.swiftbat.model.TabularData;
 import it.casiraghi.swiftbat.service.ExcelExportService;
 import it.casiraghi.swiftbat.ui.components.ThreeDChartPane;
@@ -88,6 +89,7 @@ public final class ExplorerPage extends BorderPane {
     private final TextField redshiftMinFilter = compactFilterField("min");
     private final TextField redshiftMaxFilter = compactFilterField("max");
     private final Map<String, SkyBurst> scientificMetadata = new LinkedHashMap<>();
+    private Map<String, SpectralData> spectralCatalog = Map.of();
     private final Label catalogCount = UiFactory.label("Catalogo in caricamento…", "sidebar-caption");
     private final StackPane workspace = new StackPane();
     private CatalogEntry selectedEntry;
@@ -123,6 +125,13 @@ public final class ExplorerPage extends BorderPane {
         }
         applyCatalogFilters();
         catalogList.refresh();
+    }
+
+    public void setSpectralCatalog(Map<String, SpectralData> catalog) {
+        spectralCatalog = catalog == null ? Map.of() : Map.copyOf(catalog);
+        if (currentData != null) {
+            setWorkspace(buildDashboard(currentData));
+        }
     }
 
     public void setSelectedEntry(CatalogEntry entry) {
@@ -449,6 +458,8 @@ public final class ExplorerPage extends BorderPane {
         tabs.getTabs().addAll(
                 tab("Curva 2D", buildOverview(data)),
                 tab("Vista 3D", buildThreeD(data)),
+                tab("Spettroscopia", new SpectroscopyPane(data,
+                        spectralCatalog.get(data.grbName().toUpperCase(Locale.ROOT)), hostServices)),
                 tab("Dati", buildDataWorkspace(data)),
                 tab("Metadati", buildMetadata(data)),
                 tab("Guida", buildUnderstand(data)));
