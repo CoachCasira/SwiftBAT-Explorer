@@ -10,179 +10,34 @@ permissions:
 
 jobs:
   patch:
+    if: github.event.head_commit.message == 'chore: esegue patch FRACEXP finale'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Scarica il progetto
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-java@v4
+
+      - name: Configura Java 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
           cache: maven
-      - name: Modifica sorgenti
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
 
-          def rep(path, old, new):
-              p=Path(path); s=p.read_text(encoding='utf-8')
-              if old not in s: raise SystemExit('pattern missing: '+old[:80])
-              p.write_text(s.replace(old,new,1),encoding='utf-8')
+      - name: Applica correzioni FRACEXP e tooltip
+        run: python3 .github/scripts/apply_fracexp_stepper.py
 
-          p='src/main/java/it/casiraghi/swiftbat/ui/PopulationPage.java'
-          u='src/main/java/it/casiraghi/swiftbat/ui/UiFactory.java'
-          c='src/main/resources/app.css'
-
-          rep(u,'import javafx.scene.text.Text;\n','import javafx.scene.text.Text;\nimport javafx.util.Duration;\n')
-          rep(u,'choice.setTooltip(value == null || value.toString().isBlank() ? null : new Tooltip(value.toString()));','choice.setTooltip(value == null || value.toString().isBlank() ? null : quickTooltip(value.toString()));')
-          rep(u,'control.setTooltip(new Tooltip(text));','control.setTooltip(quickTooltip(text));')
-          rep(u,'button.setTooltip(new Tooltip(tooltip));','button.setTooltip(quickTooltip(tooltip));')
-          rep(u,'    public static Button iconButton(String glyph, String tooltip) {','''    public static Tooltip quickTooltip(String text) {
-        Tooltip tooltip = new Tooltip(text);
-        tooltip.setShowDelay(Duration.millis(500));
-        tooltip.setHideDelay(Duration.millis(80));
-        tooltip.setShowDuration(Duration.seconds(30));
-        return tooltip;
-    }
-
-    public static Button iconButton(String glyph, String tooltip) {''')
-
-          rep(p,'import javafx.scene.control.ScrollPane;\nimport javafx.scene.control.Slider;\nimport javafx.scene.control.Tab;','import javafx.scene.control.ScrollPane;\nimport javafx.scene.control.Tab;')
-          rep(p,'''    private final Slider exposureMin = slider(0);
-    private final Slider exposureMax = slider(100);
-    private final Label exposureMinValue = UiFactory.label("0%", "filter-value");
-    private final Label exposureMaxValue = UiFactory.label("100%", "filter-value");''','''    private final TextField exposureMin = percentField("0");
-    private final TextField exposureMax = percentField("100");''')
-          rep(p,'''        VBox minimum = exposureControl("Minimo ammesso", exposureMin, exposureMinValue);
-        VBox maximum = exposureControl("Massimo ammesso", exposureMax, exposureMaxValue);''','''        VBox minimum = exposureControl("Minimo ammesso", exposureMin, true);
-        VBox maximum = exposureControl("Massimo ammesso", exposureMax, false);''')
-          a=s='''    private void configureControls() {
-        exposureMin.valueProperty().addListener((obs, oldValue, value) -> {
-            if (value.doubleValue() > exposureMax.getValue()) {
-                exposureMin.setValue(exposureMax.getValue());
-            }
-            updateExposureLabel();
-            updateCandidatePreview();
-        });
-        exposureMax.valueProperty().addListener((obs, oldValue, value) -> {
-            if (value.doubleValue() < exposureMin.getValue()) {
-                exposureMax.setValue(exposureMin.getValue());
-            }
-            updateExposureLabel();
-            updateCandidatePreview();
-        });'''
-          b='''    private void configureControls() {
-        exposureMin.textProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
-        exposureMax.textProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
-        exposureMin.focusedProperty().addListener((obs, oldValue, focused) -> { if (!focused) normalizeExposureField(exposureMin, true); });
-        exposureMax.focusedProperty().addListener((obs, oldValue, focused) -> { if (!focused) normalizeExposureField(exposureMax, false); });
-        exposureMin.setOnAction(event -> normalizeExposureField(exposureMin, true));
-        exposureMax.setOnAction(event -> normalizeExposureField(exposureMax, false));'''
-          rep(p,a,b)
-          rep(p,'''        return new Filter(duration.getValue(), redshiftAvailability.getValue(), minZ, maxZ,
-                minRa, maxRa, minDec, maxDec, exposureMin.getValue(), exposureMax.getValue(),
-                halfWindow, maximumEvents);''','''        double minExposure = percentage(exposureMin, "Copertura FRACEXP minima");
-        double maxExposure = percentage(exposureMax, "Copertura FRACEXP massima");
-        if (minExposure > maxExposure) throw new IllegalArgumentException("Il minimo FRACEXP non può superare il massimo.");
-        return new Filter(duration.getValue(), redshiftAvailability.getValue(), minZ, maxZ,
-                minRa, maxRa, minDec, maxDec, minExposure, maxExposure,
-                halfWindow, maximumEvents);''')
-          rep(p,'''    private void updateExposureLabel() {
-        exposureMinValue.setText(String.format(Locale.ITALY, "%.0f%%", exposureMin.getValue()));
-        exposureMaxValue.setText(String.format(Locale.ITALY, "%.0f%%", exposureMax.getValue()));
-    }
-
-''','')
-          rep(p,'''        exposureMin.setValue(0);
-        exposureMax.setValue(100);''','''        exposureMin.setText("0");
-        exposureMax.setText("100");''')
-          rep(p,'''    private static Slider slider(double value) {
-        Slider slider = new Slider(0, 100, value);
-        slider.setBlockIncrement(1);
-        slider.setMajorTickUnit(25);
-        slider.setMinorTickCount(0);
-        slider.setSnapToTicks(false);
-        slider.setPadding(new Insets(0, 12, 0, 12));
-        slider.setMinWidth(0);
-        slider.setPrefWidth(320);
-        slider.setMaxWidth(Double.MAX_VALUE);
-        return slider;
-    }
-
-    private static VBox exposureControl(String label, Slider slider, Label value) {
-        HBox heading = new HBox(8, UiFactory.label(label, "filter-label"), UiFactory.spacer(), value);
-        heading.setAlignment(Pos.CENTER_LEFT);
-        slider.setMaxWidth(Double.MAX_VALUE);
-        VBox box = new VBox(7, heading, slider);
-        box.setMinWidth(220);
-        box.setPrefWidth(320);
-        box.setMaxWidth(Double.MAX_VALUE);
-        box.setStyle("-fx-background-color: rgba(13, 20, 35, 0.55); -fx-background-radius: 10; -fx-padding: 9 10 8 10;");
-        return box;
-    }''','''    private static TextField percentField(String value) {
-        TextField field = new TextField(value);
-        field.getStyleClass().add("percentage-field");
-        field.setAlignment(Pos.CENTER);
-        field.setPrefWidth(86);
-        field.setMaxWidth(96);
-        return field;
-    }
-
-    private VBox exposureControl(String label, TextField field, boolean minimum) {
-        Button minus = UiFactory.button("−", "percentage-step-button");
-        Button plus = UiFactory.button("+", "percentage-step-button");
-        minus.setOnAction(event -> adjustExposure(field, -1, minimum));
-        plus.setOnAction(event -> adjustExposure(field, 1, minimum));
-        HBox stepper = new HBox(8, minus, field, UiFactory.label("%", "percentage-unit"), plus);
-        stepper.setAlignment(Pos.CENTER_LEFT);
-        VBox box = new VBox(7, UiFactory.label(label, "filter-label"), stepper,
-                UiFactory.label("Scrivi 0–100 oppure usa − / +", "filter-detail"));
-        box.getStyleClass().add("percentage-control");
-        box.setMinWidth(250); box.setPrefWidth(330); box.setMaxWidth(Double.MAX_VALUE);
-        return box;
-    }
-
-    private void adjustExposure(TextField field, int delta, boolean minimum) {
-        Integer current = parseExposureInteger(field);
-        int value = Math.max(0, Math.min(100, (current == null ? (minimum ? 0 : 100) : current) + delta));
-        Integer other = parseExposureInteger(minimum ? exposureMax : exposureMin);
-        if (other != null) value = minimum ? Math.min(value, other) : Math.max(value, other);
-        field.setText(Integer.toString(value));
-    }
-
-    private void normalizeExposureField(TextField field, boolean minimum) {
-        Integer value = parseExposureInteger(field);
-        if (value == null) value = minimum ? 0 : 100;
-        value = Math.max(0, Math.min(100, value));
-        Integer other = parseExposureInteger(minimum ? exposureMax : exposureMin);
-        if (other != null) value = minimum ? Math.min(value, other) : Math.max(value, other);
-        field.setText(Integer.toString(value));
-    }
-
-    private Integer parseExposureInteger(TextField field) {
-        try { return (int) Math.round(Double.parseDouble(field.getText().trim().replace(',', '.'))); }
-        catch (Exception error) { return null; }
-    }''')
-          rep(p,'''    private void updateReadyState() {''','''    private double percentage(TextField field, String label) {
-        double value = number(field, label);
-        if (value < 0 || value > 100) throw new IllegalArgumentException(label + " deve essere compresa fra 0% e 100%.");
-        return value;
-    }
-
-    private void updateReadyState() {''')
-          rep(p,'Tooltip.install(item, new Tooltip(','Tooltip.install(item, UiFactory.quickTooltip(')
-
-          css=Path(c); text=css.read_text(encoding='utf-8')
-          text += '''\n.percentage-control { -fx-background-color: rgba(255,255,255,0.025); -fx-border-color: rgba(255,174,74,0.10); -fx-background-radius: 11px; -fx-border-radius: 11px; -fx-padding: 10 12; }\n.percentage-field { -fx-background-color: rgba(6,10,17,0.92); -fx-text-fill: #fff2e2; -fx-font-size: 15px; -fx-font-weight: bold; -fx-background-radius: 9px; -fx-border-radius: 9px; -fx-border-color: rgba(255,174,74,0.18); -fx-padding: 8 10; }\n.percentage-field:focused { -fx-border-color: rgba(255,183,101,0.72); }\n.percentage-step-button { -fx-background-color: rgba(255,174,74,0.08); -fx-text-fill: #ffc47e; -fx-border-color: rgba(255,174,74,0.15); -fx-background-radius: 9px; -fx-border-radius: 9px; -fx-font-size: 16px; -fx-font-weight: bold; -fx-min-width: 36px; -fx-min-height: 36px; -fx-padding: 5px; -fx-cursor: hand; }\n.percentage-step-button:hover { -fx-background-color: rgba(255,174,74,0.15); }\n.percentage-unit { -fx-text-fill: #ffbd75; -fx-font-size: 13px; -fx-font-weight: bold; }\n'''
-          css.write_text(text,encoding='utf-8')
-          PY
       - name: Verifica Maven
         run: mvn --batch-mode --no-transfer-progress verify
-      - name: Commit
+
+      - name: Commit e push
+        shell: bash
         run: |
-          git config user.name ChatGPT
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add src/main/java/it/casiraghi/swiftbat/ui/PopulationPage.java src/main/java/it/casiraghi/swiftbat/ui/UiFactory.java src/main/resources/app.css
-          git diff --cached --quiet || git commit -m 'Sostituisce gli slider FRACEXP con selettori numerici'
+          git config user.name "ChatGPT"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main/java/it/casiraghi/swiftbat/ui/PopulationPage.java
+          git add src/main/java/it/casiraghi/swiftbat/ui/UiFactory.java
+          git add src/main/resources/app.css
+          git commit -m "Sostituisce gli slider FRACEXP con selettori numerici"
           git push
