@@ -42,6 +42,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
@@ -79,6 +80,11 @@ public final class ExplorerPage extends BorderPane {
     private final TextField catalogSearch = new TextField();
     private final ComboBox<String> durationFilter = new ComboBox<>();
     private final ComboBox<String> redshiftFilter = new ComboBox<>();
+    private final ComboBox<String> cacheFilter = new ComboBox<>();
+    private final TextField t90MinFilter = compactFilterField("min");
+    private final TextField t90MaxFilter = compactFilterField("max");
+    private final TextField redshiftMinFilter = compactFilterField("min");
+    private final TextField redshiftMaxFilter = compactFilterField("max");
     private final Map<String, SkyBurst> scientificMetadata = new LinkedHashMap<>();
     private final Label catalogCount = UiFactory.label("Catalogo in caricamento…", "sidebar-caption");
     private final StackPane workspace = new StackPane();
@@ -186,9 +192,9 @@ public final class ExplorerPage extends BorderPane {
     }
 
     private Node buildBody() {
-        VBox sidebar = new VBox(12);
+        VBox sidebar = new VBox(9);
         sidebar.getStyleClass().add("catalog-panel");
-        sidebar.setPadding(new Insets(17));
+        sidebar.setPadding(new Insets(14));
         sidebar.setMinWidth(290);
         sidebar.setPrefWidth(320);
         sidebar.setMinHeight(0);
@@ -222,6 +228,52 @@ public final class ExplorerPage extends BorderPane {
         secondColumn.setPercentWidth(50);
         secondColumn.setHgrow(Priority.ALWAYS);
         filterGrid.getColumnConstraints().addAll(firstColumn, secondColumn);
+
+        cacheFilter.setItems(FXCollections.observableArrayList("Tutti", "Solo in cache", "Da scaricare"));
+        cacheFilter.setValue("Tutti");
+        cacheFilter.getStyleClass().add("choice-box-modern");
+        cacheFilter.setMaxWidth(Double.MAX_VALUE);
+
+        GridPane extraGrid = new GridPane();
+        extraGrid.setHgap(8);
+        extraGrid.setVgap(6);
+        extraGrid.add(UiFactory.label("T90 (s)", "filter-label"), 0, 0);
+        extraGrid.add(UiFactory.label("Redshift z", "filter-label"), 1, 0);
+        extraGrid.add(filterRange(t90MinFilter, t90MaxFilter), 0, 1);
+        extraGrid.add(filterRange(redshiftMinFilter, redshiftMaxFilter), 1, 1);
+        var extraFirst = new javafx.scene.layout.ColumnConstraints();
+        extraFirst.setPercentWidth(50);
+        extraFirst.setHgrow(Priority.ALWAYS);
+        var extraSecond = new javafx.scene.layout.ColumnConstraints();
+        extraSecond.setPercentWidth(50);
+        extraSecond.setHgrow(Priority.ALWAYS);
+        extraGrid.getColumnConstraints().addAll(extraFirst, extraSecond);
+
+        Button clearExtra = UiFactory.button("Azzera filtri extra", "ghost-button");
+        clearExtra.setOnAction(event -> {
+            cacheFilter.setValue("Tutti");
+            t90MinFilter.clear();
+            t90MaxFilter.clear();
+            redshiftMinFilter.clear();
+            redshiftMaxFilter.clear();
+            applyCatalogFilters();
+        });
+        VBox extraBox = new VBox(8,
+                UiFactory.label("Cache locale", "filter-label"), cacheFilter,
+                extraGrid, clearExtra);
+        extraBox.getStyleClass().add("explorer-extra-filters");
+        extraBox.setVisible(false);
+        extraBox.setManaged(false);
+
+        ToggleButton extraToggle = new ToggleButton("Altri filtri ▾");
+        extraToggle.getStyleClass().addAll("sky-toggle", "explorer-extra-toggle");
+        extraToggle.setMaxWidth(Double.MAX_VALUE);
+        extraToggle.selectedProperty().addListener((obs, oldValue, selected) -> {
+            extraBox.setVisible(selected);
+            extraBox.setManaged(selected);
+            extraToggle.setText(selected ? "Nascondi filtri ▴" : "Altri filtri ▾");
+        });
+
         catalogList.getStyleClass().add("catalog-list");
         catalogList.setCellFactory(ignored -> new CatalogCell());
         catalogList.setMinHeight(140);
@@ -233,7 +285,7 @@ public final class ExplorerPage extends BorderPane {
         Label hint = UiFactory.wrappedLabel(
                 "Dopo il primo download, ASCII e FITS restano nella cache locale anche ai successivi avvii.",
                 "sidebar-hint");
-        sidebar.getChildren().addAll(title, catalogSearch, filterGrid,
+        sidebar.getChildren().addAll(title, catalogSearch, filterGrid, extraToggle, extraBox,
                 catalogCount, catalogList, separator, hint);
 
         workspace.getStyleClass().add("workspace-host");
@@ -247,11 +299,13 @@ public final class ExplorerPage extends BorderPane {
     }
 
     private void wireCatalog() {
-        catalogSearch.textProperty().addListener((observable, oldValue, newValue) -> {
-            applyCatalogFilters();
-        });
+        catalogSearch.textProperty().addListener((observable, oldValue, newValue) -> applyCatalogFilters());
         durationFilter.setOnAction(event -> applyCatalogFilters());
         redshiftFilter.setOnAction(event -> applyCatalogFilters());
+        cacheFilter.setOnAction(event -> applyCatalogFilters());
+        for (TextField field : List.of(t90MinFilter, t90MaxFilter, redshiftMinFilter, redshiftMaxFilter)) {
+            field.textProperty().addListener((obs, oldValue, newValue) -> applyCatalogFilters());
+        }
         catalogList.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue != null && newValue != selectedEntry) {
                 selectedEntry = newValue;
@@ -264,23 +318,68 @@ public final class ExplorerPage extends BorderPane {
         String query = catalogSearch.getText() == null ? "" : catalogSearch.getText().trim().toLowerCase(Locale.ROOT);
         String duration = durationFilter.getValue() == null ? "Tutte" : durationFilter.getValue();
         String redshift = redshiftFilter.getValue() == null ? "Tutti" : redshiftFilter.getValue();
+        String cache = cacheFilter.getValue() == null ? "Tutti" : cacheFilter.getValue();
+        Double t90Min = optionalNumber(t90MinFilter);
+        Double t90Max = optionalNumber(t90MaxFilter);
+        Double zMin = optionalNumber(redshiftMinFilter);
+        Double zMax = optionalNumber(redshiftMaxFilter);
+
         filteredCatalog.setPredicate(entry -> {
             if (!query.isBlank()
                     && !entry.grbName().toLowerCase(Locale.ROOT).contains(query)
                     && !entry.triggerId().toLowerCase(Locale.ROOT).contains(query)) {
                 return false;
             }
+            boolean cached = cacheLookup.test(entry);
+            if (cache.equals("Solo in cache") && !cached) return false;
+            if (cache.equals("Da scaricare") && cached) return false;
+
             SkyBurst burst = scientificMetadata.get(entry.grbName().toUpperCase(Locale.ROOT));
+            boolean hasNumericFilters = t90Min != null || t90Max != null || zMin != null || zMax != null;
             if (burst == null) {
-                return duration.equals("Tutte") && !redshift.equals("Con z");
+                return duration.equals("Tutte") && !redshift.equals("Con z") && !hasNumericFilters;
             }
             if (duration.startsWith("Short") && !burst.isShort()) return false;
             if (duration.startsWith("Long") && !burst.isLong()) return false;
             if (duration.equals("T90 n.d.") && burst.hasT90()) return false;
             if (redshift.equals("Con z") && !burst.redshift().available()) return false;
-            return !redshift.equals("Senza z") || !burst.redshift().available();
+            if (redshift.equals("Senza z") && burst.redshift().available()) return false;
+
+            Double t90 = burst.t90Sec();
+            if (t90Min != null && (t90 == null || t90 < t90Min)) return false;
+            if (t90Max != null && (t90 == null || t90 > t90Max)) return false;
+            Double z = burst.redshift().representativeValue();
+            if (zMin != null && (z == null || z < zMin)) return false;
+            return zMax == null || (z != null && z <= zMax);
         });
         catalogCount.setText(filteredCatalog.size() + " GRB visualizzati");
+    }
+
+    private static TextField compactFilterField(String prompt) {
+        TextField field = new TextField();
+        field.setPromptText(prompt);
+        field.getStyleClass().addAll("search-field", "explorer-compact-field");
+        field.setPrefWidth(70);
+        field.setMaxWidth(Double.MAX_VALUE);
+        return field;
+    }
+
+    private static HBox filterRange(TextField minimum, TextField maximum) {
+        HBox box = new HBox(5, minimum, UiFactory.label("–", "filter-label"), maximum);
+        box.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(minimum, Priority.ALWAYS);
+        HBox.setHgrow(maximum, Priority.ALWAYS);
+        return box;
+    }
+
+    private static Double optionalNumber(TextField field) {
+        String text = field.getText();
+        if (text == null || text.isBlank()) return null;
+        try {
+            return Double.parseDouble(text.trim().replace(',', '.'));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private void showEmptyState() {
@@ -297,7 +396,7 @@ public final class ExplorerPage extends BorderPane {
     }
 
     private Node buildDashboard(GrbData data) {
-        VBox dashboard = new VBox(18);
+        VBox dashboard = new VBox(10);
         dashboard.getStyleClass().add("dashboard");
         SkyBurst scientific = scientificMetadata.get(data.grbName().toUpperCase(Locale.ROOT));
         String scientificLine = scientific == null ? ""
@@ -317,7 +416,8 @@ public final class ExplorerPage extends BorderPane {
         source.setOnAction(event -> hostServices.showDocument(data.availability().dataProductUrl()));
         eventHeader.getChildren().addAll(identity, status, reload, source);
 
-        FlowPane metrics = new FlowPane(12, 12);
+        FlowPane metrics = new FlowPane(8, 8);
+        metrics.getStyleClass().add("explorer-metrics");
         metrics.getChildren().addAll(
                 metric(data, "PEAK_RATE", "Picco", "RATE massimo"),
                 metric(data, "PEAK_TIME", "Tempo del picco", "rispetto al trigger"),
@@ -326,16 +426,16 @@ public final class ExplorerPage extends BorderPane {
                 metric(data, "HARDNESS_PROXY", "Durezza", "proxy alte / basse energie"));
         if (scientific != null) {
             metrics.getChildren().addAll(
-                    UiFactory.metricCard("T90", scientific.formattedT90(), scientific.durationClass()),
-                    UiFactory.metricCard("Redshift", scientific.redshift().available()
+                    compactMetricCard("T90", scientific.formattedT90(), scientific.durationClass()),
+                    compactMetricCard("Redshift", scientific.redshift().available()
                             ? scientific.redshift().rawValue() : "n.d.", "z cosmologico · valore BAT"));
         }
 
         TabPane tabs = new TabPane();
         tabs.getStyleClass().add("main-tabs");
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        tabs.setMinHeight(590);
-        tabs.setPrefHeight(680);
+        tabs.setMinHeight(520);
+        tabs.setPrefHeight(610);
         tabs.getTabs().addAll(
                 tab("Curva 2D", buildOverview(data)),
                 tab("Vista 3D", buildThreeD(data)),
@@ -357,11 +457,20 @@ public final class ExplorerPage extends BorderPane {
     private VBox metric(GrbData data, String key, String title, String detail) {
         SummaryItem item = data.summaryByKey().get(key);
         String value = DisplayFormat.summary(key, item);
-        VBox card = UiFactory.metricCard(title, value, detail);
+        VBox card = compactMetricCard(title, value, detail);
         if (item != null && item.value() != null && !item.value().isBlank()) {
             String complete = item.value() + (item.unit().isBlank() ? "" : " " + item.unit());
-            Tooltip.install(card, new Tooltip("Valore completo: " + complete));
+            Tooltip.install(card, UiFactory.quickTooltip("Valore completo: " + complete));
         }
+        return card;
+    }
+
+    private VBox compactMetricCard(String eyebrow, String value, String detail) {
+        VBox card = UiFactory.metricCard(eyebrow, value, detail);
+        card.getStyleClass().add("metric-card-compact");
+        card.setMinWidth(128);
+        card.setPrefWidth(146);
+        card.setMaxWidth(168);
         return card;
     }
 
@@ -372,10 +481,11 @@ public final class ExplorerPage extends BorderPane {
 
     private Node buildOverview(GrbData data) {
         BorderPane pane = new BorderPane();
-        pane.setPadding(new Insets(18));
-        VBox chartCard = new VBox(14);
-        chartCard.getStyleClass().add("card");
-        HBox controls = new HBox(11);
+        pane.setPadding(new Insets(12));
+        VBox chartCard = new VBox(9);
+        chartCard.getStyleClass().addAll("card", "overview-chart-card");
+        chartCard.setPadding(new Insets(12));
+        HBox controls = new HBox(9);
         controls.setAlignment(Pos.CENTER_LEFT);
 
         ChoiceBox<String> channelChoice = new ChoiceBox<>(FXCollections.observableArrayList(CHANNELS.keySet()));
@@ -393,12 +503,39 @@ public final class ExplorerPage extends BorderPane {
         CheckBox smooth = new CheckBox("Media mobile 5 bin");
         smooth.getStyleClass().add("modern-check");
         UiFactory.autoTooltip(smooth);
-        Label help = UiFactory.label("Il tratteggio verticale indica il trigger (t = 0).", "subtle-text");
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        Button export = UiFactory.button("Esporta PNG", "ghost-button");
-        controls.getChildren().addAll(channelChoice, windowChoice, smooth, spacer, help, export);
+        Label help = UiFactory.label("t = 0 indica il trigger", "subtle-text");
+        controls.getChildren().addAll(channelChoice, windowChoice, smooth, UiFactory.spacer(), help);
 
+        LineChart<Number, Number> chart = createLightCurveChart();
+        VBox.setVgrow(chart, Priority.ALWAYS);
+
+        Runnable refresh = () -> populateChart(chart, data, channelChoice.getValue(), windowChoice.getValue(), smooth.isSelected());
+        channelChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refresh.run());
+        windowChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refresh.run());
+        smooth.selectedProperty().addListener((obs, oldValue, newValue) -> refresh.run());
+        refresh.run();
+
+        Button export = UiFactory.button("Esporta PNG", "ghost-button");
+        export.setOnAction(event -> exportNode(chart, data.grbName() + "_curva_1s.png"));
+        Button fullscreen = UiFactory.button("Schermo intero  ⛶", "secondary-button");
+        fullscreen.setOnAction(event -> openOverviewFullscreen(
+                data, channelChoice.getValue(), windowChoice.getValue(), smooth.isSelected()));
+        HBox bottomActions = new HBox(8, UiFactory.spacer(), export, fullscreen);
+        bottomActions.setAlignment(Pos.CENTER_RIGHT);
+        chartCard.getChildren().addAll(controls, chart, bottomActions);
+        pane.setCenter(chartCard);
+
+        VBox right = new VBox(10);
+        right.setPrefWidth(310);
+        right.getChildren().addAll(
+                summaryCard(data, "In breve", List.of("BIN_SIZE", "ENERGY_RANGE", "TIME_RANGE", "ASCII_ROWS", "FITS_ROWS")),
+                plainConceptCard("Trigger", "Il punto zero dell'allerta", "Tempi negativi: prima del trigger. Tempi positivi: dopo il trigger. Il trigger non coincide necessariamente con l'inizio fisico esatto del burst."));
+        pane.setRight(right);
+        BorderPane.setMargin(right, new Insets(0, 0, 0, 12));
+        return pane;
+    }
+
+    private LineChart<Number, Number> createLightCurveChart() {
         NumberAxis xAxis = new NumberAxis();
         NumberAxis yAxis = new NumberAxis();
         xAxis.setLabel("Tempo dal trigger (s)");
@@ -409,26 +546,20 @@ public final class ExplorerPage extends BorderPane {
         chart.setCreateSymbols(false);
         chart.setLegendVisible(true);
         chart.setTitle("Curva di luce a binning di 1 secondo");
-        VBox.setVgrow(chart, Priority.ALWAYS);
+        return chart;
+    }
 
-        Runnable refresh = () -> populateChart(chart, data, channelChoice.getValue(), windowChoice.getValue(), smooth.isSelected());
-        channelChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refresh.run());
-        windowChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refresh.run());
-        smooth.selectedProperty().addListener((obs, oldValue, newValue) -> refresh.run());
-        export.setOnAction(event -> exportNode(chart, data.grbName() + "_curva_1s.png"));
-        refresh.run();
-
-        chartCard.getChildren().addAll(controls, chart);
-        pane.setCenter(chartCard);
-
-        VBox right = new VBox(13);
-        right.setPrefWidth(330);
-        right.getChildren().addAll(
-                summaryCard(data, "In breve", List.of("BIN_SIZE", "ENERGY_RANGE", "TIME_RANGE", "ASCII_ROWS", "FITS_ROWS")),
-                plainConceptCard("Trigger", "Il punto zero dell'allerta", "Tempi negativi: prima del trigger. Tempi positivi: dopo il trigger. Il trigger non coincide necessariamente con l'inizio fisico esatto del burst."));
-        pane.setRight(right);
-        BorderPane.setMargin(right, new Insets(0, 0, 0, 16));
-        return pane;
+    private void openOverviewFullscreen(GrbData data, String channel, String window, boolean smooth) {
+        LineChart<Number, Number> enlarged = createLightCurveChart();
+        enlarged.setMinHeight(0);
+        enlarged.setMaxHeight(Double.MAX_VALUE);
+        enlarged.setPrefHeight(760);
+        populateChart(enlarged, data, channel, window, smooth);
+        VBox content = new VBox(8, enlarged);
+        content.setMinWidth(0);
+        content.setMaxWidth(Double.MAX_VALUE);
+        VBox.setVgrow(enlarged, Priority.ALWAYS);
+        InPlaceFullscreen.show(this, data.grbName() + " · Curva 2D", content);
     }
 
     private Node buildThreeD(GrbData data) {

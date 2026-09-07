@@ -1777,3 +1777,112 @@
     -fx-font-weight: bold;
     -fx-min-width: 18px;
 }
+
+
+/* ---------- Layout compatto Explorer / Popolazione ---------- */
+.population-filter-card-compact {
+    -fx-spacing: 9px;
+}
+
+.population-filter-card-compact .population-filter-group {
+    -fx-padding: 7 9;
+}
+
+.population-filter-card-compact .choice-box-modern {
+    -fx-padding: 7 10;
+}
+
+.population-filter-section-compact {
+    -fx-padding: 9 11;
+}
+
+.population-filter-section-compact .sky-filter-help {
+    -fx-font-size: 9px;
+}
+
+.percentage-control {
+    -fx-padding: 7 9;
+}
+
+.percentage-field {
+    -fx-font-size: 13px;
+    -fx-padding: 5 7;
+}
+
+.fracexp-slider {
+    -fx-padding: 0 4 0 4;
+}
+
+.fracexp-slider .track {
+    -fx-background-color: rgba(255, 255, 255, 0.10);
+    -fx-background-radius: 999px;
+    -fx-pref-height: 5px;
+}
+
+.fracexp-slider .thumb {
+    -fx-background-color: linear-gradient(to bottom right, #ffae4a, #a66bdd);
+    -fx-background-radius: 999px;
+    -fx-pref-width: 15px;
+    -fx-pref-height: 15px;
+    -fx-effect: dropshadow(gaussian, rgba(255, 174, 74, 0.24), 7, 0.18, 0, 1);
+}
+
+.filter-reset-button {
+    -fx-background-color: rgba(255, 174, 74, 0.08);
+    -fx-text-fill: #ffc47e;
+    -fx-border-color: rgba(255, 174, 74, 0.18);
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-min-width: 29px;
+    -fx-min-height: 29px;
+    -fx-padding: 3px;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.filter-reset-button:hover {
+    -fx-background-color: rgba(255, 174, 74, 0.16);
+}
+
+.explorer-extra-toggle {
+    -fx-padding: 7 10;
+}
+
+.explorer-extra-filters {
+    -fx-background-color: rgba(255, 255, 255, 0.018);
+    -fx-border-color: rgba(255, 255, 255, 0.055);
+    -fx-background-radius: 10px;
+    -fx-border-radius: 10px;
+    -fx-padding: 9px;
+}
+
+.explorer-extra-filters .choice-box-modern,
+.explorer-compact-field {
+    -fx-padding: 6 8;
+}
+
+.explorer-metrics {
+    -fx-padding: 0;
+}
+
+.metric-card-compact {
+    -fx-padding: 9 11;
+    -fx-background-radius: 13px;
+    -fx-border-radius: 13px;
+}
+
+.metric-card-compact .metric-eyebrow {
+    -fx-font-size: 8px;
+}
+
+.metric-card-compact .metric-value {
+    -fx-font-size: 15px;
+}
+
+.metric-card-compact .metric-detail {
+    -fx-font-size: 8px;
+}
+
+.overview-chart-card {
+    -fx-padding: 12px;
+}

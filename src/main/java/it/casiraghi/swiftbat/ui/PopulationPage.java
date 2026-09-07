@@ -10,6 +10,7 @@ import it.casiraghi.swiftbat.service.QualityMetrics;
 import it.casiraghi.swiftbat.ui.components.Java2DGroupedBarPanel;
 import it.casiraghi.swiftbat.ui.components.Population3DChartPane;
 import it.casiraghi.swiftbat.ui.components.PopulationHistogram3DPane;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
@@ -29,6 +30,7 @@ import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Slider;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TableColumn;
@@ -43,6 +45,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Line;
+import javafx.util.Duration;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -86,8 +89,13 @@ public final class PopulationPage extends BorderPane {
     private final TextField raMax = field("360");
     private final TextField decMin = field("-90");
     private final TextField decMax = field("90");
+    private final Slider exposureMinSlider = exposureSlider(0);
+    private final Slider exposureMaxSlider = exposureSlider(100);
     private final TextField exposureMin = percentField("0");
     private final TextField exposureMax = percentField("100");
+    private final PauseTransition exposureMinDebounce = new PauseTransition(Duration.millis(350));
+    private final PauseTransition exposureMaxDebounce = new PauseTransition(Duration.millis(350));
+    private boolean syncingExposureControls;
     private final ChoiceBox<String> window = new ChoiceBox<>();
     private final ChoiceBox<String> limit = new ChoiceBox<>();
     private final Button analyze = UiFactory.button("Analizza il gruppo", "primary-button");
@@ -153,8 +161,8 @@ public final class PopulationPage extends BorderPane {
     }
 
     private Node buildPage() {
-        VBox page = new VBox(18);
-        page.setPadding(new Insets(30, 34, 36, 34));
+        VBox page = new VBox(12);
+        page.setPadding(new Insets(18, 24, 24, 24));
         page.getStyleClass().add("page-content");
 
         HBox title = new HBox(14);
@@ -177,9 +185,9 @@ public final class PopulationPage extends BorderPane {
                 new Tab("Profilo temporale", chartCard()),
                 new Tab("Distribuzioni del campione", distributionPane()),
                 new Tab("GRB inclusi", resultTable));
-        resultTabs.setMinHeight(480);
-        resultTabs.setPrefHeight(520);
-        resultTabs.setMaxHeight(570);
+        resultTabs.setMinHeight(450);
+        resultTabs.setPrefHeight(500);
+        resultTabs.setMaxHeight(560);
 
         page.getChildren().addAll(title, filterCard, resultTabs);
         ScrollPane scroll = new ScrollPane(page);
@@ -203,20 +211,20 @@ public final class PopulationPage extends BorderPane {
             UiFactory.autoTooltip(choice);
         }
 
-        FlowPane primary = new FlowPane(12, 12);
+        FlowPane primary = new FlowPane(10, 7);
         primary.getStyleClass().add("population-filter-grid");
         primary.getChildren().addAll(
-                filterGroup("Durata T90", "Seleziona la classe temporale", duration, 210),
-                filterGroup("Redshift", "Presenza della misura z", redshiftAvailability, 210),
-                filterGroup("Finestra temporale", "Secondi attorno al trigger", window, 170),
-                filterGroup("Campione massimo", "GRB più recenti dopo i filtri", limit, 170));
+                filterGroup("Durata T90", "Classe temporale", duration, 200),
+                filterGroup("Redshift", "Disponibilità della misura z", redshiftAvailability, 200),
+                filterGroup("Finestra temporale", "Secondi attorno al trigger", window, 160),
+                filterGroup("Campione massimo", "GRB più recenti dopo i filtri", limit, 160));
 
-        FlowPane advancedContent = new FlowPane(12, 12);
+        FlowPane advancedContent = new FlowPane(10, 7);
         advancedContent.getStyleClass().addAll("population-filter-grid", "advanced-filter-row");
         advancedContent.getChildren().addAll(
-                filterGroup("Intervallo redshift z", "Applicato ai GRB che hanno z", range(zMin, zMax), 220),
-                filterGroup("Ascensione retta RA", "Intervallo 0°–360°", range(raMin, raMax), 220),
-                filterGroup("Declinazione DEC", "Intervallo −90°–+90°", range(decMin, decMax), 220));
+                filterGroup("Intervallo redshift z", "Applicato ai GRB con z", range(zMin, zMax), 205),
+                filterGroup("Ascensione retta RA", "Intervallo 0°–360°", range(raMin, raMax), 205),
+                filterGroup("Declinazione DEC", "Intervallo −90°–+90°", range(decMin, decMax), 205));
         advancedContent.setVisible(false);
         advancedContent.setManaged(false);
 
@@ -228,23 +236,28 @@ public final class PopulationPage extends BorderPane {
             advanced.setText(selected ? "Nascondi filtri avanzati" : "Filtri avanzati: z e area di cielo");
         });
 
-        VBox minimum = exposureControl("Minimo ammesso", exposureMin, true);
-        VBox maximum = exposureControl("Massimo ammesso", exposureMax, false);
-        HBox exposureControls = new HBox(16, minimum, maximum);
+        VBox minimum = exposureControl("Minimo ammesso", exposureMinSlider, exposureMin, true);
+        VBox maximum = exposureControl("Massimo ammesso", exposureMaxSlider, exposureMax, false);
+        HBox exposureControls = new HBox(12, minimum, maximum);
         exposureControls.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(minimum, Priority.ALWAYS);
         HBox.setHgrow(maximum, Priority.ALWAYS);
-        VBox exposureBox = new VBox(8,
+
+        VBox exposureIntro = new VBox(3,
                 UiFactory.label("Qualità della copertura FRACEXP", "population-section-title"),
                 UiFactory.wrappedLabel(
-                        "Per ogni GRB viene calcolata la percentuale di bin con FRACEXP ≥ 0,999. Imposta qui l'intervallo accettato.",
-                        "sky-filter-help"),
-                exposureControls);
-        exposureBox.getStyleClass().add("population-filter-section");
+                        "Percentuale di bin con FRACEXP ≥ 0,999. Trascina oppure scrivi il valore.",
+                        "sky-filter-help"));
+        exposureIntro.setMinWidth(250);
+        exposureIntro.setPrefWidth(300);
+        HBox exposureBox = new HBox(14, exposureIntro, exposureControls);
+        exposureBox.setAlignment(Pos.CENTER_LEFT);
+        exposureBox.getStyleClass().addAll("population-filter-section", "population-filter-section-compact");
+        HBox.setHgrow(exposureControls, Priority.ALWAYS);
 
-        HBox actions = new HBox(10);
+        HBox actions = new HBox(8);
         actions.setAlignment(Pos.CENTER_LEFT);
-        progress.setPrefWidth(230);
+        progress.setPrefWidth(190);
         progress.setVisible(false);
         progress.setManaged(false);
         cancel.setDisable(true);
@@ -252,19 +265,22 @@ public final class PopulationPage extends BorderPane {
         cancel.setOnAction(event -> cancelAnalysis());
         Button reset = UiFactory.button("Ripristina filtri", "ghost-button");
         reset.setOnAction(event -> resetFilters());
-        actions.getChildren().addAll(
-                analyze, cancel, reset, progress);
+        actions.getChildren().addAll(analyze, cancel, reset, progress);
 
-        VBox footer = new VBox(4,
+        VBox preview = new VBox(2,
                 candidatePreview,
                 UiFactory.wrappedLabel(
-                        "Prima vengono applicati T90, redshift e coordinate; FRACEXP richiede il FITS. I file scaricati restano nella cache locale anche dopo la chiusura.",
+                        "T90, redshift e coordinate vengono applicati prima; FRACEXP richiede il FITS e usa la cache locale.",
                         "sky-filter-help"));
+        preview.setMinWidth(0);
+        preview.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(preview, Priority.ALWAYS);
+        HBox footer = new HBox(16, actions, preview);
+        footer.setAlignment(Pos.CENTER_LEFT);
 
-        VBox card = new VBox(14, primary, advanced, advancedContent, exposureBox, actions, footer);
-        card.getStyleClass().add("card");
-        card.getStyleClass().add("population-filter-card");
-        card.setPadding(new Insets(17));
+        VBox card = new VBox(9, primary, advanced, advancedContent, exposureBox, footer);
+        card.getStyleClass().addAll("card", "population-filter-card", "population-filter-card-compact");
+        card.setPadding(new Insets(12));
         return card;
     }
 
@@ -526,22 +542,75 @@ public final class PopulationPage extends BorderPane {
     }
 
     private void configureControls() {
-        exposureMin.textProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
-        exposureMax.textProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
-        exposureMin.focusedProperty().addListener((obs, oldValue, focused) -> {
-            if (!focused) normalizeExposureField(exposureMin, true);
-        });
-        exposureMax.focusedProperty().addListener((obs, oldValue, focused) -> {
-            if (!focused) normalizeExposureField(exposureMax, false);
-        });
-        exposureMin.setOnAction(event -> normalizeExposureField(exposureMin, true));
-        exposureMax.setOnAction(event -> normalizeExposureField(exposureMax, false));
+        configureExposureControl(exposureMinSlider, exposureMin, true, exposureMinDebounce);
+        configureExposureControl(exposureMaxSlider, exposureMax, false, exposureMaxDebounce);
         duration.valueProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
         redshiftAvailability.valueProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
         limit.valueProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
         for (TextField field : List.of(zMin, zMax, raMin, raMax, decMin, decMax)) {
             field.textProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
         }
+    }
+
+    private void configureExposureControl(Slider slider, TextField field, boolean minimum,
+                                          PauseTransition debounce) {
+        slider.valueProperty().addListener((obs, oldValue, newValue) -> {
+            if (syncingExposureControls) return;
+            double value = clampExposure(newValue.doubleValue(), minimum);
+            syncingExposureControls = true;
+            slider.setValue(value);
+            field.setText(formatExposure(value));
+            syncingExposureControls = false;
+            updateCandidatePreview();
+        });
+        field.textProperty().addListener((obs, oldValue, newValue) -> {
+            if (syncingExposureControls) return;
+            debounce.stop();
+            debounce.setOnFinished(event -> commitExposureField(slider, field, minimum));
+            debounce.playFromStart();
+        });
+        field.setOnAction(event -> {
+            debounce.stop();
+            commitExposureField(slider, field, minimum);
+        });
+        field.focusedProperty().addListener((obs, oldValue, focused) -> {
+            if (!focused) {
+                debounce.stop();
+                commitExposureField(slider, field, minimum);
+            }
+        });
+    }
+
+    private void commitExposureField(Slider slider, TextField field, boolean minimum) {
+        double fallback = slider.getValue();
+        double value;
+        try {
+            value = Double.parseDouble(field.getText().trim().replace(',', '.'));
+        } catch (Exception error) {
+            value = fallback;
+        }
+        value = clampExposure(value, minimum);
+        syncingExposureControls = true;
+        slider.setValue(value);
+        field.setText(formatExposure(value));
+        syncingExposureControls = false;
+        updateCandidatePreview();
+    }
+
+    private double clampExposure(double value, boolean minimum) {
+        value = Math.max(0.0, Math.min(100.0, value));
+        if (minimum) {
+            return Math.min(value, exposureMaxSlider.getValue());
+        }
+        return Math.max(value, exposureMinSlider.getValue());
+    }
+
+    private String formatExposure(double value) {
+        double rounded = Math.round(value * 10.0) / 10.0;
+        if (Math.abs(rounded - Math.rint(rounded)) < 1e-9) {
+            return Integer.toString((int) Math.rint(rounded));
+        }
+        return String.format(Locale.ITALY, "%.1f", rounded);
     }
 
     private void configureChart() {
@@ -1085,8 +1154,12 @@ public final class PopulationPage extends BorderPane {
         raMax.setText("360");
         decMin.setText("-90");
         decMax.setText("90");
+        syncingExposureControls = true;
+        exposureMinSlider.setValue(0);
+        exposureMaxSlider.setValue(100);
         exposureMin.setText("0");
         exposureMax.setText("100");
+        syncingExposureControls = false;
         window.setValue("±60 s");
         limit.setValue("25");
         updateCandidatePreview();
@@ -1099,64 +1172,54 @@ public final class PopulationPage extends BorderPane {
         return field;
     }
 
+    private static Slider exposureSlider(double value) {
+        Slider slider = new Slider(0, 100, value);
+        slider.getStyleClass().add("fracexp-slider");
+        slider.setBlockIncrement(1);
+        slider.setMajorTickUnit(25);
+        slider.setMinorTickCount(0);
+        slider.setSnapToTicks(false);
+        slider.setMinWidth(120);
+        slider.setPrefWidth(230);
+        slider.setMaxWidth(Double.MAX_VALUE);
+        return slider;
+    }
+
     private static TextField percentField(String value) {
         TextField field = new TextField(value);
         field.getStyleClass().add("percentage-field");
         field.setAlignment(Pos.CENTER);
-        field.setMinWidth(72);
-        field.setPrefWidth(86);
-        field.setMaxWidth(96);
+        field.setMinWidth(58);
+        field.setPrefWidth(64);
+        field.setMaxWidth(72);
         return field;
     }
 
-    private VBox exposureControl(String label, TextField field, boolean minimum) {
-        Button minus = UiFactory.button("−", "percentage-step-button");
-        Button plus = UiFactory.button("+", "percentage-step-button");
-        minus.setOnAction(event -> adjustExposure(field, -1, minimum));
-        plus.setOnAction(event -> adjustExposure(field, 1, minimum));
-        minus.setTooltip(UiFactory.quickTooltip("Riduci di 1%"));
-        plus.setTooltip(UiFactory.quickTooltip("Aumenta di 1%"));
+    private VBox exposureControl(String label, Slider slider, TextField field, boolean minimum) {
+        Button reset = UiFactory.button("↺", "filter-reset-button");
+        reset.setTooltip(UiFactory.quickTooltip(minimum
+                ? "Ripristina il minimo a 0%" : "Ripristina il massimo a 100%"));
+        reset.setOnAction(event -> {
+            double value = minimum ? 0.0 : 100.0;
+            syncingExposureControls = true;
+            slider.setValue(value);
+            field.setText(formatExposure(value));
+            syncingExposureControls = false;
+            updateCandidatePreview();
+        });
 
         Label unit = UiFactory.label("%", "percentage-unit");
-        HBox stepper = new HBox(8, minus, field, unit, plus);
-        stepper.setAlignment(Pos.CENTER_LEFT);
-        Label hint = UiFactory.label("Scrivi un valore da 0 a 100 oppure usa − / +", "filter-detail");
-        VBox box = new VBox(7, UiFactory.label(label, "filter-label"), stepper, hint);
+        HBox valueBox = new HBox(5, field, unit, reset);
+        valueBox.setAlignment(Pos.CENTER_RIGHT);
+        HBox heading = new HBox(8, UiFactory.label(label, "filter-label"), UiFactory.spacer(), valueBox);
+        heading.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(slider, Priority.ALWAYS);
+        VBox box = new VBox(5, heading, slider);
         box.getStyleClass().add("percentage-control");
-        box.setMinWidth(250);
-        box.setPrefWidth(330);
+        box.setMinWidth(260);
+        box.setPrefWidth(340);
         box.setMaxWidth(Double.MAX_VALUE);
         return box;
-    }
-
-    private void adjustExposure(TextField field, int delta, boolean minimum) {
-        int fallback = minimum ? 0 : 100;
-        Integer current = parseExposureInteger(field);
-        int value = Math.max(0, Math.min(100, (current == null ? fallback : current) + delta));
-        Integer other = parseExposureInteger(minimum ? exposureMax : exposureMin);
-        if (other != null) {
-            value = minimum ? Math.min(value, other) : Math.max(value, other);
-        }
-        field.setText(Integer.toString(value));
-    }
-
-    private void normalizeExposureField(TextField field, boolean minimum) {
-        Integer value = parseExposureInteger(field);
-        if (value == null) value = minimum ? 0 : 100;
-        value = Math.max(0, Math.min(100, value));
-        Integer other = parseExposureInteger(minimum ? exposureMax : exposureMin);
-        if (other != null) {
-            value = minimum ? Math.min(value, other) : Math.max(value, other);
-        }
-        field.setText(Integer.toString(value));
-    }
-
-    private Integer parseExposureInteger(TextField field) {
-        try {
-            return (int) Math.round(Double.parseDouble(field.getText().trim().replace(',', '.')));
-        } catch (Exception error) {
-            return null;
-        }
     }
 
     private static VBox filterGroup(String title, String detail, Node control, double width) {
