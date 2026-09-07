@@ -26,15 +26,19 @@ jobs:
           java-version: "17"
           cache: maven
 
-      - name: Applica layout compatto
-        if: github.event.pull_request.head.sha == '4cb43c877aee5d81b1001db944c7c48d7862275b'
-        run: python3 .github/scripts/apply_compact_ui.py
+      - name: Applica layout compatto se necessario
+        shell: bash
+        run: |
+          if grep -q "exposureMinSlider" src/main/java/it/casiraghi/swiftbat/ui/PopulationPage.java; then
+            echo "Layout già applicato"
+          else
+            python3 .github/scripts/apply_compact_ui.py
+          fi
 
       - name: Verifica Maven
         run: mvn --batch-mode --no-transfer-progress verify
 
-      - name: Salva revisione
-        if: github.event.pull_request.head.sha == '4cb43c877aee5d81b1001db944c7c48d7862275b'
+      - name: Salva revisione se presente
         shell: bash
         run: |
           git config user.name "ChatGPT"
@@ -42,5 +46,9 @@ jobs:
           git add src/main/java/it/casiraghi/swiftbat/ui/PopulationPage.java \
                   src/main/java/it/casiraghi/swiftbat/ui/ExplorerPage.java \
                   src/main/resources/app.css
-          git commit -m "Compatta analisi di popolazione ed Esplora"
-          git push origin HEAD:feature/analysis-population-1.3.0
+          if git diff --cached --quiet; then
+            echo "Nessuna modifica sorgente da salvare"
+          else
+            git commit -m "Compatta analisi di popolazione ed Esplora"
+            git push origin HEAD:feature/analysis-population-1.3.0
+          fi
