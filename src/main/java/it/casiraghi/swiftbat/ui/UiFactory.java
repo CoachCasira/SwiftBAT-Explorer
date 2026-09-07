@@ -14,6 +14,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
+import javafx.util.Duration;
 
 public final class UiFactory {
     private static final String AUTO_TOOLTIP_KEY = UiFactory.class.getName() + ".autoTooltip";
@@ -58,7 +59,7 @@ public final class UiFactory {
         if (choice == null) return null;
         Runnable refresh = () -> {
             T value = choice.getValue();
-            choice.setTooltip(value == null || value.toString().isBlank() ? null : new Tooltip(value.toString()));
+            choice.setTooltip(value == null || value.toString().isBlank() ? null : quickTooltip(value.toString()));
         };
         choice.valueProperty().addListener((obs, oldValue, newValue) -> refresh.run());
         refresh.run();
@@ -87,7 +88,7 @@ public final class UiFactory {
         boolean clipped = probe.getLayoutBounds().getWidth() > available;
         if (clipped) {
             if (control.getTooltip() == null || autoTooltip) {
-                control.setTooltip(new Tooltip(text));
+                control.setTooltip(quickTooltip(text));
                 control.getProperties().put(AUTO_TOOLTIP_KEY, Boolean.TRUE);
             }
         } else if (autoTooltip) {
@@ -96,10 +97,18 @@ public final class UiFactory {
         }
     }
 
+    public static Tooltip quickTooltip(String text) {
+        Tooltip tooltip = new Tooltip(text);
+        tooltip.setShowDelay(Duration.millis(500));
+        tooltip.setHideDelay(Duration.millis(80));
+        tooltip.setShowDuration(Duration.seconds(30));
+        return tooltip;
+    }
+
     public static Button iconButton(String glyph, String tooltip) {
         Button button = button(glyph, "icon-button");
         button.getProperties().remove(AUTO_TOOLTIP_KEY);
-        button.setTooltip(new Tooltip(tooltip));
+        button.setTooltip(quickTooltip(tooltip));
         return button;
     }
 

@@ -29,7 +29,6 @@ import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.control.Slider;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TableColumn;
@@ -87,10 +86,8 @@ public final class PopulationPage extends BorderPane {
     private final TextField raMax = field("360");
     private final TextField decMin = field("-90");
     private final TextField decMax = field("90");
-    private final Slider exposureMin = slider(0);
-    private final Slider exposureMax = slider(100);
-    private final Label exposureMinValue = UiFactory.label("0%", "filter-value");
-    private final Label exposureMaxValue = UiFactory.label("100%", "filter-value");
+    private final TextField exposureMin = percentField("0");
+    private final TextField exposureMax = percentField("100");
     private final ChoiceBox<String> window = new ChoiceBox<>();
     private final ChoiceBox<String> limit = new ChoiceBox<>();
     private final Button analyze = UiFactory.button("Analizza il gruppo", "primary-button");
@@ -231,8 +228,8 @@ public final class PopulationPage extends BorderPane {
             advanced.setText(selected ? "Nascondi filtri avanzati" : "Filtri avanzati: z e area di cielo");
         });
 
-        VBox minimum = exposureControl("Minimo ammesso", exposureMin, exposureMinValue);
-        VBox maximum = exposureControl("Massimo ammesso", exposureMax, exposureMaxValue);
+        VBox minimum = exposureControl("Minimo ammesso", exposureMin, true);
+        VBox maximum = exposureControl("Massimo ammesso", exposureMax, false);
         HBox exposureControls = new HBox(16, minimum, maximum);
         exposureControls.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(minimum, Priority.ALWAYS);
@@ -345,7 +342,7 @@ public final class PopulationPage extends BorderPane {
         item.setAlignment(Pos.CENTER_LEFT);
         item.getStyleClass().add("population-legend-item");
         if (title.startsWith("Fascia centrale")) {
-            Tooltip.install(item, new Tooltip(
+            Tooltip.install(item, UiFactory.quickTooltip(
                     "A ogni secondo si ordinano i valori delle curve: il 25° percentile lascia sotto di sé il 25% dei valori, "
                             + "il 75° percentile ne lascia sotto il 75%. Tra i due rimane quindi il 50% centrale del campione."));
         }
@@ -529,20 +526,16 @@ public final class PopulationPage extends BorderPane {
     }
 
     private void configureControls() {
-        exposureMin.valueProperty().addListener((obs, oldValue, value) -> {
-            if (value.doubleValue() > exposureMax.getValue()) {
-                exposureMin.setValue(exposureMax.getValue());
-            }
-            updateExposureLabel();
-            updateCandidatePreview();
+        exposureMin.textProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
+        exposureMax.textProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
+        exposureMin.focusedProperty().addListener((obs, oldValue, focused) -> {
+            if (!focused) normalizeExposureField(exposureMin, true);
         });
-        exposureMax.valueProperty().addListener((obs, oldValue, value) -> {
-            if (value.doubleValue() < exposureMin.getValue()) {
-                exposureMax.setValue(exposureMin.getValue());
-            }
-            updateExposureLabel();
-            updateCandidatePreview();
+        exposureMax.focusedProperty().addListener((obs, oldValue, focused) -> {
+            if (!focused) normalizeExposureField(exposureMax, false);
         });
+        exposureMin.setOnAction(event -> normalizeExposureField(exposureMin, true));
+        exposureMax.setOnAction(event -> normalizeExposureField(exposureMax, false));
         duration.valueProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
         redshiftAvailability.valueProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
         limit.valueProperty().addListener((obs, oldValue, value) -> updateCandidatePreview());
@@ -992,8 +985,13 @@ public final class PopulationPage extends BorderPane {
         int maximumEvents = "Tutti".equals(limit.getValue())
                 ? Integer.MAX_VALUE
                 : Integer.parseInt(limit.getValue());
+        double minExposure = percentage(exposureMin, "Copertura FRACEXP minima");
+        double maxExposure = percentage(exposureMax, "Copertura FRACEXP massima");
+        if (minExposure > maxExposure) {
+            throw new IllegalArgumentException("Il minimo FRACEXP non può superare il massimo.");
+        }
         return new Filter(duration.getValue(), redshiftAvailability.getValue(), minZ, maxZ,
-                minRa, maxRa, minDec, maxDec, exposureMin.getValue(), exposureMax.getValue(),
+                minRa, maxRa, minDec, maxDec, minExposure, maxExposure,
                 halfWindow, maximumEvents);
     }
 
@@ -1003,6 +1001,14 @@ public final class PopulationPage extends BorderPane {
         } catch (Exception error) {
             throw new IllegalArgumentException(label + " non è un numero valido.");
         }
+    }
+
+    private double percentage(TextField field, String label) {
+        double value = number(field, label);
+        if (value < 0 || value > 100) {
+            throw new IllegalArgumentException(label + " deve essere compresa fra 0% e 100%.");
+        }
+        return value;
     }
 
     private void updateReadyState() {
@@ -1048,11 +1054,6 @@ public final class PopulationPage extends BorderPane {
         curveChart.setTitle("Nessuna analisi eseguita");
     }
 
-    private void updateExposureLabel() {
-        exposureMinValue.setText(String.format(Locale.ITALY, "%.0f%%", exposureMin.getValue()));
-        exposureMaxValue.setText(String.format(Locale.ITALY, "%.0f%%", exposureMax.getValue()));
-    }
-
     private void updateCandidatePreview() {
         if (catalog.isEmpty() || metadata.isEmpty() || duration.getValue() == null
                 || redshiftAvailability.getValue() == null || limit.getValue() == null
@@ -1084,8 +1085,8 @@ public final class PopulationPage extends BorderPane {
         raMax.setText("360");
         decMin.setText("-90");
         decMax.setText("90");
-        exposureMin.setValue(0);
-        exposureMax.setValue(100);
+        exposureMin.setText("0");
+        exposureMax.setText("100");
         window.setValue("±60 s");
         limit.setValue("25");
         updateCandidatePreview();
@@ -1098,29 +1099,64 @@ public final class PopulationPage extends BorderPane {
         return field;
     }
 
-    private static Slider slider(double value) {
-        Slider slider = new Slider(0, 100, value);
-        slider.setBlockIncrement(1);
-        slider.setMajorTickUnit(25);
-        slider.setMinorTickCount(0);
-        slider.setSnapToTicks(false);
-        slider.setPadding(new Insets(0, 12, 0, 12));
-        slider.setMinWidth(0);
-        slider.setPrefWidth(320);
-        slider.setMaxWidth(Double.MAX_VALUE);
-        return slider;
+    private static TextField percentField(String value) {
+        TextField field = new TextField(value);
+        field.getStyleClass().add("percentage-field");
+        field.setAlignment(Pos.CENTER);
+        field.setMinWidth(72);
+        field.setPrefWidth(86);
+        field.setMaxWidth(96);
+        return field;
     }
 
-    private static VBox exposureControl(String label, Slider slider, Label value) {
-        HBox heading = new HBox(8, UiFactory.label(label, "filter-label"), UiFactory.spacer(), value);
-        heading.setAlignment(Pos.CENTER_LEFT);
-        slider.setMaxWidth(Double.MAX_VALUE);
-        VBox box = new VBox(7, heading, slider);
-        box.setMinWidth(220);
-        box.setPrefWidth(320);
+    private VBox exposureControl(String label, TextField field, boolean minimum) {
+        Button minus = UiFactory.button("−", "percentage-step-button");
+        Button plus = UiFactory.button("+", "percentage-step-button");
+        minus.setOnAction(event -> adjustExposure(field, -1, minimum));
+        plus.setOnAction(event -> adjustExposure(field, 1, minimum));
+        minus.setTooltip(UiFactory.quickTooltip("Riduci di 1%"));
+        plus.setTooltip(UiFactory.quickTooltip("Aumenta di 1%"));
+
+        Label unit = UiFactory.label("%", "percentage-unit");
+        HBox stepper = new HBox(8, minus, field, unit, plus);
+        stepper.setAlignment(Pos.CENTER_LEFT);
+        Label hint = UiFactory.label("Scrivi un valore da 0 a 100 oppure usa − / +", "filter-detail");
+        VBox box = new VBox(7, UiFactory.label(label, "filter-label"), stepper, hint);
+        box.getStyleClass().add("percentage-control");
+        box.setMinWidth(250);
+        box.setPrefWidth(330);
         box.setMaxWidth(Double.MAX_VALUE);
-        box.setStyle("-fx-background-color: rgba(13, 20, 35, 0.55); -fx-background-radius: 10; -fx-padding: 9 10 8 10;");
         return box;
+    }
+
+    private void adjustExposure(TextField field, int delta, boolean minimum) {
+        int fallback = minimum ? 0 : 100;
+        Integer current = parseExposureInteger(field);
+        int value = Math.max(0, Math.min(100, (current == null ? fallback : current) + delta));
+        Integer other = parseExposureInteger(minimum ? exposureMax : exposureMin);
+        if (other != null) {
+            value = minimum ? Math.min(value, other) : Math.max(value, other);
+        }
+        field.setText(Integer.toString(value));
+    }
+
+    private void normalizeExposureField(TextField field, boolean minimum) {
+        Integer value = parseExposureInteger(field);
+        if (value == null) value = minimum ? 0 : 100;
+        value = Math.max(0, Math.min(100, value));
+        Integer other = parseExposureInteger(minimum ? exposureMax : exposureMin);
+        if (other != null) {
+            value = minimum ? Math.min(value, other) : Math.max(value, other);
+        }
+        field.setText(Integer.toString(value));
+    }
+
+    private Integer parseExposureInteger(TextField field) {
+        try {
+            return (int) Math.round(Double.parseDouble(field.getText().trim().replace(',', '.')));
+        } catch (Exception error) {
+            return null;
+        }
     }
 
     private static VBox filterGroup(String title, String detail, Node control, double width) {
