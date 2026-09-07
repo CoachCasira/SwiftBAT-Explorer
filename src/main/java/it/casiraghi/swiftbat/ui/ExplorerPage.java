@@ -388,8 +388,11 @@ public final class ExplorerPage extends BorderPane {
         ChoiceBox<String> windowChoice = new ChoiceBox<>(FXCollections.observableArrayList(WINDOWS.keySet()));
         windowChoice.getStyleClass().add("choice-box-modern");
         windowChoice.setValue("±60 s dal trigger");
+        UiFactory.autoTooltip(channelChoice);
+        UiFactory.autoTooltip(windowChoice);
         CheckBox smooth = new CheckBox("Media mobile 5 bin");
         smooth.getStyleClass().add("modern-check");
+        UiFactory.autoTooltip(smooth);
         Label help = UiFactory.label("Il tratteggio verticale indica il trigger (t = 0).", "subtle-text");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);

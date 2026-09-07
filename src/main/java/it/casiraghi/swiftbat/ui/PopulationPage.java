@@ -26,6 +26,7 @@ import javafx.scene.chart.XYChart;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ProgressBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Slider;
@@ -118,6 +119,7 @@ public final class PopulationPage extends BorderPane {
     private Java2DGroupedBarPanel.Dataset t90ThreeDDataset = Java2DGroupedBarPanel.Dataset.empty();
     private Java2DGroupedBarPanel.Dataset redshift3DDataset = Java2DGroupedBarPanel.Dataset.empty();
     private AnalysisResult lastResult;
+    private PopulationInsightService.Narrative lastNarrative;
     private Task<AnalysisResult> runningTask;
 
     public PopulationPage(DataLoader loader, Executor taskExecutor, ExecutorService loaderExecutor,
@@ -201,6 +203,7 @@ public final class PopulationPage extends BorderPane {
         limit.setValue("25");
         for (ChoiceBox<?> choice : List.of(duration, redshiftAvailability, window, limit)) {
             choice.getStyleClass().add("choice-box-modern");
+            UiFactory.autoTooltip(choice);
         }
 
         FlowPane primary = new FlowPane(12, 12);
@@ -230,8 +233,10 @@ public final class PopulationPage extends BorderPane {
 
         VBox minimum = exposureControl("Minimo ammesso", exposureMin, exposureMinValue);
         VBox maximum = exposureControl("Massimo ammesso", exposureMax, exposureMaxValue);
-        FlowPane exposureControls = new FlowPane(22, 10, minimum, maximum);
+        HBox exposureControls = new HBox(16, minimum, maximum);
         exposureControls.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(minimum, Priority.ALWAYS);
+        HBox.setHgrow(maximum, Priority.ALWAYS);
         VBox exposureBox = new VBox(8,
                 UiFactory.label("Qualità della copertura FRACEXP", "population-section-title"),
                 UiFactory.wrappedLabel(
@@ -295,6 +300,9 @@ public final class PopulationPage extends BorderPane {
     }
 
     private VBox insightCard() {
+        insightHeadline.setMinWidth(0);
+        insightHeadline.setMaxWidth(Double.MAX_VALUE);
+        insightHeadline.setTextOverrun(OverrunStyle.CLIP);
         insightObservations.getStyleClass().add("population-insight-list");
         insightCautions.getStyleClass().add("population-insight-cautions");
         VBox content = new VBox(10,
@@ -307,6 +315,7 @@ public final class PopulationPage extends BorderPane {
                         "Il testo deriva solo dalle statistiche del grafico e non sostituisce l'interpretazione scientifica.",
                         "population-insight-footnote"));
         content.getStyleClass().add("population-insight-card");
+        content.setFillWidth(true);
         content.setMinWidth(270);
         content.setPrefWidth(330);
         content.setMaxWidth(370);
@@ -321,8 +330,8 @@ public final class PopulationPage extends BorderPane {
                         "linee normalizzate e allineate al trigger"),
                 profileLegendItem("population-legend-median", "Mediana",
                         "comportamento centrale del gruppo a ogni secondo"),
-                profileLegendItem("population-legend-quartile", "25° e 75° percentile",
-                        "intervallo che contiene la metà centrale dei valori"));
+                profileLegendItem("population-legend-quartile", "Fascia centrale 25°–75°",
+                        "tra i due limiti cade il 50% centrale delle curve"));
         return legend;
     }
 
@@ -335,6 +344,11 @@ public final class PopulationPage extends BorderPane {
         HBox item = new HBox(9, sample, text);
         item.setAlignment(Pos.CENTER_LEFT);
         item.getStyleClass().add("population-legend-item");
+        if (title.startsWith("Fascia centrale")) {
+            Tooltip.install(item, new Tooltip(
+                    "A ogni secondo si ordinano i valori delle curve: il 25° percentile lascia sotto di sé il 25% dei valori, "
+                            + "il 75° percentile ne lascia sotto il 75%. Tra i due rimane quindi il 50% centrale del campione."));
+        }
         return item;
     }
 
@@ -343,10 +357,57 @@ public final class PopulationPage extends BorderPane {
         enlarged.setMinHeight(0);
         enlarged.setPrefHeight(760);
         enlarged.setMaxHeight(Double.MAX_VALUE);
-        VBox content = new VBox(12, profileLegend(), enlarged);
-        content.getStyleClass().add("population-fullscreen-content");
+
+        VBox chartColumn = new VBox(12, profileLegend(), enlarged);
+        chartColumn.setMinWidth(0);
+        chartColumn.setMaxWidth(Double.MAX_VALUE);
         VBox.setVgrow(enlarged, Priority.ALWAYS);
+        HBox.setHgrow(chartColumn, Priority.ALWAYS);
+
+        HBox content = new HBox(18, chartColumn, insightSnapshotCard(true));
+        content.setAlignment(Pos.TOP_LEFT);
+        content.getStyleClass().add("population-fullscreen-content");
         InPlaceFullscreen.show(this, "Profilo temporale della popolazione", content);
+    }
+
+    private VBox insightSnapshotCard(boolean expanded) {
+        String headlineText = lastNarrative == null ? insightHeadline.getText() : lastNarrative.headline();
+        List<String> observations = lastNarrative == null ? List.of() : lastNarrative.observations();
+        List<String> cautions = lastNarrative == null ? List.of() : lastNarrative.cautions();
+
+        Label headline = UiFactory.wrappedLabel(headlineText, "population-insight-headline");
+        headline.setMinWidth(0);
+        headline.setMaxWidth(Double.MAX_VALUE);
+        headline.setTextOverrun(OverrunStyle.CLIP);
+
+        VBox observationBox = new VBox(expanded ? 10 : 7);
+        observationBox.getStyleClass().add("population-insight-list");
+        observationBox.getChildren().setAll(observations.stream()
+                .map(text -> insightLine("●", text, "population-insight-dot", expanded))
+                .toList());
+
+        VBox cautionBox = new VBox(expanded ? 9 : 6);
+        cautionBox.getStyleClass().add("population-insight-cautions");
+        if (!cautions.isEmpty()) {
+            cautionBox.getChildren().add(UiFactory.label("Da tenere presente", "population-insight-caution-title"));
+            cautions.stream().limit(expanded ? cautions.size() : 3)
+                    .map(text -> insightLine("!", text, "population-insight-warning", expanded))
+                    .forEach(cautionBox.getChildren()::add);
+        }
+
+        VBox card = new VBox(expanded ? 13 : 10,
+                UiFactory.label("Assistente di lettura", "population-insight-title"),
+                UiFactory.label("ANALISI LOCALE · RIPRODUCIBILE", "population-insight-badge"),
+                headline, observationBox, cautionBox,
+                UiFactory.wrappedLabel(
+                        "Il testo deriva solo dalle statistiche del grafico e non sostituisce l'interpretazione scientifica.",
+                        "population-insight-footnote"));
+        card.getStyleClass().add("population-insight-card");
+        card.setFillWidth(true);
+        card.setMinWidth(expanded ? 350 : 270);
+        card.setPrefWidth(expanded ? 430 : 330);
+        card.setMaxWidth(expanded ? 520 : 370);
+        return card;
     }
 
     private void openProfile3D() {
@@ -354,8 +415,15 @@ public final class PopulationPage extends BorderPane {
             return;
         }
         Population3DChartPane pane = new Population3DChartPane();
-        pane.setData(lastResult.curves(), Map.copyOf(metadata), lastResult.halfWindow());
-        InPlaceFullscreen.show(this, "Profilo di popolazione 3D", pane);
+        pane.setData(lastResult.curves(), lastResult.profile(), lastResult.halfWindow());
+        pane.setMinWidth(0);
+        pane.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(pane, Priority.ALWAYS);
+
+        HBox content = new HBox(18, pane, insightSnapshotCard(true));
+        content.setAlignment(Pos.TOP_LEFT);
+        content.getStyleClass().add("population-fullscreen-content");
+        InPlaceFullscreen.show(this, "Profilo di popolazione 3D", content);
     }
 
     private LineChart<Number, Number> copyProfileChart() {
@@ -725,6 +793,7 @@ public final class PopulationPage extends BorderPane {
                 .toList();
         PopulationInsightService.Narrative narrative = insightService.analyze(
                 result.curves(), result.profile(), facts, result.examined(), result.failures(), result.halfWindow());
+        lastNarrative = narrative;
         insightHeadline.setText(narrative.headline());
         insightObservations.getChildren().setAll(narrative.observations().stream()
                 .map(text -> insightLine("●", text, "population-insight-dot"))
@@ -739,10 +808,20 @@ public final class PopulationPage extends BorderPane {
     }
 
     private HBox insightLine(String marker, String text, String markerStyle) {
+        return insightLine(marker, text, markerStyle, false);
+    }
+
+    private HBox insightLine(String marker, String text, String markerStyle, boolean expanded) {
         Label bullet = UiFactory.label(marker, markerStyle);
         Label copy = UiFactory.wrappedLabel(text, "population-insight-text");
+        copy.setMinWidth(0);
+        copy.setMaxWidth(Double.MAX_VALUE);
+        copy.setTextOverrun(OverrunStyle.CLIP);
+        if (expanded) copy.setStyle("-fx-font-size: 12px; -fx-line-spacing: 2.5px;");
         HBox.setHgrow(copy, Priority.ALWAYS);
         HBox row = new HBox(8, bullet, copy);
+        row.setMinWidth(0);
+        row.setMaxWidth(Double.MAX_VALUE);
         row.setAlignment(Pos.TOP_LEFT);
         return row;
     }
@@ -950,6 +1029,7 @@ public final class PopulationPage extends BorderPane {
 
     private void clearResults() {
         lastResult = null;
+        lastNarrative = null;
         curveChart.getData().clear();
         resultTable.getItems().clear();
         exposureHistogram.getData().clear();
@@ -1022,20 +1102,24 @@ public final class PopulationPage extends BorderPane {
         Slider slider = new Slider(0, 100, value);
         slider.setBlockIncrement(1);
         slider.setMajorTickUnit(25);
-        slider.setMinorTickCount(24);
-        slider.setSnapToTicks(true);
-        slider.setPrefWidth(240);
-        slider.setMinWidth(180);
-        slider.setMaxWidth(260);
+        slider.setMinorTickCount(0);
+        slider.setSnapToTicks(false);
+        slider.setPadding(new Insets(0, 12, 0, 12));
+        slider.setMinWidth(0);
+        slider.setPrefWidth(320);
+        slider.setMaxWidth(Double.MAX_VALUE);
         return slider;
     }
 
     private static VBox exposureControl(String label, Slider slider, Label value) {
         HBox heading = new HBox(8, UiFactory.label(label, "filter-label"), UiFactory.spacer(), value);
         heading.setAlignment(Pos.CENTER_LEFT);
-        VBox box = new VBox(4, heading, slider);
-        box.setPrefWidth(260);
-        box.setMaxWidth(280);
+        slider.setMaxWidth(Double.MAX_VALUE);
+        VBox box = new VBox(7, heading, slider);
+        box.setMinWidth(220);
+        box.setPrefWidth(320);
+        box.setMaxWidth(Double.MAX_VALUE);
+        box.setStyle("-fx-background-color: rgba(13, 20, 35, 0.55); -fx-background-radius: 10; -fx-padding: 9 10 8 10;");
         return box;
     }
 

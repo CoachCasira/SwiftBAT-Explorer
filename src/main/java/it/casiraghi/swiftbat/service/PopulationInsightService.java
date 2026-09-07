@@ -139,7 +139,7 @@ public final class PopulationInsightService {
         }
         String level = meanIqr < 0.15 ? "contenuta" : meanIqr < 0.35 ? "moderata" : "elevata";
         return String.format(Locale.ITALY,
-                "Variabilità — La distanza media fra 25° e 75° percentile è %.2f: la dispersione delle forme è %s.",
+                "Variabilità — La fascia 25°–75° ha ampiezza media %.2f: contiene il 50%% centrale delle curve e indica una dispersione %s.",
                 meanIqr, level);
     }
 

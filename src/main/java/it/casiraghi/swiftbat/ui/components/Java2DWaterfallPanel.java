@@ -341,14 +341,28 @@ public final class Java2DWaterfallPanel extends JPanel {
             g.fill(area);
         }
 
-        // Glow sottile seguito dalla linea nitida.
-        g.setColor(withAlpha(color, presentation.denseSeries() ? 22 : 55));
-        g.setStroke(new BasicStroke(presentation.denseSeries() ? 3.2f : 7.5f,
-                BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        // Glow sottile seguito dalla linea nitida. Nel profilo di popolazione
+        // mediana e quartili mantengono la stessa gerarchia visiva della vista 2D.
+        boolean medianBand = isMedianBand(band);
+        boolean quartileBand = isQuartileBand(band);
+        int glowAlpha = medianBand ? 70 : quartileBand ? 40 : presentation.denseSeries() ? 18 : 55;
+        float glowWidth = medianBand ? 8.0f : quartileBand ? 5.0f
+                : presentation.denseSeries() ? 3.0f : 7.5f;
+        g.setColor(withAlpha(color, glowAlpha));
+        g.setStroke(new BasicStroke(glowWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g.draw(line);
-        g.setColor(withAlpha(color, presentation.denseSeries() ? 145 : band == 0 ? 245 : 220));
-        g.setStroke(new BasicStroke(presentation.denseSeries() ? 1.25f : band == 0 ? 2.8f : 2.35f,
-                BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+
+        int lineAlpha = medianBand ? 255 : quartileBand ? 235
+                : presentation.denseSeries() ? 105 : band == 0 ? 245 : 220;
+        float lineWidth = medianBand ? 4.2f : quartileBand ? 2.4f
+                : presentation.denseSeries() ? 1.05f : band == 0 ? 2.8f : 2.35f;
+        g.setColor(withAlpha(color, lineAlpha));
+        if (quartileBand) {
+            g.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND,
+                    10f, new float[]{8f, 6f}, 0f));
+        } else {
+            g.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        }
         g.draw(line);
 
         // Evidenzia il massimo quando è utile per il tipo di grafico visualizzato.
@@ -361,6 +375,19 @@ public final class Java2DWaterfallPanel extends JPanel {
             g.setStroke(new BasicStroke(1.5f));
             g.drawOval((int) peak.getX() - 5, (int) peak.getY() - 5, 10, 10);
         }
+    }
+
+    private boolean isMedianBand(int band) {
+        return "Mediana".equals(labelForBand(band));
+    }
+
+    private boolean isQuartileBand(int band) {
+        String label = labelForBand(band);
+        return label != null && label.contains("percentile");
+    }
+
+    private String labelForBand(int band) {
+        return band >= 0 && band < dataset.labels().length ? dataset.labels()[band] : null;
     }
 
     private void paintAxesAndLabels(Graphics2D g, Bounds bounds, Geometry geometry) {

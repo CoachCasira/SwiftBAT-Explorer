@@ -1,6 +1,5 @@
 package it.casiraghi.swiftbat.ui.components;
 
-import it.casiraghi.swiftbat.model.SkyBurst;
 import it.casiraghi.swiftbat.service.CumulativeAnalysisService;
 import it.casiraghi.swiftbat.ui.UiFactory;
 import javafx.application.Platform;
@@ -20,17 +19,13 @@ import javafx.scene.layout.VBox;
 import javax.swing.SwingUtilities;
 import java.awt.Color;
 import java.awt.Dimension;
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 
-/** Vista interattiva tempo–rate–GRB del campione di popolazione. */
+/** Vista interattiva 3D degli stessi elementi statistici mostrati nel profilo 2D. */
 public final class Population3DChartPane extends BorderPane {
-    private static final Color SHORT_COLOR = new Color(255, 174, 74);
-    private static final Color LONG_COLOR = new Color(82, 216, 255);
-    private static final Color UNKNOWN_COLOR = new Color(145, 157, 179);
+    private static final Color SINGLE_COLOR = new Color(82, 216, 255);
+    private static final Color MEDIAN_COLOR = new Color(255, 174, 74);
+    private static final Color QUARTILE_COLOR = new Color(170, 120, 219);
 
     private final SwingNode swingNode = new SwingNode();
     private final Java2DWaterfallPanel renderer = new Java2DWaterfallPanel();
@@ -41,12 +36,11 @@ public final class Population3DChartPane extends BorderPane {
         getStyleClass().add("three-d-panel");
         setMinHeight(560);
         setPrefHeight(700);
-
         SwingUtilities.invokeLater(() -> {
             renderer.setPresentation(new Java2DWaterfallPanel.Presentation(
                     "Nessuna curva normalizzata disponibile per la vista 3D.",
-                    "Tempo dal trigger (s)", "Rate normalizzato", "GRB ordinati per T90",
-                    "Rate normalizzato", "", false, false, true, 8));
+                    "Tempo dal trigger (s)", "Rate normalizzato", "Elementi del profilo 2D",
+                    "Rate normalizzato", "", false, false, true, 10));
             swingNode.setContent(renderer);
         });
 
@@ -56,59 +50,74 @@ public final class Population3DChartPane extends BorderPane {
         viewer.setPrefHeight(590);
         viewer.widthProperty().addListener((obs, oldValue, newValue) -> syncRendererSize(viewer));
         viewer.heightProperty().addListener((obs, oldValue, newValue) -> syncRendererSize(viewer));
-
         setTop(buildHeader());
         setCenter(viewer);
         setBottom(buildFooter());
-        BorderPane.setMargin(viewer, Insets.EMPTY);
         Platform.runLater(() -> syncRendererSize(viewer));
     }
 
     public void setData(List<CumulativeAnalysisService.NormalizedCurve> curves,
-                        Map<String, SkyBurst> metadata,
+                        CumulativeAnalysisService.PopulationProfile profile,
                         double halfWindowSeconds) {
-        Java2DWaterfallPanel.Dataset dataset = toDataset(curves, metadata, halfWindowSeconds);
-        sampleLabel.setText(dataset.isEmpty() ? "Nessun campione" : dataset.bandCount() + " GRB");
+        Java2DWaterfallPanel.Dataset dataset = toDataset(curves, profile, halfWindowSeconds);
+        int curveCount = curves == null ? 0 : curves.size();
+        sampleLabel.setText(dataset.isEmpty() ? "Nessun campione"
+                : curveCount + " GRB · mediana + fascia centrale");
         SwingUtilities.invokeLater(() -> renderer.setDataset(dataset));
     }
 
-    private Java2DWaterfallPanel.Dataset toDataset(
-            List<CumulativeAnalysisService.NormalizedCurve> curves,
-            Map<String, SkyBurst> metadata,
-            double halfWindowSeconds) {
-        if (curves == null || curves.isEmpty()) {
-            return Java2DWaterfallPanel.Dataset.empty();
-        }
-        Map<String, SkyBurst> safeMetadata = metadata == null ? Map.of() : metadata;
-        List<CumulativeAnalysisService.NormalizedCurve> ordered = new ArrayList<>(curves);
-        ordered.sort(Comparator
-                .comparingDouble((CumulativeAnalysisService.NormalizedCurve curve) ->
-                        t90For(curve.grbName(), safeMetadata))
-                .thenComparing(CumulativeAnalysisService.NormalizedCurve::grbName));
-
+    private Java2DWaterfallPanel.Dataset toDataset(List<CumulativeAnalysisService.NormalizedCurve> curves,
+                                                    CumulativeAnalysisService.PopulationProfile profile,
+                                                    double halfWindowSeconds) {
+        if (curves == null || curves.isEmpty()) return Java2DWaterfallPanel.Dataset.empty();
         int start = (int) Math.ceil(-halfWindowSeconds);
         int end = (int) Math.floor(halfWindowSeconds);
-        if (end < start) {
-            return Java2DWaterfallPanel.Dataset.empty();
-        }
+        if (end < start) return Java2DWaterfallPanel.Dataset.empty();
         double[] times = new double[end - start + 1];
-        for (int index = 0; index < times.length; index++) {
-            times[index] = start + index;
-        }
+        for (int i = 0; i < times.length; i++) times[i] = start + i;
 
-        double[][] rates = new double[ordered.size()][times.length];
-        String[] labels = new String[ordered.size()];
-        Color[] colors = new Color[ordered.size()];
-        for (int curveIndex = 0; curveIndex < ordered.size(); curveIndex++) {
-            CumulativeAnalysisService.NormalizedCurve curve = ordered.get(curveIndex);
-            SkyBurst burst = safeMetadata.get(curve.grbName().toUpperCase(Locale.ROOT));
-            labels[curveIndex] = curve.grbName() + " · " + shortClass(burst);
-            colors[curveIndex] = colorFor(burst);
-            for (int timeIndex = 0; timeIndex < times.length; timeIndex++) {
-                rates[curveIndex][timeIndex] = analysisService.sampleAt(curve, times[timeIndex]);
+        boolean hasProfile = profile != null && !profile.median().isEmpty()
+                && !profile.lowerQuartile().isEmpty() && !profile.upperQuartile().isEmpty();
+        int offset = hasProfile ? 3 : 0;
+        double[][] rates = new double[curves.size() + offset][times.length];
+        String[] labels = new String[curves.size() + offset];
+        Color[] colors = new Color[curves.size() + offset];
+
+        if (hasProfile) {
+            labels[0] = "Mediana";
+            labels[1] = "25° percentile";
+            labels[2] = "75° percentile";
+            colors[0] = MEDIAN_COLOR;
+            colors[1] = QUARTILE_COLOR;
+            colors[2] = QUARTILE_COLOR;
+            for (int i = 0; i < times.length; i++) {
+                rates[0][i] = valueAt(profile.median(), times[i]);
+                rates[1][i] = valueAt(profile.lowerQuartile(), times[i]);
+                rates[2][i] = valueAt(profile.upperQuartile(), times[i]);
             }
         }
+        for (int c = 0; c < curves.size(); c++) {
+            int band = c + offset;
+            CumulativeAnalysisService.NormalizedCurve curve = curves.get(c);
+            labels[band] = curve.grbName();
+            colors[band] = SINGLE_COLOR;
+            for (int i = 0; i < times.length; i++) rates[band][i] = analysisService.sampleAt(curve, times[i]);
+        }
         return new Java2DWaterfallPanel.Dataset(times, rates, labels, colors);
+    }
+
+    private double valueAt(List<CumulativeAnalysisService.Point> points, double time) {
+        double bestDistance = Double.POSITIVE_INFINITY;
+        double bestValue = Double.NaN;
+        for (CumulativeAnalysisService.Point point : points) {
+            if (!Double.isFinite(point.time()) || !Double.isFinite(point.value())) continue;
+            double distance = Math.abs(point.time() - time);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestValue = point.value();
+            }
+        }
+        return bestDistance <= 0.51 ? bestValue : Double.NaN;
     }
 
     private VBox buildHeader() {
@@ -117,15 +126,14 @@ public final class Population3DChartPane extends BorderPane {
         HBox.setHgrow(spacer, Priority.ALWAYS);
         HBox titleRow = new HBox(10, title, spacer, sampleLabel);
         titleRow.setAlignment(Pos.CENTER_LEFT);
-
         Label explanation = UiFactory.wrappedLabel(
-                "Asse X = tempo dal trigger; asse Y = rate normalizzato; profondità = singoli GRB, ordinati dal T90 più corto al più lungo. Ogni linea resta un evento distinto: i segnali non vengono sommati.",
+                "La vista 3D riproduce gli stessi elementi del grafico 2D: singoli GRB in azzurro, mediana in arancio e limiti 25°/75° in viola. "
+                        + "La profondità serve solo a separare visivamente le curve e non rappresenta T90, distanza o posizione nello spazio.",
                 "overlay-caption");
         FlowPane legend = new FlowPane(14, 6,
-                legendItem("● Short · T90 ≤ 2 s", SHORT_COLOR),
-                legendItem("● Long · T90 > 2 s", LONG_COLOR),
-                legendItem("● T90 non disponibile", UNKNOWN_COLOR));
-
+                legendItem("— Singoli GRB", SINGLE_COLOR),
+                legendItem("— Mediana", MEDIAN_COLOR),
+                legendItem("- - Fascia centrale 25°–75°", QUARTILE_COLOR));
         VBox header = new VBox(8, titleRow, explanation, legend);
         header.getStyleClass().add("three-d-header");
         header.setPadding(new Insets(15, 17, 13, 17));
@@ -134,7 +142,7 @@ public final class Population3DChartPane extends BorderPane {
 
     private HBox buildFooter() {
         Label note = UiFactory.label(
-                "La profondità separa i GRB del campione: non rappresenta distanza cosmologica né posizione nello spazio.",
+                "Trascina per ruotare · rotella per zoom · doppio clic per centrare. La profondità è puramente grafica.",
                 "subtle-text");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -150,21 +158,6 @@ public final class Population3DChartPane extends BorderPane {
         Label label = UiFactory.label(text, "legend-item");
         label.setStyle("-fx-text-fill: " + toHex(color) + ";");
         return label;
-    }
-
-    private double t90For(String name, Map<String, SkyBurst> metadata) {
-        SkyBurst burst = metadata.get(name.toUpperCase(Locale.ROOT));
-        return burst == null || burst.t90Sec() == null ? Double.POSITIVE_INFINITY : burst.t90Sec();
-    }
-
-    private String shortClass(SkyBurst burst) {
-        if (burst == null || !burst.hasT90()) return "T90 n.d.";
-        return burst.isShort() ? "short" : "long";
-    }
-
-    private Color colorFor(SkyBurst burst) {
-        if (burst == null || !burst.hasT90()) return UNKNOWN_COLOR;
-        return burst.isShort() ? SHORT_COLOR : LONG_COLOR;
     }
 
     private void syncRendererSize(StackPane viewer) {
