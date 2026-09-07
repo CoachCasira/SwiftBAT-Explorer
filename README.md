@@ -152,8 +152,23 @@ dedicata per curve individuali, mediana e percentili. Il pulsante **Schermo inte
 espande il grafico nella finestra principale e ripristina la pagina con `ESC` o
 **Torna all'app**, senza aprire finestre secondarie.
 
+Accanto al profilo compare un **Assistente di lettura** interamente locale e
+riproducibile. Il commento viene rigenerato per il campione corrente e riassume:
+tempo del massimo della mediana, larghezza sopra metà massimo, prevalenza del segnale
+prima o dopo il trigger, distanza media fra i quartili, composizione short/long,
+disponibilità del redshift e copertura FRACEXP. Non chiama API esterne e non formula
+una diagnosi astrofisica: ogni frase deriva da statistiche visibili nel grafico.
+
+Il pulsante **Vista 3D interattiva** apre, nella stessa finestra, una rappresentazione
+con tempo sull'asse X, rate normalizzato sull'asse Y e singoli GRB in profondità,
+ordinati per T90 e colorati per classe di durata. Tutte le curve restano eventi
+distinti e possono essere ispezionate passando il mouse sui punti.
+
 Sono inclusi istogrammi spiegati di copertura, T90 e redshift. Il flag “coda bassa” indica
 gli eventi sotto il 10° percentile della copertura fra quelli effettivamente letti.
+Ogni istogramma offre inoltre una vista 3D interattiva: la profondità rappresenta una
+seconda suddivisione reale del campione (classe T90 per copertura/redshift e presenza
+del redshift per la distribuzione T90), non una semplice estrusione grafica.
 I candidati vengono caricati in parallelo con concorrenza limitata; lo stato finale
 indica anche l'intervallo FRACEXP osservato quando nessun evento supera il filtro.
 

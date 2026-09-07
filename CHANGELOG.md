@@ -2,6 +2,11 @@
 
 ## In sviluppo — Analisi di popolazione e qualità
 
+- assistente di lettura locale che commenta picco della mediana, larghezza temporale,
+  asimmetria pre/post-trigger, dispersione, composizione T90/redshift e qualità FRACEXP;
+- vista 3D interattiva del profilo con tempo, rate normalizzato e singoli GRB ordinati per T90;
+- viste 3D interattive per tutti gli istogrammi, con una seconda suddivisione scientifica
+  del campione e tooltip sui conteggi;
 - profilo temporale ridimensionato, con legenda esplicativa sempre visibile;
 - fullscreen del profilo temporale integrato nella finestra principale;
 - fullscreen della Vista 3D corretto per non aprire più una seconda finestra;

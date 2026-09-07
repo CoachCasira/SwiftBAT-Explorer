@@ -50,7 +50,7 @@ public final class CumulativeAnalysisService {
         for (int second = start; second <= end; second++) {
             List<Double> values = new ArrayList<>();
             for (NormalizedCurve curve : curves) {
-                double value = interpolate(curve.points(), second);
+                double value = sampleAt(curve, second);
                 if (Double.isFinite(value)) {
                     values.add(value);
                 }
@@ -63,6 +63,11 @@ public final class CumulativeAnalysisService {
             upper.add(new Point(second, QualityMetrics.percentile(values, 0.75)));
         }
         return new PopulationProfile(List.copyOf(lower), List.copyOf(median), List.copyOf(upper));
+    }
+
+    /** Restituisce il valore interpolato della curva al tempo richiesto, se coperto dai dati. */
+    public double sampleAt(NormalizedCurve curve, double time) {
+        return curve == null ? Double.NaN : interpolate(curve.points(), time);
     }
 
     private double interpolate(List<Point> points, double time) {

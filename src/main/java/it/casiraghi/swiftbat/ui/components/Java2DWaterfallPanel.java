@@ -52,6 +52,7 @@ public final class Java2DWaterfallPanel extends JPanel {
     }
 
     private Dataset dataset = Dataset.empty();
+    private Presentation presentation = Presentation.explorerDefaults();
     private final List<ProjectedPoint> projectedPoints = new ArrayList<>();
 
     private double yaw = 0.32;
@@ -135,6 +136,17 @@ public final class Java2DWaterfallPanel extends JPanel {
         repaint();
     }
 
+    /** Personalizza testi e densità del renderer senza cambiare la geometria dei dati. */
+    public void setPresentation(Presentation newPresentation) {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(() -> setPresentation(newPresentation));
+            return;
+        }
+        presentation = newPresentation == null ? Presentation.explorerDefaults() : newPresentation;
+        hover = null;
+        repaint();
+    }
+
     public void resetView() {
         yaw = 0.32;
         pitch = 0.72;
@@ -176,7 +188,7 @@ public final class Java2DWaterfallPanel extends JPanel {
     private void paintEmpty(Graphics2D g) {
         g.setColor(MUTED);
         g.setFont(new Font("SansSerif", Font.PLAIN, 15));
-        String text = "Nessun dato a quattro bande disponibile per la vista 3D.";
+        String text = presentation.emptyMessage();
         FontMetrics metrics = g.getFontMetrics();
         g.drawString(text, (getWidth() - metrics.stringWidth(text)) / 2, getHeight() / 2);
     }
@@ -253,13 +265,15 @@ public final class Java2DWaterfallPanel extends JPanel {
             g.draw(new Line2D.Double(leftFront, leftBack));
         }
 
-        // Linee di base delle quattro bande.
+        // Linee di base delle serie disposte in profondità.
         double zeroNorm = normalize(0, bounds.minRate(), bounds.maxRate());
         for (int band = 0; band < dataset.bandCount(); band++) {
             Point2D left = geometry.project(0, zeroNorm, band);
             Point2D right = geometry.project(1, zeroNorm, band);
-            g.setColor(withAlpha(dataset.colors()[band], band == 0 ? 90 : 55));
-            g.setStroke(new BasicStroke(band == 0 ? 1.5f : 1f, BasicStroke.CAP_ROUND,
+            int baselineAlpha = presentation.denseSeries() ? 24 : band == 0 ? 90 : 55;
+            g.setColor(withAlpha(dataset.colors()[band], baselineAlpha));
+            g.setStroke(new BasicStroke(presentation.denseSeries() ? 0.8f : band == 0 ? 1.5f : 1f,
+                    BasicStroke.CAP_ROUND,
                     BasicStroke.JOIN_ROUND, 10f, new float[]{5f, 7f}, 0f));
             g.draw(new Line2D.Double(left, right));
         }
@@ -290,14 +304,22 @@ public final class Java2DWaterfallPanel extends JPanel {
         double zeroNorm = normalize(0, bounds.minRate(), bounds.maxRate());
 
         Path2D line = new Path2D.Double();
-        List<Point2D> points = new ArrayList<>(times.length);
+        Point2D[] points = new Point2D[times.length];
+        boolean drawingSegment = false;
+        boolean allFinite = true;
         for (int index = 0; index < times.length; index++) {
+            if (!Double.isFinite(times[index]) || !Double.isFinite(values[index])) {
+                drawingSegment = false;
+                allFinite = false;
+                continue;
+            }
             double xNorm = normalize(times[index], bounds.minTime(), bounds.maxTime());
             double yNorm = normalize(values[index], bounds.minRate(), bounds.maxRate());
             Point2D point = geometry.project(xNorm, yNorm, band);
-            points.add(point);
-            if (index == 0) {
+            points[index] = point;
+            if (!drawingSegment) {
                 line.moveTo(point.getX(), point.getY());
+                drawingSegment = true;
             } else {
                 line.lineTo(point.getX(), point.getY());
             }
@@ -305,7 +327,7 @@ public final class Java2DWaterfallPanel extends JPanel {
         }
 
         // Riempimento trasparente: dà profondità senza creare un pannello opaco.
-        if (points.size() >= 2) {
+        if (presentation.showAreaFill() && allFinite && points.length >= 2) {
             Path2D area = new Path2D.Double();
             Point2D firstBase = geometry.project(0, zeroNorm, band);
             area.moveTo(firstBase.getX(), firstBase.getY());
@@ -320,17 +342,19 @@ public final class Java2DWaterfallPanel extends JPanel {
         }
 
         // Glow sottile seguito dalla linea nitida.
-        g.setColor(withAlpha(color, 55));
-        g.setStroke(new BasicStroke(7.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.setColor(withAlpha(color, presentation.denseSeries() ? 22 : 55));
+        g.setStroke(new BasicStroke(presentation.denseSeries() ? 3.2f : 7.5f,
+                BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g.draw(line);
-        g.setColor(withAlpha(color, band == 0 ? 245 : 220));
-        g.setStroke(new BasicStroke(band == 0 ? 2.8f : 2.35f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.setColor(withAlpha(color, presentation.denseSeries() ? 145 : band == 0 ? 245 : 220));
+        g.setStroke(new BasicStroke(presentation.denseSeries() ? 1.25f : band == 0 ? 2.8f : 2.35f,
+                BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g.draw(line);
 
-        // Evidenzia il massimo della banda.
-        int peakIndex = peakIndex(values);
-        if (peakIndex >= 0) {
-            Point2D peak = points.get(peakIndex);
+        // Evidenzia il massimo quando è utile per il tipo di grafico visualizzato.
+        int peakIndex = presentation.showPeakMarkers() ? peakIndex(values) : -1;
+        if (peakIndex >= 0 && points[peakIndex] != null) {
+            Point2D peak = points[peakIndex];
             g.setColor(new Color(255, 255, 255, 220));
             g.fillOval((int) peak.getX() - 3, (int) peak.getY() - 3, 6, 6);
             g.setColor(withAlpha(color, 245));
@@ -378,14 +402,26 @@ public final class Java2DWaterfallPanel extends JPanel {
 
         g.setFont(new Font("SansSerif", Font.BOLD, 12));
         g.setColor(TEXT);
-        String xLabel = "Tempo dal trigger (s)";
+        String xLabel = presentation.xAxisLabel();
         g.drawString(xLabel, (float) ((xStart.getX() + xEnd.getX()) / 2 - g.getFontMetrics().stringWidth(xLabel) / 2.0),
                 (float) Math.max(xStart.getY(), xEnd.getY()) + 43);
-        g.drawString("Rate (count/s)", (float) yTop.getX() - 42, (float) yTop.getY() - 12);
+        g.drawString(presentation.yAxisLabel(), (float) yTop.getX() - 42, (float) yTop.getY() - 12);
 
-        // Etichette bande all'estremità destra.
+        if (!presentation.depthAxisLabel().isBlank()) {
+            g.setColor(new Color(190, 166, 250));
+            int labelWidth = g.getFontMetrics().stringWidth(presentation.depthAxisLabel());
+            float labelX = (float) clamp(depthEnd.getX() + 8, 12, getWidth() - labelWidth - 12);
+            float labelY = (float) clamp(depthEnd.getY() - 9, 20, getHeight() - 45);
+            g.drawString(presentation.depthAxisLabel(), labelX, labelY);
+        }
+
+        // Etichette delle serie all'estremità destra, diradate nei campioni numerosi.
         g.setFont(new Font("SansSerif", Font.BOLD, 11));
+        int labelStep = labelStep(dataset.bandCount(), presentation.maxDepthLabels());
         for (int band = dataset.bandCount() - 1; band >= 0; band--) {
+            if (band != 0 && band != dataset.bandCount() - 1 && band % labelStep != 0) {
+                continue;
+            }
             Point2D point = geometry.project(1, zeroNorm, band);
             g.setColor(dataset.colors()[band]);
             g.fillOval((int) point.getX() + 8, (int) point.getY() - 4, 8, 8);
@@ -437,7 +473,8 @@ public final class Java2DWaterfallPanel extends JPanel {
         String[] lines = {
                 dataset.labels()[band],
                 "Tempo: " + VALUE_FORMAT.format(dataset.times()[index]) + " s",
-                "Rate: " + VALUE_FORMAT.format(dataset.rates()[band][index]) + " count/s"
+                presentation.valueLabel() + ": " + VALUE_FORMAT.format(dataset.rates()[band][index])
+                        + presentation.valueUnit()
         };
         g.setFont(new Font("SansSerif", Font.PLAIN, 12));
         FontMetrics metrics = g.getFontMetrics();
@@ -481,6 +518,13 @@ public final class Java2DWaterfallPanel extends JPanel {
             }
         }
         return result;
+    }
+
+    private static int labelStep(int count, int maximumLabels) {
+        if (count <= 1 || maximumLabels <= 1 || count <= maximumLabels) {
+            return 1;
+        }
+        return Math.max(1, (int) Math.ceil((count - 1.0) / (maximumLabels - 1.0)));
     }
 
     private static Color withAlpha(Color color, int alpha) {
@@ -530,7 +574,16 @@ public final class Java2DWaterfallPanel extends JPanel {
         }
 
         public boolean isEmpty() {
-            return times.length == 0 || rates.length == 0 || labels.length != rates.length || colors.length != rates.length;
+            if (times.length == 0 || rates.length == 0 || labels.length != rates.length
+                    || colors.length != rates.length) {
+                return true;
+            }
+            for (double[] series : rates) {
+                if (series == null || series.length != times.length) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         public int bandCount() {
@@ -544,6 +597,32 @@ public final class Java2DWaterfallPanel extends JPanel {
             }
             return new Dataset(Arrays.copyOf(times, times.length), copiedRates,
                     Arrays.copyOf(labels, labels.length), Arrays.copyOf(colors, colors.length));
+        }
+    }
+
+    public record Presentation(String emptyMessage, String xAxisLabel, String yAxisLabel,
+                               String depthAxisLabel, String valueLabel, String valueUnit,
+                               boolean showPeakMarkers, boolean showAreaFill, boolean denseSeries,
+                               int maxDepthLabels) {
+        public Presentation {
+            emptyMessage = textOr(emptyMessage, "Nessun dato disponibile per la vista 3D.");
+            xAxisLabel = textOr(xAxisLabel, "Tempo dal trigger (s)");
+            yAxisLabel = textOr(yAxisLabel, "Rate (count/s)");
+            depthAxisLabel = depthAxisLabel == null ? "" : depthAxisLabel;
+            valueLabel = textOr(valueLabel, "Rate");
+            valueUnit = valueUnit == null ? "" : valueUnit;
+            maxDepthLabels = Math.max(2, maxDepthLabels);
+        }
+
+        public static Presentation explorerDefaults() {
+            return new Presentation(
+                    "Nessun dato a quattro bande disponibile per la vista 3D.",
+                    "Tempo dal trigger (s)", "Rate (count/s)", "Bande energetiche",
+                    "Rate", " count/s", true, true, false, 8);
+        }
+
+        private static String textOr(String value, String fallback) {
+            return value == null || value.isBlank() ? fallback : value;
         }
     }
 

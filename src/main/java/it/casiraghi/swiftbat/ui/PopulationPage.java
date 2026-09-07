@@ -5,7 +5,11 @@ import it.casiraghi.swiftbat.model.GrbData;
 import it.casiraghi.swiftbat.model.LoadUpdate;
 import it.casiraghi.swiftbat.model.SkyBurst;
 import it.casiraghi.swiftbat.service.CumulativeAnalysisService;
+import it.casiraghi.swiftbat.service.PopulationInsightService;
 import it.casiraghi.swiftbat.service.QualityMetrics;
+import it.casiraghi.swiftbat.ui.components.Java2DGroupedBarPanel;
+import it.casiraghi.swiftbat.ui.components.Population3DChartPane;
+import it.casiraghi.swiftbat.ui.components.PopulationHistogram3DPane;
 import javafx.application.Platform;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
@@ -47,6 +51,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Comparator;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorCompletionService;
@@ -69,6 +74,7 @@ public final class PopulationPage extends BorderPane {
     private final ExecutorService loaderExecutor;
     private final ObservableMap<String, GrbData> sessionData;
     private final CumulativeAnalysisService analysisService = new CumulativeAnalysisService();
+    private final PopulationInsightService insightService = new PopulationInsightService();
     private final Map<String, CatalogEntry> catalog = new LinkedHashMap<>();
     private final Map<String, SkyBurst> metadata = new LinkedHashMap<>();
 
@@ -100,6 +106,18 @@ public final class PopulationPage extends BorderPane {
     private final BarChart<String, Number> redshiftHistogram = histogram("Redshift");
     private final TableView<PopulationEvent> resultTable = new TableView<>();
     private final TabPane resultTabs = new TabPane();
+    private final Button profile3D = UiFactory.button("Vista 3D interattiva", "secondary-button");
+    private final Button exposure3D = UiFactory.button("Vista 3D", "secondary-button");
+    private final Button t90ThreeD = UiFactory.button("Vista 3D", "secondary-button");
+    private final Button redshift3D = UiFactory.button("Vista 3D", "secondary-button");
+    private final Label insightHeadline = UiFactory.wrappedLabel(
+            "Esegui un'analisi per ottenere un commento automatico sul campione.", "population-insight-headline");
+    private final VBox insightObservations = new VBox(7);
+    private final VBox insightCautions = new VBox(6);
+    private Java2DGroupedBarPanel.Dataset exposure3DDataset = Java2DGroupedBarPanel.Dataset.empty();
+    private Java2DGroupedBarPanel.Dataset t90ThreeDDataset = Java2DGroupedBarPanel.Dataset.empty();
+    private Java2DGroupedBarPanel.Dataset redshift3DDataset = Java2DGroupedBarPanel.Dataset.empty();
+    private AnalysisResult lastResult;
     private Task<AnalysisResult> runningTask;
 
     public PopulationPage(DataLoader loader, Executor taskExecutor, ExecutorService loaderExecutor,
@@ -258,13 +276,41 @@ public final class PopulationPage extends BorderPane {
                         + "Il grafico confronta la forma temporale e non somma i segnali.",
                 "explanation-text");
         HBox.setHgrow(note, Priority.ALWAYS);
+        profile3D.setDisable(true);
+        profile3D.setOnAction(event -> openProfile3D());
         Button fullscreen = UiFactory.button("Schermo intero  ⛶", "secondary-button");
         fullscreen.setOnAction(event -> openProfileFullscreen());
-        HBox header = new HBox(12, note, fullscreen);
+        HBox actions = new HBox(8, profile3D, fullscreen);
+        actions.setAlignment(Pos.CENTER_RIGHT);
+        HBox header = new HBox(12, note, actions);
         header.setAlignment(Pos.CENTER_LEFT);
 
-        box.getChildren().addAll(header, profileLegend(), curveChart);
+        VBox chartArea = new VBox(8, profileLegend(), curveChart);
+        HBox.setHgrow(chartArea, Priority.ALWAYS);
+        VBox.setVgrow(curveChart, Priority.ALWAYS);
+        HBox body = new HBox(14, chartArea, insightCard());
+        HBox.setHgrow(chartArea, Priority.ALWAYS);
+        box.getChildren().addAll(header, body);
         return box;
+    }
+
+    private VBox insightCard() {
+        insightObservations.getStyleClass().add("population-insight-list");
+        insightCautions.getStyleClass().add("population-insight-cautions");
+        VBox content = new VBox(10,
+                UiFactory.label("Assistente di lettura", "population-insight-title"),
+                UiFactory.label("ANALISI LOCALE · RIPRODUCIBILE", "population-insight-badge"),
+                insightHeadline,
+                insightObservations,
+                insightCautions,
+                UiFactory.wrappedLabel(
+                        "Il testo deriva solo dalle statistiche del grafico e non sostituisce l'interpretazione scientifica.",
+                        "population-insight-footnote"));
+        content.getStyleClass().add("population-insight-card");
+        content.setMinWidth(270);
+        content.setPrefWidth(330);
+        content.setMaxWidth(370);
+        return content;
     }
 
     private FlowPane profileLegend() {
@@ -301,6 +347,15 @@ public final class PopulationPage extends BorderPane {
         content.getStyleClass().add("population-fullscreen-content");
         VBox.setVgrow(enlarged, Priority.ALWAYS);
         InPlaceFullscreen.show(this, "Profilo temporale della popolazione", content);
+    }
+
+    private void openProfile3D() {
+        if (lastResult == null || lastResult.curves().isEmpty()) {
+            return;
+        }
+        Population3DChartPane pane = new Population3DChartPane();
+        pane.setData(lastResult.curves(), Map.copyOf(metadata), lastResult.halfWindow());
+        InPlaceFullscreen.show(this, "Profilo di popolazione 3D", pane);
     }
 
     private LineChart<Number, Number> copyProfileChart() {
@@ -344,16 +399,38 @@ public final class PopulationPage extends BorderPane {
     }
 
     private Node distributionPane() {
-        FlowPane flow = new FlowPane(14, 14);
-        flow.setPadding(new Insets(16));
-        flow.getChildren().addAll(
-                histogramCard("Qualità FRACEXP",
-                        "Quanti GRB hanno una determinata percentuale di bin completamente esposti", exposureHistogram),
-                histogramCard("Durata T90",
-                        "Quanti GRB inclusi ricadono in ciascun intervallo di durata", t90Histogram),
-                histogramCard("Distanza cosmologica",
-                        "Distribuzione del redshift dei GRB inclusi; n.d. indica un valore assente", redshiftHistogram));
-        return flow;
+        exposure3D.setDisable(true);
+        t90ThreeD.setDisable(true);
+        redshift3D.setDisable(true);
+        exposure3D.setOnAction(event -> openHistogram3D(
+                "Copertura FRACEXP · vista 3D",
+                "Le classi sull'asse X sono intervalli di copertura; la profondità separa short, long e GRB senza T90.",
+                exposure3DDataset));
+        t90ThreeD.setOnAction(event -> openHistogram3D(
+                "Durata T90 · vista 3D",
+                "Le classi sull'asse X sono intervalli di T90; la profondità separa gli eventi con e senza redshift disponibile.",
+                t90ThreeDDataset));
+        redshift3D.setOnAction(event -> openHistogram3D(
+                "Redshift · vista 3D",
+                "Le classi sull'asse X sono intervalli di redshift; la profondità separa short, long e GRB senza T90.",
+                redshift3DDataset));
+        VBox exposureCard = histogramCard("Qualità FRACEXP",
+                "Quanti GRB hanno una determinata percentuale di bin completamente esposti",
+                exposureHistogram, exposure3D);
+        VBox t90Card = histogramCard("Durata T90",
+                "Quanti GRB inclusi ricadono in ciascun intervallo di durata",
+                t90Histogram, t90ThreeD);
+        VBox redshiftCard = histogramCard("Distanza cosmologica",
+                "Distribuzione del redshift dei GRB inclusi; n.d. indica un valore assente",
+                redshiftHistogram, redshift3D);
+        HBox row = new HBox(14, exposureCard, t90Card, redshiftCard);
+        row.setPadding(new Insets(16));
+        for (VBox card : List.of(exposureCard, t90Card, redshiftCard)) {
+            card.setMinWidth(0);
+            card.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(card, Priority.ALWAYS);
+        }
+        return row;
     }
 
     private BarChart<String, Number> histogram(String title) {
@@ -362,11 +439,25 @@ public final class PopulationPage extends BorderPane {
         chart.setLegendVisible(false);
         chart.setTitle(title);
         chart.setPrefSize(420, 330);
+        chart.setMinWidth(250);
+        chart.setMaxWidth(Double.MAX_VALUE);
         return chart;
     }
 
-    private VBox histogramCard(String title, String subtitle, BarChart<String, Number> chart) {
-        return UiFactory.card(title, subtitle, chart);
+    private VBox histogramCard(String title, String subtitle, BarChart<String, Number> chart, Button threeDButton) {
+        HBox toolbar = new HBox(8, UiFactory.spacer(), threeDButton);
+        VBox content = new VBox(6, toolbar, chart);
+        VBox.setVgrow(chart, Priority.ALWAYS);
+        VBox card = UiFactory.card(title, subtitle, content);
+        card.getStyleClass().add("population-histogram-card");
+        return card;
+    }
+
+    private void openHistogram3D(String title, String explanation, Java2DGroupedBarPanel.Dataset dataset) {
+        if (dataset == null || dataset.isEmpty() || dataset.maximumCount() == 0) {
+            return;
+        }
+        InPlaceFullscreen.show(this, title, new PopulationHistogram3DPane(title, explanation, dataset));
     }
 
     private void configureControls() {
@@ -548,9 +639,12 @@ public final class PopulationPage extends BorderPane {
         progress.progressProperty().unbind();
         status.textProperty().unbind();
         sessionData.putAll(result.loaded());
+        lastResult = result;
         populateCurveChart(result);
         resultTable.setItems(FXCollections.observableArrayList(result.accepted()));
         populateHistograms(result);
+        populateInsight(result);
+        profile3D.setDisable(result.curves().isEmpty());
         StringBuilder message = new StringBuilder()
                 .append(result.accepted().size()).append(" GRB inclusi su ")
                 .append(result.examined()).append(" esaminati");
@@ -619,6 +713,40 @@ public final class PopulationPage extends BorderPane {
         curveChart.setTitle(result.curves().size() + " curve normalizzate e allineate a t = 0");
     }
 
+    private void populateInsight(AnalysisResult result) {
+        Set<String> curveNames = result.curves().stream()
+                .map(CumulativeAnalysisService.NormalizedCurve::grbName)
+                .collect(java.util.stream.Collectors.toSet());
+        List<PopulationInsightService.EventFacts> facts = result.accepted().stream()
+                .filter(event -> curveNames.contains(event.grbName()))
+                .map(event -> new PopulationInsightService.EventFacts(
+                        event.grbName(), event.burst().t90Sec(),
+                        event.burst().redshift().representativeValue(), event.exposurePercent()))
+                .toList();
+        PopulationInsightService.Narrative narrative = insightService.analyze(
+                result.curves(), result.profile(), facts, result.examined(), result.failures(), result.halfWindow());
+        insightHeadline.setText(narrative.headline());
+        insightObservations.getChildren().setAll(narrative.observations().stream()
+                .map(text -> insightLine("●", text, "population-insight-dot"))
+                .toList());
+        insightCautions.getChildren().clear();
+        if (!narrative.cautions().isEmpty()) {
+            insightCautions.getChildren().add(UiFactory.label("Da tenere presente", "population-insight-caution-title"));
+            narrative.cautions().stream().limit(3)
+                    .map(text -> insightLine("!", text, "population-insight-warning"))
+                    .forEach(insightCautions.getChildren()::add);
+        }
+    }
+
+    private HBox insightLine(String marker, String text, String markerStyle) {
+        Label bullet = UiFactory.label(marker, markerStyle);
+        Label copy = UiFactory.wrappedLabel(text, "population-insight-text");
+        HBox.setHgrow(copy, Priority.ALWAYS);
+        HBox row = new HBox(8, bullet, copy);
+        row.setAlignment(Pos.TOP_LEFT);
+        return row;
+    }
+
     private XYChart.Series<Number, Number> series(String name, List<CumulativeAnalysisService.Point> points) {
         XYChart.Series<Number, Number> series = new XYChart.Series<>();
         series.setName(name);
@@ -646,8 +774,10 @@ public final class PopulationPage extends BorderPane {
     }
 
     private void populateHistograms(AnalysisResult result) {
-        setBars(exposureHistogram, bins(result.measured().stream().map(PopulationEvent::exposurePercent).toList(),
-                new double[]{0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100}, "%"));
+        Map<String, Integer> exposureBins = bins(
+                result.measured().stream().map(PopulationEvent::exposurePercent).toList(),
+                new double[]{0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100}, "%");
+        setBars(exposureHistogram, exposureBins);
 
         Map<String, Integer> t90Bins = new LinkedHashMap<>();
         for (String label : List.of("≤2", "2–10", "10–50", "50–100", ">100", "n.d.")) t90Bins.put(label, 0);
@@ -663,6 +793,64 @@ public final class PopulationPage extends BorderPane {
         }
         setBars(t90Histogram, t90Bins);
         setBars(redshiftHistogram, zBins);
+
+        exposure3DDataset = groupedByT90(result.measured(), new ArrayList<>(exposureBins.keySet()),
+                event -> coverageBin(event.exposurePercent()), "Copertura FRACEXP", "Classe T90");
+        t90ThreeDDataset = groupedByRedshiftAvailability(result.accepted(), new ArrayList<>(t90Bins.keySet()),
+                event -> t90Bin(event.burst().t90Sec()), "Durata T90 (s)", "Disponibilità redshift");
+        redshift3DDataset = groupedByT90(result.accepted(), new ArrayList<>(zBins.keySet()),
+                event -> redshiftBin(event.burst().redshift().representativeValue()),
+                "Redshift z", "Classe T90");
+        exposure3D.setDisable(exposure3DDataset.maximumCount() == 0);
+        t90ThreeD.setDisable(t90ThreeDDataset.maximumCount() == 0);
+        redshift3D.setDisable(redshift3DDataset.maximumCount() == 0);
+    }
+
+    private Java2DGroupedBarPanel.Dataset groupedByT90(
+            List<PopulationEvent> events, List<String> categories,
+            java.util.function.Function<PopulationEvent, String> classifier,
+            String xAxis, String depthAxis) {
+        String[] groups = {"Short · T90 ≤ 2 s", "Long · T90 > 2 s", "T90 n.d."};
+        int[][] counts = new int[groups.length][categories.size()];
+        for (PopulationEvent event : events) {
+            int group = !event.burst().hasT90() ? 2 : event.burst().isShort() ? 0 : 1;
+            int category = categories.indexOf(classifier.apply(event));
+            if (category >= 0) counts[group][category]++;
+        }
+        return new Java2DGroupedBarPanel.Dataset(categories.toArray(String[]::new), groups, counts,
+                new java.awt.Color[]{new java.awt.Color(255, 174, 74), new java.awt.Color(82, 216, 255),
+                        new java.awt.Color(145, 157, 179)}, xAxis, depthAxis);
+    }
+
+    private Java2DGroupedBarPanel.Dataset groupedByRedshiftAvailability(
+            List<PopulationEvent> events, List<String> categories,
+            java.util.function.Function<PopulationEvent, String> classifier,
+            String xAxis, String depthAxis) {
+        String[] groups = {"Con redshift", "Senza redshift"};
+        int[][] counts = new int[groups.length][categories.size()];
+        for (PopulationEvent event : events) {
+            int group = event.burst().redshift().available() ? 0 : 1;
+            int category = categories.indexOf(classifier.apply(event));
+            if (category >= 0) counts[group][category]++;
+        }
+        return new Java2DGroupedBarPanel.Dataset(categories.toArray(String[]::new), groups, counts,
+                new java.awt.Color[]{new java.awt.Color(110, 231, 183), new java.awt.Color(167, 139, 250)},
+                xAxis, depthAxis);
+    }
+
+    private String coverageBin(double value) {
+        int lower = Math.min(90, Math.max(0, (int) Math.floor(value / 10.0) * 10));
+        return lower + "–" + (lower + 10) + "%";
+    }
+
+    private String t90Bin(Double value) {
+        return value == null ? "n.d." : value <= 2 ? "≤2" : value <= 10 ? "2–10"
+                : value <= 50 ? "10–50" : value <= 100 ? "50–100" : ">100";
+    }
+
+    private String redshiftBin(Double value) {
+        return value == null ? "n.d." : value < 1 ? "0–1" : value < 2 ? "1–2" : value < 3 ? "2–3"
+                : value < 4 ? "3–4" : value < 6 ? "4–6" : ">6";
     }
 
     private void setBars(BarChart<String, Number> chart, Map<String, Integer> counts) {
@@ -761,11 +949,22 @@ public final class PopulationPage extends BorderPane {
     }
 
     private void clearResults() {
+        lastResult = null;
         curveChart.getData().clear();
         resultTable.getItems().clear();
         exposureHistogram.getData().clear();
         t90Histogram.getData().clear();
         redshiftHistogram.getData().clear();
+        exposure3DDataset = Java2DGroupedBarPanel.Dataset.empty();
+        t90ThreeDDataset = Java2DGroupedBarPanel.Dataset.empty();
+        redshift3DDataset = Java2DGroupedBarPanel.Dataset.empty();
+        profile3D.setDisable(true);
+        exposure3D.setDisable(true);
+        t90ThreeD.setDisable(true);
+        redshift3D.setDisable(true);
+        insightHeadline.setText("Esegui un'analisi per ottenere un commento automatico sul campione.");
+        insightObservations.getChildren().clear();
+        insightCautions.getChildren().clear();
         curveChart.setTitle("Nessuna analisi eseguita");
     }
 
