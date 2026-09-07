@@ -3,10 +3,12 @@ package it.casiraghi.swiftbat.ui;
 import it.casiraghi.swiftbat.model.CatalogEntry;
 import it.casiraghi.swiftbat.model.GrbData;
 import it.casiraghi.swiftbat.model.RedshiftInfo;
+import it.casiraghi.swiftbat.model.SpectralData;
 import it.casiraghi.swiftbat.model.SkyBurst;
 import it.casiraghi.swiftbat.service.OnlineGrbService;
 import it.casiraghi.swiftbat.service.RedshiftCatalogService;
 import it.casiraghi.swiftbat.service.SkyCatalogService;
+import it.casiraghi.swiftbat.service.SpectralCatalogService;
 import it.casiraghi.swiftbat.service.SwiftCatalogService;
 import javafx.application.HostServices;
 import javafx.application.Platform;
@@ -50,6 +52,7 @@ public final class MainView {
     private final SwiftCatalogService catalogService = new SwiftCatalogService();
     private final SkyCatalogService skyCatalogService = new SkyCatalogService();
     private final RedshiftCatalogService redshiftCatalogService = new RedshiftCatalogService();
+    private final SpectralCatalogService spectralCatalogService = new SpectralCatalogService();
     private final OnlineGrbService grbService = new OnlineGrbService();
     private final ObservableMap<String, GrbData> sessionData = FXCollections.observableHashMap();
 
@@ -101,6 +104,7 @@ public final class MainView {
     public void initialize() {
         navigate("home");
         loadCatalog();
+        loadSpectralCatalog(false);
     }
 
     public static void shutdownSharedExecutor() {
@@ -189,7 +193,10 @@ public final class MainView {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         Button refresh = UiFactory.iconButton("↻", "Aggiorna il catalogo online");
-        refresh.setOnAction(event -> loadCatalog());
+        refresh.setOnAction(event -> {
+            loadCatalog();
+            loadSpectralCatalog(true);
+        });
         Button official = UiFactory.iconButton("↗", "Apri il catalogo ufficiale");
         official.setOnAction(event -> hostServices.showDocument(SwiftCatalogService.CATALOG_URL));
 
@@ -294,6 +301,20 @@ public final class MainView {
                     : "Mappa non disponibile: " + error.getMessage();
             skyMapPage.showError(detail);
         });
+        BACKGROUND_EXECUTOR.execute(task);
+    }
+
+    private void loadSpectralCatalog(boolean forceRefresh) {
+        Task<Map<String, SpectralData>> task = new Task<>() {
+            @Override
+            protected Map<String, SpectralData> call() throws Exception {
+                return spectralCatalogService.fetchCatalog(forceRefresh);
+            }
+        };
+        task.setOnSucceeded(event -> explorerPage.setSpectralCatalog(task.getValue()));
+        // Senza rete o cache la mappa tempo-energia resta utilizzabile e la scheda
+        // segnala esplicitamente l'assenza dei fit ufficiali.
+        task.setOnFailed(event -> explorerPage.setSpectralCatalog(Map.of()));
         BACKGROUND_EXECUTOR.execute(task);
     }
 
