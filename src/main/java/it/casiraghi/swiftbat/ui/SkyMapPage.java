@@ -125,8 +125,8 @@ public final class SkyMapPage extends BorderPane {
     }
 
     private Node buildPage() {
-        VBox page = new VBox(18);
-        page.setPadding(new Insets(30, 34, 36, 34));
+        VBox page = new VBox(12);
+        page.setPadding(new Insets(20, 26, 24, 26));
         page.getStyleClass().add("page-content");
 
         HBox titleRow = new HBox(16);
@@ -150,9 +150,9 @@ public final class SkyMapPage extends BorderPane {
         HBox viewSwitch = buildViewSwitch();
 
         HBox content = new HBox(16);
-        VBox mapCard = new VBox(12);
+        VBox mapCard = new VBox(8);
         mapCard.getStyleClass().add("card");
-        mapCard.setPadding(new Insets(15));
+        mapCard.setPadding(new Insets(12));
         Button resetView = UiFactory.button("Centra", "ghost-button");
         resetView.setOnAction(event -> {
             mollweide.resetView();
@@ -165,8 +165,8 @@ public final class SkyMapPage extends BorderPane {
                 viewSwitch);
         mapHead.setAlignment(Pos.CENTER_LEFT);
         mapHost.getChildren().setAll(mollweide);
-        mapHost.setMinHeight(500);
-        mapHost.setPrefHeight(650);
+        mapHost.setMinHeight(390);
+        mapHost.setPrefHeight(500);
         VBox.setVgrow(mapHost, Priority.ALWAYS);
         HBox.setHgrow(mapCard, Priority.ALWAYS);
         mapCard.getChildren().addAll(mapHead, buildSkyLegend(), mapHost,
@@ -283,7 +283,11 @@ public final class SkyMapPage extends BorderPane {
                 mollweideButton.setSelected(true);
                 return;
             }
-            mapHost.getChildren().setAll(newToggle == sphereButton ? sphere : mollweide);
+            boolean showSphere = newToggle == sphereButton;
+            mapHost.getChildren().setAll(showSphere ? sphere : mollweide);
+            javafx.application.Platform.runLater(() -> {
+                if (showSphere) sphere.resetView(); else mollweide.resetView();
+            });
         });
         return new HBox(6, mollweideButton, sphereButton);
     }

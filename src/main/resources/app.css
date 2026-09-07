@@ -1886,3 +1886,39 @@
 .overview-chart-card {
     -fx-padding: 12px;
 }
+
+
+/* ---------- Refinements 1.2.0 ---------- */
+.fracexp-slider {
+    -fx-background-color: transparent;
+    -fx-padding: 0 2 0 2;
+}
+.fracexp-slider .track {
+    -fx-background-color: rgba(255,255,255,0.10);
+    -fx-background-radius: 999px;
+    -fx-pref-height: 6px;
+}
+.fracexp-slider .thumb {
+    -fx-background-color: linear-gradient(to bottom right, #ffb15c, #a866dc);
+    -fx-background-radius: 999px;
+    -fx-pref-width: 16px;
+    -fx-pref-height: 16px;
+    -fx-effect: dropshadow(gaussian, rgba(255,177,92,0.24), 8, 0.18, 0, 1);
+}
+.fracexp-slider .increment-button,
+.fracexp-slider .decrement-button,
+.fracexp-slider .increment-arrow,
+.fracexp-slider .decrement-arrow {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-shape: "";
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+}
+.overview-action-card {
+    -fx-background-color: rgba(255,255,255,0.025);
+    -fx-border-color: rgba(255,177,92,0.10);
+}
+.three-d-footer {
+    -fx-padding: 9px 12px;
+}

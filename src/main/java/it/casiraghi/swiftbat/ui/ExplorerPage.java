@@ -517,19 +517,25 @@ public final class ExplorerPage extends BorderPane {
 
         Button export = UiFactory.button("Esporta PNG", "ghost-button");
         export.setOnAction(event -> exportNode(chart, data.grbName() + "_curva_1s.png"));
-        Button fullscreen = UiFactory.button("Schermo intero  ⛶", "secondary-button");
+        Button fullscreen = UiFactory.button("Schermo intero  ⛶", "primary-button");
         fullscreen.setOnAction(event -> openOverviewFullscreen(
                 data, channelChoice.getValue(), windowChoice.getValue(), smooth.isSelected()));
-        HBox bottomActions = new HBox(8, UiFactory.spacer(), export, fullscreen);
-        bottomActions.setAlignment(Pos.CENTER_RIGHT);
-        chartCard.getChildren().addAll(controls, chart, bottomActions);
+        chartCard.getChildren().addAll(controls, chart);
         pane.setCenter(chartCard);
+
+        HBox graphActions = new HBox(8, export, fullscreen);
+        graphActions.setAlignment(Pos.CENTER_RIGHT);
+        VBox actionCard = new VBox(7,
+                UiFactory.label("Azioni grafico", "card-subtitle"), graphActions);
+        actionCard.getStyleClass().addAll("card", "overview-action-card");
+        actionCard.setPadding(new Insets(12));
 
         VBox right = new VBox(10);
         right.setPrefWidth(310);
         right.getChildren().addAll(
                 summaryCard(data, "In breve", List.of("BIN_SIZE", "ENERGY_RANGE", "TIME_RANGE", "ASCII_ROWS", "FITS_ROWS")),
-                plainConceptCard("Trigger", "Il punto zero dell'allerta", "Tempi negativi: prima del trigger. Tempi positivi: dopo il trigger. Il trigger non coincide necessariamente con l'inizio fisico esatto del burst."));
+                plainConceptCard("Trigger", "Il punto zero dell'allerta", "Tempi negativi: prima del trigger. Tempi positivi: dopo il trigger. Il trigger non coincide necessariamente con l'inizio fisico esatto del burst."),
+                actionCard);
         pane.setRight(right);
         BorderPane.setMargin(right, new Insets(0, 0, 0, 12));
         return pane;
@@ -564,7 +570,7 @@ public final class ExplorerPage extends BorderPane {
 
     private Node buildThreeD(GrbData data) {
         VBox box = new VBox(13);
-        box.setPadding(new Insets(18));
+        box.setPadding(new Insets(10, 12, 10, 12));
         if (data.asciiData().isEmpty()) {
             box.getChildren().add(UiFactory.card("Vista 3D non disponibile",
                     "Per costruire il paesaggio tempo–energia servono le quattro bande del file ASCII.", null));

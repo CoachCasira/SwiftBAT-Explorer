@@ -62,8 +62,8 @@ public final class ThreeDChartPane extends BorderPane {
     private ThreeDChartPane(boolean allowFullscreen) {
         this.allowFullscreen = allowFullscreen;
         getStyleClass().add("three-d-panel");
-        setMinHeight(560);
-        setPrefHeight(650);
+        setMinHeight(430);
+        setPrefHeight(500);
 
         windowChoice.getStyleClass().add("choice-box-modern");
         windowChoice.setValue(DEFAULT_WINDOW);
@@ -74,8 +74,8 @@ public final class ThreeDChartPane extends BorderPane {
 
         StackPane viewer = new StackPane(swingNode);
         viewer.getStyleClass().add("three-d-viewer");
-        viewer.setMinHeight(500);
-        viewer.setPrefHeight(560);
+        viewer.setMinHeight(330);
+        viewer.setPrefHeight(390);
         viewer.widthProperty().addListener((obs, oldValue, newValue) -> syncRendererSize(viewer));
         viewer.heightProperty().addListener((obs, oldValue, newValue) -> syncRendererSize(viewer));
 
@@ -190,7 +190,7 @@ public final class ThreeDChartPane extends BorderPane {
     private VBox buildHeader() {
         VBox header = new VBox(8);
         header.getStyleClass().add("three-d-header");
-        header.setPadding(new Insets(15, 17, 13, 17));
+        header.setPadding(new Insets(10, 14, 9, 14));
 
         HBox titleRow = new HBox(10);
         titleRow.setAlignment(Pos.CENTER_LEFT);
@@ -218,6 +218,7 @@ public final class ThreeDChartPane extends BorderPane {
     private HBox buildFooter() {
         HBox footer = new HBox(10);
         footer.getStyleClass().add("three-d-footer");
+        footer.setMinHeight(50);
         footer.setAlignment(Pos.CENTER_LEFT);
 
         Label note = UiFactory.label(

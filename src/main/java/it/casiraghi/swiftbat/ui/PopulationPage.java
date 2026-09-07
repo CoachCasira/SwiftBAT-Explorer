@@ -29,8 +29,8 @@ import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ProgressBar;
+import javafx.scene.control.ScrollBar;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.control.Slider;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TableColumn;
@@ -89,8 +89,8 @@ public final class PopulationPage extends BorderPane {
     private final TextField raMax = field("360");
     private final TextField decMin = field("-90");
     private final TextField decMax = field("90");
-    private final Slider exposureMinSlider = exposureSlider(0);
-    private final Slider exposureMaxSlider = exposureSlider(100);
+    private final ScrollBar exposureMinSlider = exposureSlider(0);
+    private final ScrollBar exposureMaxSlider = exposureSlider(100);
     private final TextField exposureMin = percentField("0");
     private final TextField exposureMax = percentField("100");
     private final PauseTransition exposureMinDebounce = new PauseTransition(Duration.millis(350));
@@ -552,7 +552,7 @@ public final class PopulationPage extends BorderPane {
         }
     }
 
-    private void configureExposureControl(Slider slider, TextField field, boolean minimum,
+    private void configureExposureControl(ScrollBar slider, TextField field, boolean minimum,
                                           PauseTransition debounce) {
         slider.valueProperty().addListener((obs, oldValue, newValue) -> {
             if (syncingExposureControls) return;
@@ -581,7 +581,7 @@ public final class PopulationPage extends BorderPane {
         });
     }
 
-    private void commitExposureField(Slider slider, TextField field, boolean minimum) {
+    private void commitExposureField(ScrollBar slider, TextField field, boolean minimum) {
         double fallback = slider.getValue();
         double value;
         try {
@@ -1172,16 +1172,21 @@ public final class PopulationPage extends BorderPane {
         return field;
     }
 
-    private static Slider exposureSlider(double value) {
-        Slider slider = new Slider(0, 100, value);
+    private static ScrollBar exposureSlider(double value) {
+        ScrollBar slider = new ScrollBar();
         slider.getStyleClass().add("fracexp-slider");
-        slider.setBlockIncrement(1);
-        slider.setMajorTickUnit(25);
-        slider.setMinorTickCount(0);
-        slider.setSnapToTicks(false);
+        slider.setOrientation(javafx.geometry.Orientation.HORIZONTAL);
+        slider.setMin(0);
+        slider.setMax(100);
+        slider.setValue(value);
+        slider.setUnitIncrement(1);
+        slider.setBlockIncrement(5);
+        slider.setVisibleAmount(1);
         slider.setMinWidth(120);
         slider.setPrefWidth(230);
         slider.setMaxWidth(Double.MAX_VALUE);
+        slider.setMinHeight(20);
+        slider.setPrefHeight(20);
         return slider;
     }
 
@@ -1195,7 +1200,7 @@ public final class PopulationPage extends BorderPane {
         return field;
     }
 
-    private VBox exposureControl(String label, Slider slider, TextField field, boolean minimum) {
+    private VBox exposureControl(String label, ScrollBar slider, TextField field, boolean minimum) {
         Button reset = UiFactory.button("↺", "filter-reset-button");
         reset.setTooltip(UiFactory.quickTooltip(minimum
                 ? "Ripristina il minimo a 0%" : "Ripristina il massimo a 100%"));
