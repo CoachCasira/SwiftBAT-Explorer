@@ -1,0 +1,698 @@
+from pathlib import Path
+
+
+def replace_once(path: str, old: str, new: str, label: str) -> None:
+    p = Path(path)
+    text = p.read_text(encoding="utf-8")
+    if old not in text:
+        raise SystemExit(f"Patch non applicabile ({label}) in {path}")
+    p.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+
+# Tooltip automatici per i testi che vengono realmente troncati.
+Path("src/main/java/it/casiraghi/swiftbat/ui/UiFactory.java").write_text(r'''package it.casiraghi.swiftbat.ui;
+
+import javafx.application.Platform;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Node;
+import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.Label;
+import javafx.scene.control.Labeled;
+import javafx.scene.control.Tooltip;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.VBox;
+import javafx.scene.text.Text;
+
+public final class UiFactory {
+    private static final String AUTO_TOOLTIP_KEY = UiFactory.class.getName() + ".autoTooltip";
+
+    private UiFactory() {
+    }
+
+    public static Label label(String text, String... styleClasses) {
+        Label label = new Label(text);
+        label.getStyleClass().addAll(styleClasses);
+        autoTooltip(label);
+        return label;
+    }
+
+    public static Label wrappedLabel(String text, String... styleClasses) {
+        Label label = label(text, styleClasses);
+        label.setWrapText(true);
+        Platform.runLater(() -> refreshAutoTooltip(label));
+        return label;
+    }
+
+    public static Button button(String text, String styleClass) {
+        Button button = new Button(text);
+        button.getStyleClass().add(styleClass);
+        button.setCursor(javafx.scene.Cursor.HAND);
+        autoTooltip(button);
+        return button;
+    }
+
+    /** Mostra il testo completo al passaggio del mouse solo se il controllo lo tronca. */
+    public static <T extends Labeled> T autoTooltip(T control) {
+        if (control == null) return null;
+        control.widthProperty().addListener((obs, oldValue, newValue) -> refreshAutoTooltip(control));
+        control.textProperty().addListener((obs, oldValue, newValue) -> refreshAutoTooltip(control));
+        control.fontProperty().addListener((obs, oldValue, newValue) -> refreshAutoTooltip(control));
+        Platform.runLater(() -> refreshAutoTooltip(control));
+        return control;
+    }
+
+    /** Per i menu a scelta il tooltip mostra sempre il valore selezionato per intero. */
+    public static <T> ChoiceBox<T> autoTooltip(ChoiceBox<T> choice) {
+        if (choice == null) return null;
+        Runnable refresh = () -> {
+            T value = choice.getValue();
+            choice.setTooltip(value == null || value.toString().isBlank() ? null : new Tooltip(value.toString()));
+        };
+        choice.valueProperty().addListener((obs, oldValue, newValue) -> refresh.run());
+        refresh.run();
+        return choice;
+    }
+
+    private static void refreshAutoTooltip(Labeled control) {
+        if (control == null) return;
+        String text = control.getText();
+        boolean autoTooltip = Boolean.TRUE.equals(control.getProperties().get(AUTO_TOOLTIP_KEY));
+
+        if (text == null || text.isBlank() || control.isWrapText()) {
+            if (autoTooltip) {
+                control.setTooltip(null);
+                control.getProperties().remove(AUTO_TOOLTIP_KEY);
+            }
+            return;
+        }
+
+        double available = control.getWidth()
+                - control.getInsets().getLeft() - control.getInsets().getRight() - 10.0;
+        if (available <= 0) return;
+
+        Text probe = new Text(text);
+        probe.setFont(control.getFont());
+        boolean clipped = probe.getLayoutBounds().getWidth() > available;
+        if (clipped) {
+            if (control.getTooltip() == null || autoTooltip) {
+                control.setTooltip(new Tooltip(text));
+                control.getProperties().put(AUTO_TOOLTIP_KEY, Boolean.TRUE);
+            }
+        } else if (autoTooltip) {
+            control.setTooltip(null);
+            control.getProperties().remove(AUTO_TOOLTIP_KEY);
+        }
+    }
+
+    public static Button iconButton(String glyph, String tooltip) {
+        Button button = button(glyph, "icon-button");
+        button.getProperties().remove(AUTO_TOOLTIP_KEY);
+        button.setTooltip(new Tooltip(tooltip));
+        return button;
+    }
+
+    public static Region spacer() {
+        Region region = new Region();
+        HBox.setHgrow(region, Priority.ALWAYS);
+        return region;
+    }
+
+    public static VBox card(String title, String subtitle, Node content) {
+        VBox card = new VBox(12);
+        card.getStyleClass().add("card");
+        card.setPadding(new Insets(18));
+        if (title != null && !title.isBlank()) {
+            card.getChildren().add(label(title, "card-title"));
+        }
+        if (subtitle != null && !subtitle.isBlank()) {
+            card.getChildren().add(wrappedLabel(subtitle, "card-subtitle"));
+        }
+        if (content != null) {
+            VBox.setVgrow(content, Priority.ALWAYS);
+            card.getChildren().add(content);
+        }
+        return card;
+    }
+
+    public static VBox metricCard(String eyebrow, String value, String detail) {
+        VBox card = new VBox(7);
+        card.getStyleClass().add("metric-card");
+        card.setMinWidth(170);
+        Label eyebrowLabel = label(eyebrow, "metric-eyebrow");
+        Label valueLabel = label(value == null || value.isBlank() ? "n.d." : value, "metric-value");
+        valueLabel.setWrapText(true);
+        Label detailLabel = wrappedLabel(detail == null ? "" : detail, "metric-detail");
+        card.getChildren().addAll(eyebrowLabel, valueLabel, detailLabel);
+        return card;
+    }
+
+    public static HBox infoRow(String labelText, String valueText) {
+        HBox row = new HBox(12);
+        row.setAlignment(Pos.TOP_LEFT);
+        Label label = label(labelText, "info-key");
+        label.setMinWidth(165);
+        Label value = wrappedLabel(valueText == null || valueText.isBlank() ? "n.d." : valueText, "info-value");
+        HBox.setHgrow(value, Priority.ALWAYS);
+        row.getChildren().addAll(label, value);
+        return row;
+    }
+}
+''', encoding="utf-8")
+
+
+# Tooltip sui controlli della curva 2D creati direttamente in ExplorerPage.
+replace_once(
+    "src/main/java/it/casiraghi/swiftbat/ui/ExplorerPage.java",
+    '''        ChoiceBox<String> windowChoice = new ChoiceBox<>(FXCollections.observableArrayList(WINDOWS.keySet()));
+        windowChoice.getStyleClass().add("choice-box-modern");
+        windowChoice.setValue("±60 s dal trigger");
+        CheckBox smooth = new CheckBox("Media mobile 5 bin");
+        smooth.getStyleClass().add("modern-check");
+        Label help = UiFactory.label("Il tratteggio verticale indica il trigger (t = 0).", "subtle-text");''',
+    '''        ChoiceBox<String> windowChoice = new ChoiceBox<>(FXCollections.observableArrayList(WINDOWS.keySet()));
+        windowChoice.getStyleClass().add("choice-box-modern");
+        windowChoice.setValue("±60 s dal trigger");
+        UiFactory.autoTooltip(channelChoice);
+        UiFactory.autoTooltip(windowChoice);
+        CheckBox smooth = new CheckBox("Media mobile 5 bin");
+        smooth.getStyleClass().add("modern-check");
+        UiFactory.autoTooltip(smooth);
+        Label help = UiFactory.label("Il tratteggio verticale indica il trigger (t = 0).", "subtle-text");''',
+    "tooltip controlli curva 2D",
+)
+
+
+pop = "src/main/java/it/casiraghi/swiftbat/ui/PopulationPage.java"
+replace_once(pop,
+    'import javafx.scene.control.Label;\nimport javafx.scene.control.ProgressBar;',
+    'import javafx.scene.control.Label;\nimport javafx.scene.control.OverrunStyle;\nimport javafx.scene.control.ProgressBar;',
+    "import OverrunStyle")
+replace_once(pop,
+    '''    private AnalysisResult lastResult;
+    private Task<AnalysisResult> runningTask;''',
+    '''    private AnalysisResult lastResult;
+    private PopulationInsightService.Narrative lastNarrative;
+    private Task<AnalysisResult> runningTask;''',
+    "narrativa fullscreen")
+replace_once(pop,
+    '''        for (ChoiceBox<?> choice : List.of(duration, redshiftAvailability, window, limit)) {
+            choice.getStyleClass().add("choice-box-modern");
+        }''',
+    '''        for (ChoiceBox<?> choice : List.of(duration, redshiftAvailability, window, limit)) {
+            choice.getStyleClass().add("choice-box-modern");
+            UiFactory.autoTooltip(choice);
+        }''',
+    "tooltip choice popolazione")
+replace_once(pop,
+    '''        VBox minimum = exposureControl("Minimo ammesso", exposureMin, exposureMinValue);
+        VBox maximum = exposureControl("Massimo ammesso", exposureMax, exposureMaxValue);
+        FlowPane exposureControls = new FlowPane(22, 10, minimum, maximum);
+        exposureControls.setAlignment(Pos.CENTER_LEFT);''',
+    '''        VBox minimum = exposureControl("Minimo ammesso", exposureMin, exposureMinValue);
+        VBox maximum = exposureControl("Massimo ammesso", exposureMax, exposureMaxValue);
+        HBox exposureControls = new HBox(16, minimum, maximum);
+        exposureControls.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(minimum, Priority.ALWAYS);
+        HBox.setHgrow(maximum, Priority.ALWAYS);''',
+    "layout FRACEXP")
+replace_once(pop,
+    '''    private VBox insightCard() {
+        insightObservations.getStyleClass().add("population-insight-list");
+        insightCautions.getStyleClass().add("population-insight-cautions");''',
+    '''    private VBox insightCard() {
+        insightHeadline.setMinWidth(0);
+        insightHeadline.setMaxWidth(Double.MAX_VALUE);
+        insightHeadline.setTextOverrun(OverrunStyle.CLIP);
+        insightObservations.getStyleClass().add("population-insight-list");
+        insightCautions.getStyleClass().add("population-insight-cautions");''',
+    "wrapping assistente")
+replace_once(pop,
+    '''        content.getStyleClass().add("population-insight-card");
+        content.setMinWidth(270);''',
+    '''        content.getStyleClass().add("population-insight-card");
+        content.setFillWidth(true);
+        content.setMinWidth(270);''',
+    "fill width assistente")
+replace_once(pop,
+    '''                profileLegendItem("population-legend-quartile", "25° e 75° percentile",
+                        "intervallo che contiene la metà centrale dei valori"));''',
+    '''                profileLegendItem("population-legend-quartile", "Fascia centrale 25°–75°",
+                        "tra i due limiti cade il 50% centrale delle curve"));''',
+    "testo quartili")
+replace_once(pop,
+    '''        HBox item = new HBox(9, sample, text);
+        item.setAlignment(Pos.CENTER_LEFT);
+        item.getStyleClass().add("population-legend-item");
+        return item;''',
+    '''        HBox item = new HBox(9, sample, text);
+        item.setAlignment(Pos.CENTER_LEFT);
+        item.getStyleClass().add("population-legend-item");
+        if (title.startsWith("Fascia centrale")) {
+            Tooltip.install(item, new Tooltip(
+                    "A ogni secondo si ordinano i valori delle curve: il 25° percentile lascia sotto di sé il 25% dei valori, "
+                            + "il 75° percentile ne lascia sotto il 75%. Tra i due rimane quindi il 50% centrale del campione."));
+        }
+        return item;''',
+    "tooltip quartili")
+
+old_fullscreen = '''    private void openProfileFullscreen() {
+        LineChart<Number, Number> enlarged = copyProfileChart();
+        enlarged.setMinHeight(0);
+        enlarged.setPrefHeight(760);
+        enlarged.setMaxHeight(Double.MAX_VALUE);
+        VBox content = new VBox(12, profileLegend(), enlarged);
+        content.getStyleClass().add("population-fullscreen-content");
+        VBox.setVgrow(enlarged, Priority.ALWAYS);
+        InPlaceFullscreen.show(this, "Profilo temporale della popolazione", content);
+    }
+
+    private void openProfile3D() {
+        if (lastResult == null || lastResult.curves().isEmpty()) {
+            return;
+        }
+        Population3DChartPane pane = new Population3DChartPane();
+        pane.setData(lastResult.curves(), Map.copyOf(metadata), lastResult.halfWindow());
+        InPlaceFullscreen.show(this, "Profilo di popolazione 3D", pane);
+    }
+'''
+new_fullscreen = '''    private void openProfileFullscreen() {
+        LineChart<Number, Number> enlarged = copyProfileChart();
+        enlarged.setMinHeight(0);
+        enlarged.setPrefHeight(760);
+        enlarged.setMaxHeight(Double.MAX_VALUE);
+
+        VBox chartColumn = new VBox(12, profileLegend(), enlarged);
+        chartColumn.setMinWidth(0);
+        chartColumn.setMaxWidth(Double.MAX_VALUE);
+        VBox.setVgrow(enlarged, Priority.ALWAYS);
+        HBox.setHgrow(chartColumn, Priority.ALWAYS);
+
+        HBox content = new HBox(18, chartColumn, insightSnapshotCard(true));
+        content.setAlignment(Pos.TOP_LEFT);
+        content.getStyleClass().add("population-fullscreen-content");
+        InPlaceFullscreen.show(this, "Profilo temporale della popolazione", content);
+    }
+
+    private VBox insightSnapshotCard(boolean expanded) {
+        String headlineText = lastNarrative == null ? insightHeadline.getText() : lastNarrative.headline();
+        List<String> observations = lastNarrative == null ? List.of() : lastNarrative.observations();
+        List<String> cautions = lastNarrative == null ? List.of() : lastNarrative.cautions();
+
+        Label headline = UiFactory.wrappedLabel(headlineText, "population-insight-headline");
+        headline.setMinWidth(0);
+        headline.setMaxWidth(Double.MAX_VALUE);
+        headline.setTextOverrun(OverrunStyle.CLIP);
+
+        VBox observationBox = new VBox(expanded ? 10 : 7);
+        observationBox.getStyleClass().add("population-insight-list");
+        observationBox.getChildren().setAll(observations.stream()
+                .map(text -> insightLine("●", text, "population-insight-dot", expanded))
+                .toList());
+
+        VBox cautionBox = new VBox(expanded ? 9 : 6);
+        cautionBox.getStyleClass().add("population-insight-cautions");
+        if (!cautions.isEmpty()) {
+            cautionBox.getChildren().add(UiFactory.label("Da tenere presente", "population-insight-caution-title"));
+            cautions.stream().limit(expanded ? cautions.size() : 3)
+                    .map(text -> insightLine("!", text, "population-insight-warning", expanded))
+                    .forEach(cautionBox.getChildren()::add);
+        }
+
+        VBox card = new VBox(expanded ? 13 : 10,
+                UiFactory.label("Assistente di lettura", "population-insight-title"),
+                UiFactory.label("ANALISI LOCALE · RIPRODUCIBILE", "population-insight-badge"),
+                headline, observationBox, cautionBox,
+                UiFactory.wrappedLabel(
+                        "Il testo deriva solo dalle statistiche del grafico e non sostituisce l'interpretazione scientifica.",
+                        "population-insight-footnote"));
+        card.getStyleClass().add("population-insight-card");
+        card.setFillWidth(true);
+        card.setMinWidth(expanded ? 350 : 270);
+        card.setPrefWidth(expanded ? 430 : 330);
+        card.setMaxWidth(expanded ? 520 : 370);
+        return card;
+    }
+
+    private void openProfile3D() {
+        if (lastResult == null || lastResult.curves().isEmpty()) {
+            return;
+        }
+        Population3DChartPane pane = new Population3DChartPane();
+        pane.setData(lastResult.curves(), lastResult.profile(), lastResult.halfWindow());
+        pane.setMinWidth(0);
+        pane.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(pane, Priority.ALWAYS);
+
+        HBox content = new HBox(18, pane, insightSnapshotCard(true));
+        content.setAlignment(Pos.TOP_LEFT);
+        content.getStyleClass().add("population-fullscreen-content");
+        InPlaceFullscreen.show(this, "Profilo di popolazione 3D", content);
+    }
+'''
+replace_once(pop, old_fullscreen, new_fullscreen, "fullscreen 2D e 3D")
+replace_once(pop,
+    '''        PopulationInsightService.Narrative narrative = insightService.analyze(
+                result.curves(), result.profile(), facts, result.examined(), result.failures(), result.halfWindow());
+        insightHeadline.setText(narrative.headline());''',
+    '''        PopulationInsightService.Narrative narrative = insightService.analyze(
+                result.curves(), result.profile(), facts, result.examined(), result.failures(), result.halfWindow());
+        lastNarrative = narrative;
+        insightHeadline.setText(narrative.headline());''',
+    "memorizza narrativa")
+replace_once(pop,
+    '''    private HBox insightLine(String marker, String text, String markerStyle) {
+        Label bullet = UiFactory.label(marker, markerStyle);
+        Label copy = UiFactory.wrappedLabel(text, "population-insight-text");
+        HBox.setHgrow(copy, Priority.ALWAYS);
+        HBox row = new HBox(8, bullet, copy);
+        row.setAlignment(Pos.TOP_LEFT);
+        return row;
+    }''',
+    '''    private HBox insightLine(String marker, String text, String markerStyle) {
+        return insightLine(marker, text, markerStyle, false);
+    }
+
+    private HBox insightLine(String marker, String text, String markerStyle, boolean expanded) {
+        Label bullet = UiFactory.label(marker, markerStyle);
+        Label copy = UiFactory.wrappedLabel(text, "population-insight-text");
+        copy.setMinWidth(0);
+        copy.setMaxWidth(Double.MAX_VALUE);
+        copy.setTextOverrun(OverrunStyle.CLIP);
+        if (expanded) copy.setStyle("-fx-font-size: 12px; -fx-line-spacing: 2.5px;");
+        HBox.setHgrow(copy, Priority.ALWAYS);
+        HBox row = new HBox(8, bullet, copy);
+        row.setMinWidth(0);
+        row.setMaxWidth(Double.MAX_VALUE);
+        row.setAlignment(Pos.TOP_LEFT);
+        return row;
+    }''',
+    "righe assistente")
+replace_once(pop,
+    '''    private void clearResults() {
+        lastResult = null;''',
+    '''    private void clearResults() {
+        lastResult = null;
+        lastNarrative = null;''',
+    "reset narrativa")
+replace_once(pop,
+    '''    private static Slider slider(double value) {
+        Slider slider = new Slider(0, 100, value);
+        slider.setBlockIncrement(1);
+        slider.setMajorTickUnit(25);
+        slider.setMinorTickCount(24);
+        slider.setSnapToTicks(true);
+        slider.setPrefWidth(240);
+        slider.setMinWidth(180);
+        slider.setMaxWidth(260);
+        return slider;
+    }
+
+    private static VBox exposureControl(String label, Slider slider, Label value) {
+        HBox heading = new HBox(8, UiFactory.label(label, "filter-label"), UiFactory.spacer(), value);
+        heading.setAlignment(Pos.CENTER_LEFT);
+        VBox box = new VBox(4, heading, slider);
+        box.setPrefWidth(260);
+        box.setMaxWidth(280);
+        return box;
+    }''',
+    '''    private static Slider slider(double value) {
+        Slider slider = new Slider(0, 100, value);
+        slider.setBlockIncrement(1);
+        slider.setMajorTickUnit(25);
+        slider.setMinorTickCount(0);
+        slider.setSnapToTicks(false);
+        slider.setPadding(new Insets(0, 12, 0, 12));
+        slider.setMinWidth(0);
+        slider.setPrefWidth(320);
+        slider.setMaxWidth(Double.MAX_VALUE);
+        return slider;
+    }
+
+    private static VBox exposureControl(String label, Slider slider, Label value) {
+        HBox heading = new HBox(8, UiFactory.label(label, "filter-label"), UiFactory.spacer(), value);
+        heading.setAlignment(Pos.CENTER_LEFT);
+        slider.setMaxWidth(Double.MAX_VALUE);
+        VBox box = new VBox(7, heading, slider);
+        box.setMinWidth(220);
+        box.setPrefWidth(320);
+        box.setMaxWidth(Double.MAX_VALUE);
+        box.setStyle("-fx-background-color: rgba(13, 20, 35, 0.55); -fx-background-radius: 10; -fx-padding: 9 10 8 10;");
+        return box;
+    }''',
+    "slider FRACEXP")
+
+
+# La 3D ora rappresenta gli stessi oggetti concettuali della 2D.
+Path("src/main/java/it/casiraghi/swiftbat/ui/components/Population3DChartPane.java").write_text(r'''package it.casiraghi.swiftbat.ui.components;
+
+import it.casiraghi.swiftbat.service.CumulativeAnalysisService;
+import it.casiraghi.swiftbat.ui.UiFactory;
+import javafx.application.Platform;
+import javafx.embed.swing.SwingNode;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+
+import javax.swing.SwingUtilities;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.util.List;
+
+/** Vista interattiva 3D degli stessi elementi statistici mostrati nel profilo 2D. */
+public final class Population3DChartPane extends BorderPane {
+    private static final Color SINGLE_COLOR = new Color(82, 216, 255);
+    private static final Color MEDIAN_COLOR = new Color(255, 174, 74);
+    private static final Color QUARTILE_COLOR = new Color(170, 120, 219);
+
+    private final SwingNode swingNode = new SwingNode();
+    private final Java2DWaterfallPanel renderer = new Java2DWaterfallPanel();
+    private final CumulativeAnalysisService analysisService = new CumulativeAnalysisService();
+    private final Label sampleLabel = UiFactory.label("Nessun campione", "three-d-context");
+
+    public Population3DChartPane() {
+        getStyleClass().add("three-d-panel");
+        setMinHeight(560);
+        setPrefHeight(700);
+        SwingUtilities.invokeLater(() -> {
+            renderer.setPresentation(new Java2DWaterfallPanel.Presentation(
+                    "Nessuna curva normalizzata disponibile per la vista 3D.",
+                    "Tempo dal trigger (s)", "Rate normalizzato", "Elementi del profilo 2D",
+                    "Rate normalizzato", "", false, false, true, 10));
+            swingNode.setContent(renderer);
+        });
+
+        StackPane viewer = new StackPane(swingNode);
+        viewer.getStyleClass().add("three-d-viewer");
+        viewer.setMinHeight(480);
+        viewer.setPrefHeight(590);
+        viewer.widthProperty().addListener((obs, oldValue, newValue) -> syncRendererSize(viewer));
+        viewer.heightProperty().addListener((obs, oldValue, newValue) -> syncRendererSize(viewer));
+        setTop(buildHeader());
+        setCenter(viewer);
+        setBottom(buildFooter());
+        Platform.runLater(() -> syncRendererSize(viewer));
+    }
+
+    public void setData(List<CumulativeAnalysisService.NormalizedCurve> curves,
+                        CumulativeAnalysisService.PopulationProfile profile,
+                        double halfWindowSeconds) {
+        Java2DWaterfallPanel.Dataset dataset = toDataset(curves, profile, halfWindowSeconds);
+        int curveCount = curves == null ? 0 : curves.size();
+        sampleLabel.setText(dataset.isEmpty() ? "Nessun campione"
+                : curveCount + " GRB · mediana + fascia centrale");
+        SwingUtilities.invokeLater(() -> renderer.setDataset(dataset));
+    }
+
+    private Java2DWaterfallPanel.Dataset toDataset(List<CumulativeAnalysisService.NormalizedCurve> curves,
+                                                    CumulativeAnalysisService.PopulationProfile profile,
+                                                    double halfWindowSeconds) {
+        if (curves == null || curves.isEmpty()) return Java2DWaterfallPanel.Dataset.empty();
+        int start = (int) Math.ceil(-halfWindowSeconds);
+        int end = (int) Math.floor(halfWindowSeconds);
+        if (end < start) return Java2DWaterfallPanel.Dataset.empty();
+        double[] times = new double[end - start + 1];
+        for (int i = 0; i < times.length; i++) times[i] = start + i;
+
+        boolean hasProfile = profile != null && !profile.median().isEmpty()
+                && !profile.lowerQuartile().isEmpty() && !profile.upperQuartile().isEmpty();
+        int offset = hasProfile ? 3 : 0;
+        double[][] rates = new double[curves.size() + offset][times.length];
+        String[] labels = new String[curves.size() + offset];
+        Color[] colors = new Color[curves.size() + offset];
+
+        if (hasProfile) {
+            labels[0] = "Mediana";
+            labels[1] = "25° percentile";
+            labels[2] = "75° percentile";
+            colors[0] = MEDIAN_COLOR;
+            colors[1] = QUARTILE_COLOR;
+            colors[2] = QUARTILE_COLOR;
+            for (int i = 0; i < times.length; i++) {
+                rates[0][i] = valueAt(profile.median(), times[i]);
+                rates[1][i] = valueAt(profile.lowerQuartile(), times[i]);
+                rates[2][i] = valueAt(profile.upperQuartile(), times[i]);
+            }
+        }
+        for (int c = 0; c < curves.size(); c++) {
+            int band = c + offset;
+            CumulativeAnalysisService.NormalizedCurve curve = curves.get(c);
+            labels[band] = curve.grbName();
+            colors[band] = SINGLE_COLOR;
+            for (int i = 0; i < times.length; i++) rates[band][i] = analysisService.sampleAt(curve, times[i]);
+        }
+        return new Java2DWaterfallPanel.Dataset(times, rates, labels, colors);
+    }
+
+    private double valueAt(List<CumulativeAnalysisService.Point> points, double time) {
+        double bestDistance = Double.POSITIVE_INFINITY;
+        double bestValue = Double.NaN;
+        for (CumulativeAnalysisService.Point point : points) {
+            if (!Double.isFinite(point.time()) || !Double.isFinite(point.value())) continue;
+            double distance = Math.abs(point.time() - time);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestValue = point.value();
+            }
+        }
+        return bestDistance <= 0.51 ? bestValue : Double.NaN;
+    }
+
+    private VBox buildHeader() {
+        Label title = UiFactory.label("Profilo di popolazione 3D", "overlay-title");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox titleRow = new HBox(10, title, spacer, sampleLabel);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
+        Label explanation = UiFactory.wrappedLabel(
+                "La vista 3D riproduce gli stessi elementi del grafico 2D: singoli GRB in azzurro, mediana in arancio e limiti 25°/75° in viola. "
+                        + "La profondità serve solo a separare visivamente le curve e non rappresenta T90, distanza o posizione nello spazio.",
+                "overlay-caption");
+        FlowPane legend = new FlowPane(14, 6,
+                legendItem("— Singoli GRB", SINGLE_COLOR),
+                legendItem("— Mediana", MEDIAN_COLOR),
+                legendItem("- - Fascia centrale 25°–75°", QUARTILE_COLOR));
+        VBox header = new VBox(8, titleRow, explanation, legend);
+        header.getStyleClass().add("three-d-header");
+        header.setPadding(new Insets(15, 17, 13, 17));
+        return header;
+    }
+
+    private HBox buildFooter() {
+        Label note = UiFactory.label(
+                "Trascina per ruotare · rotella per zoom · doppio clic per centrare. La profondità è puramente grafica.",
+                "subtle-text");
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        Button reset = UiFactory.button("Centra vista", "secondary-button");
+        reset.setOnAction(event -> SwingUtilities.invokeLater(renderer::resetView));
+        HBox footer = new HBox(12, note, spacer, reset);
+        footer.setAlignment(Pos.CENTER_LEFT);
+        footer.getStyleClass().add("three-d-footer");
+        return footer;
+    }
+
+    private Label legendItem(String text, Color color) {
+        Label label = UiFactory.label(text, "legend-item");
+        label.setStyle("-fx-text-fill: " + toHex(color) + ";");
+        return label;
+    }
+
+    private void syncRendererSize(StackPane viewer) {
+        int width = (int) Math.max(680, viewer.getWidth());
+        int height = (int) Math.max(440, viewer.getHeight());
+        SwingUtilities.invokeLater(() -> {
+            Dimension dimension = new Dimension(width, height);
+            renderer.setPreferredSize(dimension);
+            renderer.setSize(dimension);
+            renderer.revalidate();
+            renderer.repaint();
+        });
+    }
+
+    private String toHex(Color color) {
+        return String.format("#%02X%02X%02X", color.getRed(), color.getGreen(), color.getBlue());
+    }
+}
+''', encoding="utf-8")
+
+
+water = "src/main/java/it/casiraghi/swiftbat/ui/components/Java2DWaterfallPanel.java"
+replace_once(water,
+    '''        // Glow sottile seguito dalla linea nitida.
+        g.setColor(withAlpha(color, presentation.denseSeries() ? 22 : 55));
+        g.setStroke(new BasicStroke(presentation.denseSeries() ? 3.2f : 7.5f,
+                BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.draw(line);
+        g.setColor(withAlpha(color, presentation.denseSeries() ? 145 : band == 0 ? 245 : 220));
+        g.setStroke(new BasicStroke(presentation.denseSeries() ? 1.25f : band == 0 ? 2.8f : 2.35f,
+                BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.draw(line);''',
+    '''        // Glow sottile seguito dalla linea nitida. Nel profilo di popolazione
+        // mediana e quartili mantengono la stessa gerarchia visiva della vista 2D.
+        boolean medianBand = isMedianBand(band);
+        boolean quartileBand = isQuartileBand(band);
+        int glowAlpha = medianBand ? 70 : quartileBand ? 40 : presentation.denseSeries() ? 18 : 55;
+        float glowWidth = medianBand ? 8.0f : quartileBand ? 5.0f
+                : presentation.denseSeries() ? 3.0f : 7.5f;
+        g.setColor(withAlpha(color, glowAlpha));
+        g.setStroke(new BasicStroke(glowWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.draw(line);
+
+        int lineAlpha = medianBand ? 255 : quartileBand ? 235
+                : presentation.denseSeries() ? 105 : band == 0 ? 245 : 220;
+        float lineWidth = medianBand ? 4.2f : quartileBand ? 2.4f
+                : presentation.denseSeries() ? 1.05f : band == 0 ? 2.8f : 2.35f;
+        g.setColor(withAlpha(color, lineAlpha));
+        if (quartileBand) {
+            g.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND,
+                    10f, new float[]{8f, 6f}, 0f));
+        } else {
+            g.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        }
+        g.draw(line);''',
+    "stile 3D statistiche")
+replace_once(water,
+    '''    private void paintAxesAndLabels(Graphics2D g, Bounds bounds, Geometry geometry) {''',
+    '''    private boolean isMedianBand(int band) {
+        return "Mediana".equals(labelForBand(band));
+    }
+
+    private boolean isQuartileBand(int band) {
+        String label = labelForBand(band);
+        return label != null && label.contains("percentile");
+    }
+
+    private String labelForBand(int band) {
+        return band >= 0 && band < dataset.labels().length ? dataset.labels()[band] : null;
+    }
+
+    private void paintAxesAndLabels(Graphics2D g, Bounds bounds, Geometry geometry) {''',
+    "helper bande 3D")
+
+
+insight = "src/main/java/it/casiraghi/swiftbat/service/PopulationInsightService.java"
+replace_once(insight,
+    '''        return String.format(Locale.ITALY,
+                "Variabilità — La distanza media fra 25° e 75° percentile è %.2f: la dispersione delle forme è %s.",
+                meanIqr, level);''',
+    '''        return String.format(Locale.ITALY,
+                "Variabilità — La fascia 25°–75° ha ampiezza media %.2f: contiene il 50%% centrale delle curve e indica una dispersione %s.",
+                meanIqr, level);''',
+    "spiegazione quartili")
+
+# Il workflow e questo script sono temporanei: spariscono nel commit finale.
+Path(".github/workflows/apply-population-ui-fixes.yml").unlink(missing_ok=True)
+Path(__file__).unlink(missing_ok=True)
+print("Correzioni applicate.")
