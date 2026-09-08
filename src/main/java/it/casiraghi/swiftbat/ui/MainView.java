@@ -137,6 +137,7 @@ public final class MainView {
 
         Button home = navButton("⌂", "Home", "home");
         Button explorer = navButton("✦", "Esplora", "explorer");
+        Button spectroscopy = navButton("λ", "Spettroscopia", "spectroscopy");
         Button sky = navButton("◎", "Mappa celeste", "sky");
         Button population = navButton("≋", "Analisi di popolazione", "population");
         Button compare = navButton("⇄", "Confronta", "compare");
@@ -152,7 +153,7 @@ public final class MainView {
         source.setMaxWidth(Double.MAX_VALUE);
         source.setOnAction(event -> hostServices.showDocument(SwiftCatalogService.CATALOG_URL));
 
-        navigation.getChildren().addAll(brand, home, explorer, sky, population, compare, about,
+        navigation.getChildren().addAll(brand, home, explorer, spectroscopy, sky, population, compare, about,
                 spacer, separator, online, source);
         return navigation;
     }
@@ -187,7 +188,7 @@ public final class MainView {
         bar.setPadding(new Insets(11, 18, 11, 20));
         bar.setAlignment(Pos.CENTER_LEFT);
 
-        Label product = UiFactory.label("SwiftBAT Explorer", "top-product-title");
+        Label product = UiFactory.label("SwiftBAT Explorer · 1.3 SPECTRAL", "top-product-title");
         Label live = UiFactory.label("LIVE", "top-live-badge");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -206,7 +207,14 @@ public final class MainView {
 
     private void navigate(String page) {
         Node node = switch (page) {
-            case "explorer" -> explorerPage;
+            case "explorer" -> {
+                explorerPage.showTab("Curva 2D");
+                yield explorerPage;
+            }
+            case "spectroscopy" -> {
+                explorerPage.showTab("Spettroscopia");
+                yield explorerPage;
+            }
             case "compare" -> comparePage;
             case "population" -> populationPage;
             case "sky" -> skyMapPage;
@@ -322,7 +330,9 @@ public final class MainView {
         if (entry == null) {
             return;
         }
-        navigate("explorer");
+        boolean spectroscopyOpen = activeNavigationButton != null
+                && "spectroscopy".equals(activeNavigationButton.getUserData());
+        navigate(spectroscopyOpen ? "spectroscopy" : "explorer");
         explorerPage.setSelectedEntry(entry);
 
         if (!forceRefresh) {
