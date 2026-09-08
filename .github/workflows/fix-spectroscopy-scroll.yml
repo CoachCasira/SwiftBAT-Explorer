@@ -35,43 +35,54 @@ jobs:
           path = Path('src/main/java/it/casiraghi/swiftbat/ui/SpectroscopyPane.java')
           text = path.read_text(encoding='utf-8')
 
-          old_tabs = '''        tabs.setMinHeight(590);
-          tabs.setPrefHeight(720);
-          VBox.setVgrow(tabs, Priority.ALWAYS);'''
-          new_tabs = '''        // Lascia che la scheda assuma l'altezza reale del contenuto: quando i grafici
-          // vengono impilati su finestre strette, lo ScrollPane esterno può così
-          // raggiungere anche l'istogramma e le sezioni successive senza tagliarle.
-          resultHost.setMinHeight(Region.USE_PREF_SIZE);
-          resultHost.setMaxHeight(Double.MAX_VALUE);
-          tabs.setMinHeight(Region.USE_PREF_SIZE);
-          tabs.setPrefHeight(Region.USE_COMPUTED_SIZE);
-          tabs.setMaxHeight(Double.MAX_VALUE);
-          VBox.setVgrow(tabs, Priority.NEVER);'''
-          if old_tabs not in text:
-              raise SystemExit('Blocco TabPane atteso non trovato')
-          text = text.replace(old_tabs, new_tabs, 1)
+          if 'tabs.setMinHeight(590);' not in text:
+              raise SystemExit('tabs.setMinHeight(590) non trovato')
+          text = text.replace(
+              'tabs.setMinHeight(590);',
+              '// Lascia che la scheda assuma l\'altezza reale del contenuto quando i grafici vengono impilati.\n'
+              '        resultHost.setMinHeight(Region.USE_PREF_SIZE);\n'
+              '        resultHost.setMaxHeight(Double.MAX_VALUE);\n'
+              '        tabs.setMinHeight(Region.USE_PREF_SIZE);',
+              1
+          )
 
-          old_content = '''        VBox content = new VBox(12);
-          content.setPadding(new Insets(12, 4, 18, 4));'''
-          new_content = '''        VBox content = new VBox(12);
-          content.setPadding(new Insets(12, 4, 18, 4));
-          content.setMinHeight(Region.USE_PREF_SIZE);
-          content.setMaxWidth(Double.MAX_VALUE);'''
-          if old_content not in text:
-              raise SystemExit('Blocco risultati ufficiali atteso non trovato')
-          text = text.replace(old_content, new_content, 1)
+          if 'tabs.setPrefHeight(720);' not in text:
+              raise SystemExit('tabs.setPrefHeight(720) non trovato')
+          text = text.replace(
+              'tabs.setPrefHeight(720);',
+              'tabs.setPrefHeight(Region.USE_COMPUTED_SIZE);\n'
+              '        tabs.setMaxHeight(Double.MAX_VALUE);',
+              1
+          )
 
-          old_scroll = '''        scroll.setFitToWidth(true);
-          scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-          return scroll;'''
-          new_scroll = '''        scroll.setFitToWidth(true);
-          scroll.setFitToHeight(false);
-          scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-          scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-          return scroll;'''
-          if old_scroll not in text:
-              raise SystemExit('Blocco ScrollPane atteso non trovato')
-          text = text.replace(old_scroll, new_scroll, 1)
+          if 'VBox.setVgrow(tabs, Priority.ALWAYS);' not in text:
+              raise SystemExit('VBox.setVgrow tabs non trovato')
+          text = text.replace(
+              'VBox.setVgrow(tabs, Priority.ALWAYS);',
+              'VBox.setVgrow(tabs, Priority.NEVER);',
+              1
+          )
+
+          marker = 'content.setPadding(new Insets(12, 4, 18, 4));'
+          if marker not in text:
+              raise SystemExit('padding risultati ufficiali non trovato')
+          text = text.replace(
+              marker,
+              marker + '\n        content.setMinHeight(Region.USE_PREF_SIZE);\n        content.setMaxWidth(Double.MAX_VALUE);',
+              1
+          )
+
+          scroll_marker = 'scroll.setFitToWidth(true);\n        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);'
+          if scroll_marker not in text:
+              raise SystemExit('configurazione ScrollPane non trovata')
+          text = text.replace(
+              scroll_marker,
+              'scroll.setFitToWidth(true);\n'
+              '        scroll.setFitToHeight(false);\n'
+              '        scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);\n'
+              '        scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);',
+              1
+          )
 
           path.write_text(text, encoding='utf-8')
 
