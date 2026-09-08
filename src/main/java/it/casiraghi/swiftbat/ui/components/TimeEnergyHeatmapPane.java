@@ -1,11 +1,8 @@
 package it.casiraghi.swiftbat.ui.components;
 
 import it.casiraghi.swiftbat.model.TabularData;
-import it.casiraghi.swiftbat.ui.InPlaceFullscreen;
-import it.casiraghi.swiftbat.ui.UiFactory;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
@@ -27,8 +24,6 @@ public final class TimeEnergyHeatmapPane extends Region {
 
     private final Canvas canvas = new Canvas();
     private final Label hoverCard = new Label();
-    private final Button fullscreenButton;
-    private final boolean allowFullscreen;
     private TabularData data = TabularData.empty();
     private double halfWindowSeconds = 60.0;
     private List<Row> visibleRows = List.of();
@@ -40,12 +35,6 @@ public final class TimeEnergyHeatmapPane extends Region {
     private double maximumTime;
 
     public TimeEnergyHeatmapPane() {
-        this(true);
-    }
-
-    private TimeEnergyHeatmapPane(boolean allowFullscreen) {
-        this.allowFullscreen = allowFullscreen;
-
         hoverCard.setManaged(false);
         hoverCard.setMouseTransparent(true);
         hoverCard.setVisible(false);
@@ -60,12 +49,7 @@ public final class TimeEnergyHeatmapPane extends Region {
                         + "-fx-padding: 8 10;"
         );
 
-        fullscreenButton = UiFactory.button("Schermo intero  ⛶", "primary-button");
-        fullscreenButton.setManaged(false);
-        fullscreenButton.setVisible(allowFullscreen);
-        fullscreenButton.setOnAction(event -> openFullscreen());
-
-        getChildren().addAll(canvas, hoverCard, fullscreenButton);
+        getChildren().addAll(canvas, hoverCard);
         setMinHeight(300);
         setPrefHeight(390);
         widthProperty().addListener(ignored -> draw());
@@ -90,25 +74,7 @@ public final class TimeEnergyHeatmapPane extends Region {
         double height = Math.max(0, getHeight());
         canvas.setWidth(width);
         canvas.setHeight(height);
-
-        if (allowFullscreen) {
-            fullscreenButton.autosize();
-            fullscreenButton.relocate(
-                    Math.max(8, width - fullscreenButton.getWidth() - 12),
-                    6);
-        }
         draw();
-    }
-
-    private void openFullscreen() {
-        if (getScene() == null) return;
-        TimeEnergyHeatmapPane enlarged = new TimeEnergyHeatmapPane(false);
-        enlarged.setData(data);
-        enlarged.setHalfWindowSeconds(halfWindowSeconds);
-        enlarged.setMinSize(0, 0);
-        enlarged.setPrefHeight(760);
-        enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        InPlaceFullscreen.show(this, "Mappa tempo–energia dei rate", enlarged);
     }
 
     private void draw() {
@@ -281,7 +247,6 @@ public final class TimeEnergyHeatmapPane extends Region {
         if (targetY + cardHeight > getHeight() - 8) targetY = y - cardHeight - 14;
         hoverCard.relocate(Math.max(8, targetX), Math.max(8, targetY));
         hoverCard.toFront();
-        if (allowFullscreen) fullscreenButton.toFront();
         hoverCard.setVisible(true);
     }
 
