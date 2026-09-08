@@ -8,9 +8,8 @@ import it.casiraghi.swiftbat.model.SpectralData.Interval;
 import it.casiraghi.swiftbat.model.SpectralData.Model;
 import it.casiraghi.swiftbat.service.SpectralCatalogService;
 import it.casiraghi.swiftbat.ui.components.Java2DGroupedBarPanel;
-import it.casiraghi.swiftbat.ui.components.Java2DWaterfallPanel;
 import it.casiraghi.swiftbat.ui.components.ScientificBar3DPane;
-import it.casiraghi.swiftbat.ui.components.ScientificLine3DPane;
+import it.casiraghi.swiftbat.ui.components.SpectralModel3DPane;
 import it.casiraghi.swiftbat.ui.components.ThreeDChartPane;
 import it.casiraghi.swiftbat.ui.components.TimeEnergyHeatmapPane;
 import javafx.application.HostServices;
@@ -90,6 +89,7 @@ public final class SpectroscopyPane extends BorderPane {
         intervalChoice.setValue(preferredInterval());
         intervalChoice.getStyleClass().add("choice-box-modern");
         intervalChoice.setPrefWidth(220);
+        intervalChoice.setMaxWidth(Double.MAX_VALUE);
         UiFactory.autoTooltip(intervalChoice);
 
         modelChoice.setItems(FXCollections.observableArrayList(
@@ -97,18 +97,18 @@ public final class SpectroscopyPane extends BorderPane {
         modelChoice.setValue(AUTOMATIC_MODEL);
         modelChoice.getStyleClass().add("choice-box-modern");
         modelChoice.setPrefWidth(240);
+        modelChoice.setMaxWidth(Double.MAX_VALUE);
         UiFactory.autoTooltip(modelChoice);
 
         Button source = UiFactory.button("Apri tabella ufficiale ↗", "ghost-button");
+        source.setMaxWidth(Double.MAX_VALUE);
         source.setOnAction(event -> hostServices.showDocument(sourceUrl()));
-        FlowPane controls = new FlowPane(10, 10);
-        controls.getChildren().addAll(
+        GridPane controls = responsiveGrid(1120, 3,
                 controlBox("Intervallo del fit", intervalChoice,
                         "T100 usa l'intervallo complessivo del burst; Picco 1 s usa il secondo più intenso."),
                 controlBox("Modello del fit", modelChoice,
                         "Automatico segue la scelta BAT; PL e CPL permettono di confrontare i due fit pubblicati."),
-                source);
-        controls.setAlignment(Pos.BOTTOM_LEFT);
+                sourceControlBox(source));
         controls.getStyleClass().add("spectroscopy-controls");
 
         intervalChoice.valueProperty().addListener((obs, oldValue, newValue) -> refreshOfficialResult());
@@ -145,6 +145,23 @@ public final class SpectroscopyPane extends BorderPane {
         VBox box = new VBox(5, UiFactory.label(label, "filter-label"), control, explanation);
         box.getStyleClass().add("spectroscopy-control-box");
         box.setPrefWidth(preferredWidth);
+        box.setFillWidth(true);
+        box.setMaxWidth(Double.MAX_VALUE);
+        return box;
+    }
+
+    private VBox sourceControlBox(Button source) {
+        Label help = UiFactory.wrappedLabel(
+                "Apre direttamente la tabella BAT da cui provengono i parametri mostrati in questa scheda.",
+                "spectroscopy-control-help");
+        help.setMinHeight(Region.USE_PREF_SIZE);
+        help.setMaxWidth(Double.MAX_VALUE);
+        VBox box = new VBox(5,
+                UiFactory.label("Fonte ufficiale BAT", "filter-label"),
+                source,
+                help);
+        box.getStyleClass().add("spectroscopy-control-box");
+        box.setPrefWidth(270);
         box.setFillWidth(true);
         box.setMaxWidth(Double.MAX_VALUE);
         return box;
@@ -346,7 +363,7 @@ public final class SpectroscopyPane extends BorderPane {
             Button threeD = UiFactory.button("Vista 3D", "secondary-button");
             threeD.setDisable(fit == null || fit.normalization() == null || fit.alpha() == null);
             threeD.setOnAction(event -> openModel3D(fit));
-            Button fullscreen = UiFactory.button("Schermo intero", "ghost-button");
+            Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
             fullscreen.setOnAction(event -> openModelFullscreen(fit));
             FlowPane actions = new FlowPane(8, 8);
             actions.getStyleClass().add("spectroscopy-chart-actions");
@@ -410,7 +427,7 @@ public final class SpectroscopyPane extends BorderPane {
             Button threeD = UiFactory.button("Vista 3D", "secondary-button");
             threeD.setDisable(fluxes.stream().noneMatch(EnergyFluxBand::available));
             threeD.setOnAction(event -> openFlux3D(fluxes, model));
-            Button fullscreen = UiFactory.button("Schermo intero", "ghost-button");
+            Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
             fullscreen.setOnAction(event -> openFluxFullscreen(fluxes, model));
             FlowPane actions = new FlowPane(8, 8);
             actions.getStyleClass().add("spectroscopy-chart-actions");
@@ -445,34 +462,12 @@ public final class SpectroscopyPane extends BorderPane {
             }
         }
         double[] xValues = new double[energies.size()];
-        double[][] yValues = new double[][]{new double[energies.size()]};
+        double[] yValues = new double[energies.size()];
         for (int index = 0; index < energies.size(); index++) {
             xValues[index] = energies.get(index);
-            yValues[0][index] = logFluxes.get(index);
+            yValues[index] = logFluxes.get(index);
         }
-        Java2DWaterfallPanel.Dataset dataset = new Java2DWaterfallPanel.Dataset(
-                xValues,
-                yValues,
-                new String[]{"Fit " + fit.model().code()},
-                new java.awt.Color[]{new java.awt.Color(255, 173, 82)});
-        Java2DWaterfallPanel.Presentation presentation = new Java2DWaterfallPanel.Presentation(
-                "Modello spettrale non disponibile.",
-                "Energia (keV)",
-                "log10 N(E)",
-                "Modello visualizzato",
-                "log10 flusso fotonico",
-                "",
-                false,
-                false,
-                false,
-                4);
-        ScientificLine3DPane view = new ScientificLine3DPane(
-                "Modello spettrale ricostruito · " + fit.model().code(),
-                "La stessa curva 2D è resa ruotabile. X = energia, Y = log₁₀ N(E); la profondità separa "
-                        + "graficamente il modello e non rappresenta una terza grandezza fisica.",
-                dataset,
-                presentation,
-                "Vista prospettica dello stesso fit ufficiale: ruota trascinando, usa la rotella per lo zoom.");
+        SpectralModel3DPane view = new SpectralModel3DPane(fit.model().code(), xValues, yValues);
         InPlaceFullscreen.show(this, grbData.grbName() + " · Modello spettrale 3D", view);
     }
 
@@ -630,15 +625,19 @@ public final class SpectroscopyPane extends BorderPane {
         threeD.setDisable(grbData.asciiData().isEmpty());
         threeD.setOnAction(event -> openTimeEnergy3D());
         FlowPane controls = new FlowPane(10, 10);
-        controls.getChildren().addAll(
+        controls.getChildren().add(
                 controlBox("Finestra temporale", window,
                         "Limita la mappa ai secondi prima e dopo t = 0; non modifica i parametri del fit ufficiale.",
-                        620),
-                threeD);
+                        620));
         controls.setAlignment(Pos.BOTTOM_LEFT);
 
+        FlowPane chartActions = new FlowPane(8, 8);
+        chartActions.getStyleClass().add("spectroscopy-chart-actions");
+        chartActions.getChildren().add(threeD);
         VBox chartCard = new VBox(9,
-                UiFactory.label("Mappa tempo–energia dei rate", "card-title"), heatmap);
+                UiFactory.label("Mappa tempo–energia dei rate", "card-title"),
+                chartActions,
+                heatmap);
         chartCard.getStyleClass().addAll("card", "time-energy-card");
         chartCard.setPadding(new Insets(14));
         VBox.setVgrow(heatmap, Priority.ALWAYS);
