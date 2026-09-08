@@ -3,7 +3,6 @@ package it.casiraghi.swiftbat.ui.components;
 import it.casiraghi.swiftbat.ui.UiFactory;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingNode;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
@@ -12,7 +11,6 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
-import javafx.scene.layout.VBox;
 
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -57,127 +55,14 @@ public final class SpectralModel3DPane extends BorderPane {
         StackPane viewer = new StackPane(swingNode);
         viewer.getStyleClass().add("three-d-viewer");
         viewer.setMinSize(0, 0);
-        viewer.setPrefHeight(640);
+        viewer.setPrefHeight(680);
         viewer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         viewer.widthProperty().addListener((obs, oldValue, newValue) -> syncRendererSize(viewer));
         viewer.heightProperty().addListener((obs, oldValue, newValue) -> syncRendererSize(viewer));
 
-        VBox reading = buildReadingPanel(modelCode);
-        reading.setMinWidth(320);
-        reading.setPrefWidth(365);
-        reading.setMaxWidth(410);
-        reading.setMaxHeight(Double.MAX_VALUE);
-
-        HBox body = new HBox(12, viewer, reading);
-        body.setPadding(Insets.EMPTY);
-        body.setMinSize(0, 0);
-        body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        body.setAlignment(Pos.CENTER_LEFT);
-        HBox.setHgrow(viewer, Priority.ALWAYS);
-        HBox.setHgrow(reading, Priority.NEVER);
-
-        setTop(buildHeader(modelCode));
-        setCenter(body);
+        setCenter(viewer);
         setBottom(buildFooter());
         Platform.runLater(() -> syncRendererSize(viewer));
-    }
-
-    private VBox buildHeader(String modelCode) {
-        Label title = UiFactory.label("Modello spettrale ricostruito · " + modelCode, "overlay-title");
-        Label caption = UiFactory.wrappedLabel(
-                "La curva arancione è la stessa funzione mostrata nella vista 2D. X = energia dei fotoni, "
-                        + "Y = log₁₀ N(E); la profondità serve solo a dare prospettiva e non rappresenta una terza grandezza fisica.",
-                "overlay-caption");
-        caption.setMinHeight(Region.USE_PREF_SIZE);
-        caption.setMaxWidth(Double.MAX_VALUE);
-        Label legend = UiFactory.label("● Fit " + modelCode, "legend-item");
-        legend.setStyle("-fx-text-fill: #ffad52;");
-
-        VBox header = new VBox(8, title, caption, legend);
-        header.getStyleClass().addAll("three-d-header", "three-d-header-fullscreen");
-        header.setPadding(new Insets(15, 17, 13, 17));
-        return header;
-    }
-
-    private VBox buildReadingPanel(String modelCode) {
-        VBox card = new VBox(10);
-        card.getStyleClass().addAll("card", "spectroscopy-assistant");
-        card.setPadding(new Insets(18));
-        card.setFillWidth(true);
-        card.setMaxHeight(Double.MAX_VALUE);
-        card.setStyle(
-                "-fx-background-color: linear-gradient(to bottom right, rgba(18, 40, 60, 0.98), rgba(31, 23, 58, 0.98));"
-                        + "-fx-border-color: rgba(92, 212, 239, 0.42);"
-                        + "-fx-border-width: 1;"
-                        + "-fx-background-radius: 14;"
-                        + "-fx-border-radius: 14;"
-        );
-
-        Label title = UiFactory.label("Come leggere la vista 3D", "card-title");
-        title.setStyle("-fx-text-fill: #f7fbff; -fx-font-size: 18px; -fx-font-weight: bold;");
-
-        VBox model = readingSection(
-                "Modello",
-                "Fit " + modelCode + ": la curva arancione è la funzione spettrale ricostruita dai parametri ufficiali BAT. "
-                        + "Non rappresenta punti osservati grezzi e non aggiunge nuovi dati rispetto alla vista 2D.",
-                "#ffad52");
-        VBox axes = readingSection(
-                "Assi",
-                "X indica l'energia dei fotoni in keV. Y indica log₁₀ N(E), cioè il logaritmo del flusso fotonico differenziale. "
-                        + "Valori negativi sono normali: significano che N(E) è minore di 1 nelle unità riportate.",
-                "#63d7ff");
-        VBox shape = readingSection(
-                "Forma della curva",
-                "L'andamento mostra come il modello previsto cambia con l'energia. Una discesa più rapida verso destra "
-                        + "corrisponde a una diminuzione più marcata del contributo alle energie elevate.",
-                "#d79aff");
-        VBox depth = readingSection(
-                "Profondità",
-                "Il piano arretrato e i collegamenti prospettici servono esclusivamente a rendere la visualizzazione tridimensionale. "
-                        + "La profondità non corrisponde a tempo, distanza, intensità o a una terza variabile fisica.",
-                "#65efae");
-        VBox controls = readingSection(
-                "Interazione",
-                "Trascina sul grafico per cambiare la prospettiva interna, usa la rotellina per lo zoom e fai doppio clic "
-                        + "per riportare la vista alla posizione iniziale.",
-                "#ffd26a");
-        VBox interpretation = readingSection(
-                "Interpretazione",
-                "Zoom e prospettiva modificano soltanto il modo in cui il modello viene mostrato: energie, valori di N(E) "
-                        + "e parametri del fit rimangono invariati.",
-                "#ff84aa");
-
-        card.getChildren().addAll(title, model, axes, shape, depth, controls, interpretation);
-        for (VBox section : new VBox[]{model, axes, shape, depth, controls, interpretation}) {
-            VBox.setVgrow(section, Priority.ALWAYS);
-        }
-        return card;
-    }
-
-    private VBox readingSection(String titleText, String bodyText, String accentColor) {
-        Label sectionTitle = UiFactory.label(titleText, "filter-label");
-        sectionTitle.setStyle("-fx-text-fill: " + accentColor + "; -fx-font-size: 13.5px; -fx-font-weight: bold;");
-
-        Label body = UiFactory.wrappedLabel(bodyText, "assistant-copy");
-        body.setMinHeight(Region.USE_PREF_SIZE);
-        body.setMaxWidth(Double.MAX_VALUE);
-        body.setMaxHeight(Double.MAX_VALUE);
-        body.setStyle("-fx-text-fill: #eef5ff; -fx-font-size: 13px; -fx-line-spacing: 3px;");
-
-        VBox section = new VBox(5, sectionTitle, body);
-        section.setPadding(new Insets(10, 11, 10, 11));
-        section.setFillWidth(true);
-        section.setMinHeight(Region.USE_PREF_SIZE);
-        section.setMaxHeight(Double.MAX_VALUE);
-        section.setStyle(
-                "-fx-background-color: rgba(255, 255, 255, 0.035);"
-                        + "-fx-border-color: rgba(118, 151, 205, 0.12);"
-                        + "-fx-border-width: 1;"
-                        + "-fx-background-radius: 10;"
-                        + "-fx-border-radius: 10;"
-        );
-        VBox.setVgrow(body, Priority.ALWAYS);
-        return section;
     }
 
     private HBox buildFooter() {
@@ -198,8 +83,8 @@ public final class SpectralModel3DPane extends BorderPane {
     }
 
     private void syncRendererSize(StackPane viewer) {
-        int width = (int) Math.max(720, viewer.getWidth());
-        int height = (int) Math.max(480, viewer.getHeight());
+        int width = (int) Math.max(560, viewer.getWidth());
+        int height = (int) Math.max(380, viewer.getHeight());
         SwingUtilities.invokeLater(() -> {
             Dimension size = new Dimension(width, height);
             renderer.setPreferredSize(size);
@@ -241,7 +126,7 @@ public final class SpectralModel3DPane extends BorderPane {
             setOpaque(true);
             setBackground(BG_TOP);
             setPreferredSize(new Dimension(980, 620));
-            setMinimumSize(new Dimension(620, 420));
+            setMinimumSize(new Dimension(520, 360));
             setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
             MouseAdapter mouse = new MouseAdapter() {
@@ -347,10 +232,10 @@ public final class SpectralModel3DPane extends BorderPane {
             minY -= yRange * 0.12;
             maxY += yRange * 0.12;
 
-            double baseWidth = Math.max(520, getWidth() * 0.69) * zoom;
-            double baseHeight = Math.max(300, getHeight() * 0.60) * zoom;
+            double baseWidth = Math.max(440, getWidth() * 0.72) * zoom;
+            double baseHeight = Math.max(260, getHeight() * 0.64) * zoom;
             double left = getWidth() * 0.47 - baseWidth / 2.0;
-            double top = getHeight() * 0.47 - baseHeight / 2.0;
+            double top = getHeight() * 0.48 - baseHeight / 2.0;
             double right = left + baseWidth;
             double bottom = top + baseHeight;
 
