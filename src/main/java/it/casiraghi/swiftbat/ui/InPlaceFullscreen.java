@@ -9,6 +9,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
@@ -104,21 +105,25 @@ public final class InPlaceFullscreen {
 
         private Node prepareContent(String title, Node content) {
             String normalized = title == null ? "" : title;
-            if (normalized.contains("Modello spettrale") && !normalized.contains("3D")) {
+            if (normalized.contains("Modello spettrale 3D")) {
+                return wrapSpectralModel3D(content);
+            }
+            if (normalized.contains("Modello spettrale")) {
                 return wrapSpectralModel2D(content);
             }
-            if (normalized.contains("Mappa tempo–energia") || normalized.contains("Modello spettrale 3D")) {
+            if (normalized.contains("Flusso energetico 3D")) {
+                return wrapFlux3D(content);
+            }
+            if (normalized.contains("Flusso energetico per banda")) {
+                return wrapFlux2D(content);
+            }
+            if (normalized.contains("Mappa tempo–energia")) {
                 polishSpectroscopyAssistant(content, normalized);
             }
             return content;
         }
 
         private Node wrapSpectralModel2D(Node content) {
-            if (content instanceof Region region) {
-                region.setMinSize(0, 0);
-                region.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-            }
-
             VBox reading = spectroscopyReadingCard(
                     "Come leggere il modello 2D",
                     "Curva — la linea arancione rappresenta la funzione spettrale ricostruita dal fit ufficiale BAT selezionato. Non è una successione di punti grezzi misurati dal rivelatore.",
@@ -128,14 +133,112 @@ public final class InPlaceFullscreen {
                     "Confronto — questa è la stessa funzione visualizzata nella vista 3D: il 3D aggiunge soltanto prospettiva grafica e non introduce una nuova grandezza fisica.",
                     "Da ricordare — il grafico visualizza il modello ricostruito dai parametri del fit BAT; non deriva dalla somma delle quattro curve di luce ASCII."
             );
+            return responsiveReadingLayout(content, reading);
+        }
 
-            HBox body = new HBox(14, content, reading);
-            body.setMinSize(0, 0);
-            body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-            body.setAlignment(Pos.CENTER_LEFT);
-            body.setFillHeight(true);
-            HBox.setHgrow(content, Priority.ALWAYS);
-            return body;
+        private Node wrapSpectralModel3D(Node content) {
+            VBox reading = spectroscopyReadingCard(
+                    "Come leggere la vista 3D",
+                    "Modello — la curva arancione rappresenta la stessa funzione spettrale ricostruita mostrata nella vista 2D. Non sono aggiunti nuovi punti osservativi.",
+                    "Assi — X indica l'energia dei fotoni in keV; Y indica log₁₀ N(E), il logaritmo del flusso fotonico differenziale previsto dal fit.",
+                    "Forma della curva — la pendenza mostra come il contributo del modello diminuisce o varia passando verso energie più elevate.",
+                    "Profondità — il piano arretrato e i collegamenti servono soltanto alla prospettiva. Non rappresentano tempo, distanza, intensità o una terza variabile fisica.",
+                    "Interazione — trascina per cambiare la prospettiva interna, usa la rotellina per lo zoom e fai doppio clic per ricentrare la vista.",
+                    "Interpretazione — zoom e prospettiva cambiano soltanto la visualizzazione: energia, N(E) e parametri del fit rimangono invariati."
+            );
+            return responsiveReadingLayout(content, reading);
+        }
+
+        private Node wrapFlux2D(Node content) {
+            VBox reading = spectroscopyReadingCard(
+                    "Come leggere l'istogramma",
+                    "Barre — ogni barra rappresenta il flusso energetico integrato pubblicato da BAT per una specifica banda energetica.",
+                    "Asse X — separa le bande di energia riportate dal catalogo, così da confrontare rapidamente dove il modello concentra più flusso.",
+                    "Asse Y — misura il flusso energetico in erg cm⁻² s⁻¹. Una barra più alta indica un flusso integrato maggiore nella banda corrispondente.",
+                    "Intervalli al 90% — i limiti di confidenza ufficiali restano disponibili nella tabella e nel tooltip delle barre; l'altezza mostra il valore centrale pubblicato.",
+                    "Confronto — questo istogramma e la curva spettrale descrivono due aspetti dello stesso fit ufficiale, ma non sono quattro curve di luce sommate.",
+                    "Da ricordare — le barre derivano dai prodotti spettroscopici BAT/XSPEC e non dai rate ASCII a bin di un secondo."
+            );
+            return responsiveReadingLayout(content, reading);
+        }
+
+        private Node wrapFlux3D(Node content) {
+            VBox reading = spectroscopyReadingCard(
+                    "Come leggere il flusso 3D",
+                    "Barre — sono gli stessi valori dell'istogramma 2D, disposti in prospettiva per facilitare il confronto visivo tra le bande energetiche.",
+                    "Assi — X identifica la banda energetica; l'altezza della barra rappresenta il flusso energetico integrato pubblicato da BAT.",
+                    "Scala — i valori sono mostrati in unità di 10⁻¹² erg cm⁻² s⁻¹ per mantenere una scala numerica leggibile senza alterare i rapporti tra le bande.",
+                    "Profondità — serve esclusivamente a separare graficamente le barre. Non è una distanza e non aggiunge una nuova grandezza fisica.",
+                    "Interazione — trascina per cambiare prospettiva, usa la rotellina per lo zoom e il pulsante Centra vista per tornare all'inquadratura iniziale.",
+                    "Da ricordare — i limiti al 90% restano consultabili nella tabella 2D; la vista 3D mostra i valori centrali del fit ufficiale."
+            );
+            return responsiveReadingLayout(content, reading);
+        }
+
+        private Node responsiveReadingLayout(Node content, VBox reading) {
+            if (content instanceof Region region) {
+                region.setMinSize(0, 0);
+                region.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+            }
+
+            ScrollPane readingScroll = new ScrollPane(reading);
+            readingScroll.setFitToWidth(true);
+            readingScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+            readingScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+            readingScroll.setPannable(true);
+            readingScroll.setMinSize(0, 0);
+            readingScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0;");
+            readingScroll.viewportBoundsProperty().addListener((obs, oldBounds, bounds) ->
+                    reading.setMinHeight(Math.max(0, bounds.getHeight())));
+
+            BorderPane split = new BorderPane();
+            split.setCenter(content);
+            split.setMinSize(0, 0);
+            split.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+            split.widthProperty().addListener((obs, oldWidth, newWidth) ->
+                    updateResponsiveReadingLayout(split, content, reading, readingScroll, newWidth.doubleValue()));
+            Platform.runLater(() ->
+                    updateResponsiveReadingLayout(split, content, reading, readingScroll, split.getWidth()));
+            return split;
+        }
+
+        private void updateResponsiveReadingLayout(BorderPane split, Node content, VBox reading,
+                                                   ScrollPane readingScroll, double width) {
+            boolean compact = width > 0 && width < 980;
+            if (compact) {
+                split.setRight(null);
+                split.setBottom(readingScroll);
+                BorderPane.setMargin(content, Insets.EMPTY);
+                BorderPane.setMargin(readingScroll, new Insets(12, 0, 0, 0));
+
+                readingScroll.setMinWidth(0);
+                readingScroll.setPrefWidth(Region.USE_COMPUTED_SIZE);
+                readingScroll.setMaxWidth(Double.MAX_VALUE);
+                readingScroll.setMinHeight(210);
+                readingScroll.setPrefHeight(280);
+                readingScroll.setMaxHeight(320);
+
+                reading.setMinWidth(0);
+                reading.setPrefWidth(Region.USE_COMPUTED_SIZE);
+                reading.setMaxWidth(Double.MAX_VALUE);
+            } else {
+                split.setBottom(null);
+                split.setRight(readingScroll);
+                BorderPane.setMargin(content, new Insets(0, 14, 0, 0));
+                BorderPane.setMargin(readingScroll, Insets.EMPTY);
+
+                double sideWidth = Math.max(320, Math.min(430, width * 0.255));
+                readingScroll.setMinWidth(Math.min(300, sideWidth));
+                readingScroll.setPrefWidth(sideWidth);
+                readingScroll.setMaxWidth(sideWidth);
+                readingScroll.setMinHeight(0);
+                readingScroll.setPrefHeight(Region.USE_COMPUTED_SIZE);
+                readingScroll.setMaxHeight(Double.MAX_VALUE);
+
+                reading.setMinWidth(0);
+                reading.setPrefWidth(sideWidth);
+                reading.setMaxWidth(Double.MAX_VALUE);
+            }
         }
 
         private VBox spectroscopyReadingCard(String title, String... paragraphs) {
@@ -157,7 +260,7 @@ public final class InPlaceFullscreen {
             card.getStyleClass().addAll("card", "spectroscopy-assistant");
             card.setSpacing(10);
             card.setPadding(new Insets(20, 18, 20, 18));
-            card.setMinWidth(340);
+            card.setMinWidth(0);
             card.setPrefWidth(395);
             card.setMaxWidth(440);
             card.setMinHeight(0);
