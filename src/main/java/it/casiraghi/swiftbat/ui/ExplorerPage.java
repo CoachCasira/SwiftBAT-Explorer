@@ -477,6 +477,11 @@ public final class ExplorerPage extends BorderPane {
                 .filter(candidate -> candidate.getText().equals(preferredTab))
                 .findFirst()
                 .ifPresent(tabs.getSelectionModel()::select);
+        tabs.getSelectionModel().selectedItemProperty().addListener((observable, previous, selected) -> {
+            if (selected != null) {
+                preferredTab = selected.getText();
+            }
+        });
         VBox.setVgrow(tabs, Priority.ALWAYS);
 
         dashboard.getChildren().addAll(eventHeader, metrics, tabs);
