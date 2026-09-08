@@ -306,7 +306,7 @@ public final class Java2DGroupedBarPanel extends JPanel {
         String[] lines = {
                 dataset.groups()[selected.group()],
                 dataset.xAxisLabel() + ": " + dataset.categories()[selected.category()],
-                "Numero di GRB: " + selected.count()
+                dataset.valueLabel() + ": " + selected.count()
         };
         g.setFont(new Font("SansSerif", Font.PLAIN, 12));
         FontMetrics metrics = g.getFontMetrics();
@@ -357,7 +357,7 @@ public final class Java2DGroupedBarPanel extends JPanel {
     }
 
     public record Dataset(String[] categories, String[] groups, int[][] counts, Color[] colors,
-                          String xAxisLabel, String depthAxisLabel) {
+                          String xAxisLabel, String depthAxisLabel, String valueLabel) {
         public Dataset {
             categories = categories == null ? new String[0] : categories;
             groups = groups == null ? new String[0] : groups;
@@ -365,6 +365,12 @@ public final class Java2DGroupedBarPanel extends JPanel {
             colors = colors == null ? new Color[0] : colors;
             xAxisLabel = xAxisLabel == null ? "Intervallo" : xAxisLabel;
             depthAxisLabel = depthAxisLabel == null ? "Gruppo" : depthAxisLabel;
+            valueLabel = valueLabel == null || valueLabel.isBlank() ? "Numero di GRB" : valueLabel;
+        }
+
+        public Dataset(String[] categories, String[] groups, int[][] counts, Color[] colors,
+                       String xAxisLabel, String depthAxisLabel) {
+            this(categories, groups, counts, colors, xAxisLabel, depthAxisLabel, "Numero di GRB");
         }
 
         public static Dataset empty() {
@@ -388,7 +394,7 @@ public final class Java2DGroupedBarPanel extends JPanel {
             int[][] copied = new int[counts.length][];
             for (int index = 0; index < counts.length; index++) copied[index] = Arrays.copyOf(counts[index], counts[index].length);
             return new Dataset(Arrays.copyOf(categories, categories.length), Arrays.copyOf(groups, groups.length),
-                    copied, Arrays.copyOf(colors, colors.length), xAxisLabel, depthAxisLabel);
+                    copied, Arrays.copyOf(colors, colors.length), xAxisLabel, depthAxisLabel, valueLabel);
         }
     }
 
