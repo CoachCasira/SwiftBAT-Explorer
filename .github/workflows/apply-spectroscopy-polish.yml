@@ -1,0 +1,448 @@
+name: Applica rifiniture spettroscopia 3D
+
+on:
+  push:
+    branches:
+      - feature/analysis-population-1.3.0
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message == 'chore: applica rifiniture spettroscopia 3D'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scarica il progetto
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configura Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Applica modifiche
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new, label):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'Patch non applicabile: {label} in {path}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          spectroscopy = 'src/main/java/it/casiraghi/swiftbat/ui/SpectroscopyPane.java'
+          line3d = 'src/main/java/it/casiraghi/swiftbat/ui/components/ScientificLine3DPane.java'
+          renderer = 'src/main/java/it/casiraghi/swiftbat/ui/components/Java2DWaterfallPanel.java'
+
+          # 1) Controlli spettroscopia: tre riquadri equivalenti e distribuiti su tutta la larghezza.
+          replace_once(spectroscopy,
+          '''        Button source = UiFactory.button("Apri tabella ufficiale ↗", "ghost-button");
+        source.setOnAction(event -> hostServices.showDocument(sourceUrl()));
+        FlowPane controls = new FlowPane(10, 10);
+        controls.getChildren().addAll(
+                controlBox("Intervallo del fit", intervalChoice,
+                        "T100 usa l'intervallo complessivo del burst; Picco 1 s usa il secondo più intenso."),
+                controlBox("Modello del fit", modelChoice,
+                        "Automatico segue la scelta BAT; PL e CPL permettono di confrontare i due fit pubblicati."),
+                source);
+        controls.setAlignment(Pos.BOTTOM_LEFT);
+        controls.getStyleClass().add("spectroscopy-controls");''',
+          '''        Button source = UiFactory.button("Apri tabella ufficiale ↗", "ghost-button");
+        source.setMaxWidth(Double.MAX_VALUE);
+        source.setOnAction(event -> hostServices.showDocument(sourceUrl()));
+        GridPane controls = responsiveGrid(1120, 3,
+                controlBox("Intervallo del fit", intervalChoice,
+                        "T100 usa l'intervallo complessivo del burst; Picco 1 s usa il secondo più intenso."),
+                controlBox("Modello del fit", modelChoice,
+                        "Automatico segue la scelta BAT; PL e CPL permettono di confrontare i due fit pubblicati."),
+                sourceControlBox(source));
+        controls.getStyleClass().add("spectroscopy-controls");''',
+          'controlli principali')
+
+          replace_once(spectroscopy,
+          '''    private Interval preferredInterval() {''',
+          '''    private VBox sourceControlBox(Button source) {
+        Label help = UiFactory.wrappedLabel(
+                "Apre direttamente la tabella BAT da cui provengono i parametri mostrati in questa scheda.",
+                "spectroscopy-control-help");
+        help.setMinHeight(Region.USE_PREF_SIZE);
+        help.setMaxWidth(Double.MAX_VALUE);
+        VBox box = new VBox(5,
+                UiFactory.label("Fonte ufficiale BAT", "filter-label"),
+                source,
+                help);
+        box.getStyleClass().add("spectroscopy-control-box");
+        box.setPrefWidth(270);
+        box.setFillWidth(true);
+        box.setMaxWidth(Double.MAX_VALUE);
+        return box;
+    }
+
+    private Interval preferredInterval() {''',
+          'card fonte ufficiale')
+
+          # 2) Fullscreen evidenziato con lo stesso colore primario usato nell'app.
+          text = Path(spectroscopy).read_text(encoding='utf-8')
+          old = 'Button fullscreen = UiFactory.button("Schermo intero", "ghost-button");'
+          if text.count(old) < 2:
+              raise SystemExit('Patch non applicabile: pulsanti fullscreen spettroscopia')
+          Path(spectroscopy).write_text(text.replace(old,
+              'Button fullscreen = UiFactory.button("Schermo intero", "primary-button");', 2), encoding='utf-8')
+
+          # 3) Mappa tempo-energia: il pulsante 3D vive nella card del grafico, non nei controlli superiori.
+          replace_once(spectroscopy,
+          '''        Button threeD = UiFactory.button("Apri vista 3D dei rate", "primary-button");
+        threeD.setDisable(grbData.asciiData().isEmpty());
+        threeD.setOnAction(event -> openTimeEnergy3D());
+        FlowPane controls = new FlowPane(10, 10);
+        controls.getChildren().addAll(
+                controlBox("Finestra temporale", window,
+                        "Limita la mappa ai secondi prima e dopo t = 0; non modifica i parametri del fit ufficiale.",
+                        620),
+                threeD);
+        controls.setAlignment(Pos.BOTTOM_LEFT);
+
+        VBox chartCard = new VBox(9,
+                UiFactory.label("Mappa tempo–energia dei rate", "card-title"), heatmap);''',
+          '''        Button threeD = UiFactory.button("Apri vista 3D dei rate", "primary-button");
+        threeD.setDisable(grbData.asciiData().isEmpty());
+        threeD.setOnAction(event -> openTimeEnergy3D());
+        FlowPane controls = new FlowPane(10, 10);
+        controls.getChildren().add(
+                controlBox("Finestra temporale", window,
+                        "Limita la mappa ai secondi prima e dopo t = 0; non modifica i parametri del fit ufficiale.",
+                        620));
+        controls.setAlignment(Pos.BOTTOM_LEFT);
+
+        FlowPane chartActions = new FlowPane(8, 8);
+        chartActions.getStyleClass().add("spectroscopy-chart-actions");
+        chartActions.getChildren().add(threeD);
+        VBox chartCard = new VBox(9,
+                UiFactory.label("Mappa tempo–energia dei rate", "card-title"),
+                chartActions,
+                heatmap);''',
+          'azione 3D mappa tempo energia')
+
+          # 4) La descrizione della vista 3D indica anche lo spostamento del quadro.
+          replace_once(spectroscopy,
+          '''                "Vista prospettica dello stesso fit ufficiale: ruota trascinando, usa la rotella per lo zoom.");''',
+          '''                "Vista prospettica dello stesso fit ufficiale: trascina per spostare la curva, usa la rotella per lo zoom; doppio clic centra la vista.");''',
+          'nota modello 3D')
+
+          # 5) ScientificLine3DPane: pannello di lettura a destra nel fullscreen.
+          replace_once(line3d,
+          '''    private final Java2DWaterfallPanel.Dataset dataset;
+''',
+          '''    private final Java2DWaterfallPanel.Dataset dataset;
+    private final Java2DWaterfallPanel.Presentation presentation;
+''',
+          'campo presentation')
+
+          replace_once(line3d,
+          '''        this.dataset = dataset == null ? Java2DWaterfallPanel.Dataset.empty() : dataset;
+''',
+          '''        this.dataset = dataset == null ? Java2DWaterfallPanel.Dataset.empty() : dataset;
+        this.presentation = presentation == null
+                ? Java2DWaterfallPanel.Presentation.explorerDefaults() : presentation;
+''',
+          'assegnazione presentation')
+
+          replace_once(line3d,
+          '''            renderer.setPresentation(presentation);''',
+          '''            renderer.setPresentation(this.presentation);''',
+          'presentation renderer')
+
+          replace_once(line3d,
+          '''        setTop(buildHeader());
+        setCenter(viewer);
+        setBottom(buildFooter());
+        Platform.runLater(() -> syncRendererSize(viewer));''',
+          '''        VBox reading = buildReadingPanel();
+        reading.setMinWidth(300);
+        reading.setPrefWidth(330);
+        reading.setMaxWidth(360);
+        HBox body = new HBox(14, viewer, reading);
+        body.setPadding(new Insets(0, 14, 0, 14));
+        HBox.setHgrow(viewer, Priority.ALWAYS);
+        body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+
+        setTop(buildHeader());
+        setCenter(body);
+        setBottom(buildFooter());
+        Platform.runLater(() -> syncRendererSize(viewer));''',
+          'layout fullscreen con lettura')
+
+          replace_once(line3d,
+          '''    private HBox buildFooter() {''',
+          '''    private VBox buildReadingPanel() {
+        VBox card = new VBox(12);
+        card.getStyleClass().addAll("card", "spectroscopy-assistant");
+        card.setPadding(new Insets(16));
+        Label heading = UiFactory.label("Come leggere la vista 3D", "card-title");
+        Label x = UiFactory.wrappedLabel(
+                "Asse X — " + presentation.xAxisLabel() + ".", "assistant-copy");
+        Label y = UiFactory.wrappedLabel(
+                "Asse Y — " + presentation.yAxisLabel() + ".", "assistant-copy");
+        Label depth = UiFactory.wrappedLabel(
+                "Profondità — è soltanto una separazione prospettica: non rappresenta una terza grandezza fisica del fit.",
+                "assistant-copy");
+        Label interaction = UiFactory.wrappedLabel(
+                "Interazione — trascina per spostare il quadro, rotella per zoomare e doppio clic per tornare alla vista iniziale.",
+                "assistant-copy");
+        Label meaning = UiFactory.wrappedLabel(
+                "La linea arancione è la stessa funzione del modello ricostruito mostrata nella vista 2D; cambiare prospettiva non modifica i valori scientifici.",
+                "assistant-copy");
+        for (Label label : List.of(x, y, depth, interaction, meaning)) {
+            label.setMinHeight(Region.USE_PREF_SIZE);
+            label.setMaxWidth(Double.MAX_VALUE);
+        }
+        card.getChildren().addAll(heading, x, y, depth, interaction, meaning);
+        VBox.setVgrow(card, Priority.ALWAYS);
+        return card;
+    }
+
+    private HBox buildFooter() {''',
+          'pannello lettura 3D')
+
+          # import java.util.List per il pannello di lettura.
+          replace_once(line3d,
+          '''import java.awt.Dimension;
+''',
+          '''import java.awt.Dimension;
+import java.util.List;
+''',
+          'import List')
+
+          # 6) Renderer 2.5D: limiti Y corretti anche per curve interamente negative + pan.
+          replace_once(renderer,
+          '''    private double dragStartYaw;
+    private double dragStartPitch;
+    private HoverPoint hover;''',
+          '''    private double dragStartYaw;
+    private double dragStartPitch;
+    private double panX;
+    private double panY;
+    private double dragStartPanX;
+    private double dragStartPanY;
+    private boolean dragPanning;
+    private HoverPoint hover;''',
+          'campi pan')
+
+          replace_once(renderer,
+          '''                dragStartYaw = yaw;
+                dragStartPitch = pitch;
+                setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));''',
+          '''                dragStartYaw = yaw;
+                dragStartPitch = pitch;
+                dragStartPanX = panX;
+                dragStartPanY = panY;
+                dragPanning = dataset.bandCount() <= 1
+                        || SwingUtilities.isRightMouseButton(event) || event.isShiftDown();
+                setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));''',
+          'inizio pan')
+
+          replace_once(renderer,
+          '''            public void mouseReleased(MouseEvent event) {
+                setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            }
+
+            @Override
+            public void mouseDragged(MouseEvent event) {
+                yaw = clamp(dragStartYaw + (event.getX() - dragStartX) * 0.0028, -0.72, 0.72);
+                pitch = clamp(dragStartPitch - (event.getY() - dragStartY) * 0.0032, 0.30, 1.12);
+                hover = null;
+                repaint();
+            }''',
+          '''            public void mouseReleased(MouseEvent event) {
+                dragPanning = false;
+                setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            }
+
+            @Override
+            public void mouseDragged(MouseEvent event) {
+                if (dragPanning) {
+                    panX = clamp(dragStartPanX + event.getX() - dragStartX,
+                            -getWidth() * 0.34, getWidth() * 0.34);
+                    panY = clamp(dragStartPanY + event.getY() - dragStartY,
+                            -getHeight() * 0.30, getHeight() * 0.30);
+                } else {
+                    yaw = clamp(dragStartYaw + (event.getX() - dragStartX) * 0.0028, -0.72, 0.72);
+                    pitch = clamp(dragStartPitch - (event.getY() - dragStartY) * 0.0032, 0.30, 1.12);
+                }
+                hover = null;
+                repaint();
+            }''',
+          'trascinamento pan')
+
+          replace_once(renderer,
+          '''        zoom = 1.0;
+        hover = null;''',
+          '''        zoom = 1.0;
+        panX = 0;
+        panY = 0;
+        hover = null;''',
+          'reset pan')
+
+          replace_once(renderer,
+          '''        Geometry geometry = new Geometry(getWidth(), getHeight(), dataset.bandCount(), yaw, pitch, zoom);''',
+          '''        Geometry geometry = new Geometry(getWidth(), getHeight(), dataset.bandCount(), yaw, pitch, zoom, panX, panY);''',
+          'geometry pan')
+
+          old_bounds = '''    private Bounds calculateBounds() {
+        double minTime = dataset.times()[0];
+        double maxTime = dataset.times()[dataset.times().length - 1];
+        double minRate = 0;
+        double maxRate = 0;
+        for (double[] band : dataset.rates()) {
+            for (double value : band) {
+                if (Double.isFinite(value)) {
+                    minRate = Math.min(minRate, value);
+                    maxRate = Math.max(maxRate, value);
+                }
+            }
+        }
+        if (maxTime <= minTime) {
+            maxTime = minTime + 1;
+        }
+        if (maxRate <= 0) {
+            maxRate = 1;
+        }
+        double paddedMax = maxRate * 1.12;
+        double paddedMin = minRate < 0 ? minRate * 1.30 : -maxRate * 0.08;
+        return new Bounds(minTime, maxTime, paddedMin, paddedMax);
+    }'''
+          new_bounds = '''    private Bounds calculateBounds() {
+        double minTime = dataset.times()[0];
+        double maxTime = dataset.times()[dataset.times().length - 1];
+        double minRate = Double.POSITIVE_INFINITY;
+        double maxRate = Double.NEGATIVE_INFINITY;
+        for (double[] band : dataset.rates()) {
+            for (double value : band) {
+                if (Double.isFinite(value)) {
+                    minRate = Math.min(minRate, value);
+                    maxRate = Math.max(maxRate, value);
+                }
+            }
+        }
+        if (maxTime <= minTime) {
+            maxTime = minTime + 1;
+        }
+        if (!Double.isFinite(minRate) || !Double.isFinite(maxRate)) {
+            return new Bounds(minTime, maxTime, -1, 1);
+        }
+        if (maxRate == minRate) {
+            double pad = Math.max(0.1, Math.abs(maxRate) * 0.12);
+            return new Bounds(minTime, maxTime, minRate - pad, maxRate + pad);
+        }
+        double range = maxRate - minRate;
+        double paddedMin;
+        double paddedMax;
+        if (minRate >= 0) {
+            paddedMin = 0;
+            paddedMax = maxRate + range * 0.12;
+        } else if (maxRate <= 0) {
+            paddedMin = minRate - range * 0.12;
+            paddedMax = maxRate + range * 0.08;
+            if (paddedMax >= 0) {
+                paddedMax = Math.min(-1.0e-9, maxRate * 0.96);
+            }
+        } else {
+            paddedMin = minRate - range * 0.10;
+            paddedMax = maxRate + range * 0.10;
+        }
+        return new Bounds(minTime, maxTime, paddedMin, paddedMax);
+    }'''
+          replace_once(renderer, old_bounds, new_bounds, 'limiti Y robusti')
+
+          # Non disegnare una baseline zero fittizia quando zero è fuori dall'intervallo (caso log-flusso tutto negativo).
+          replace_once(renderer,
+          '''        // Linee di base delle serie disposte in profondità.
+        double zeroNorm = normalize(0, bounds.minRate(), bounds.maxRate());
+        for (int band = 0; band < dataset.bandCount(); band++) {
+            Point2D left = geometry.project(0, zeroNorm, band);
+            Point2D right = geometry.project(1, zeroNorm, band);
+            int baselineAlpha = presentation.denseSeries() ? 24 : band == 0 ? 90 : 55;
+            g.setColor(withAlpha(dataset.colors()[band], baselineAlpha));
+            g.setStroke(new BasicStroke(presentation.denseSeries() ? 0.8f : band == 0 ? 1.5f : 1f,
+                    BasicStroke.CAP_ROUND,
+                    BasicStroke.JOIN_ROUND, 10f, new float[]{5f, 7f}, 0f));
+            g.draw(new Line2D.Double(left, right));
+        }
+        g.setStroke(new BasicStroke(1f));''',
+          '''        // Linee di base delle serie disposte in profondità. La linea a zero viene mostrata
+        // solo quando zero appartiene davvero all'intervallo Y visualizzato.
+        if (bounds.minRate() <= 0 && bounds.maxRate() >= 0) {
+            double zeroNorm = normalize(0, bounds.minRate(), bounds.maxRate());
+            for (int band = 0; band < dataset.bandCount(); band++) {
+                Point2D left = geometry.project(0, zeroNorm, band);
+                Point2D right = geometry.project(1, zeroNorm, band);
+                int baselineAlpha = presentation.denseSeries() ? 24 : band == 0 ? 90 : 55;
+                g.setColor(withAlpha(dataset.colors()[band], baselineAlpha));
+                g.setStroke(new BasicStroke(presentation.denseSeries() ? 0.8f : band == 0 ? 1.5f : 1f,
+                        BasicStroke.CAP_ROUND,
+                        BasicStroke.JOIN_ROUND, 10f, new float[]{5f, 7f}, 0f));
+                g.draw(new Line2D.Double(left, right));
+            }
+        }
+        g.setStroke(new BasicStroke(1f));''',
+          'baseline zero condizionale')
+
+          replace_once(renderer,
+          '''        String hint = "Trascina: ruota prospettiva   ·   Rotella: zoom   ·   Doppio clic: centra";''',
+          '''        String hint = dataset.bandCount() <= 1
+                ? "Trascina: sposta vista   ·   Rotella: zoom   ·   Doppio clic: centra"
+                : "Trascina: ruota   ·   Shift/tasto destro + trascina: sposta   ·   Rotella: zoom   ·   Doppio clic: centra";''',
+          'hint interazioni')
+
+          replace_once(renderer,
+          '''        private final double depthY;
+
+        private Geometry(int width, int height, int bandCount, double yaw, double pitch, double zoom) {''',
+          '''        private final double depthY;
+        private final double panX;
+        private final double panY;
+
+        private Geometry(int width, int height, int bandCount, double yaw, double pitch, double zoom,
+                         double panX, double panY) {''',
+          'geometry fields')
+
+          replace_once(renderer,
+          '''            this.zoom = zoom;
+            this.plotWidth = Math.max(350, width * 0.68) * zoom;
+            this.plotHeight = Math.max(190, height * 0.60) * zoom;
+            this.centerX = width * 0.45;
+            this.baselineY = height * 0.74;''',
+          '''            this.zoom = zoom;
+            this.panX = panX;
+            this.panY = panY;
+            this.plotWidth = Math.max(350, width * 0.68) * zoom;
+            this.plotHeight = Math.max(190, height * 0.60) * zoom;
+            this.centerX = width * 0.45 + panX;
+            this.baselineY = height * 0.74 + panY;''',
+          'geometry pan coords')
+
+          print('Rifiniture spettroscopia applicate.')
+          PY
+
+      - name: Verifica Maven
+        run: mvn --batch-mode --no-transfer-progress verify
+
+      - name: Commit e push
+        shell: bash
+        run: |
+          git config user.name "ChatGPT"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-spectroscopy-polish.yml .github/trigger-spectroscopy-polish
+          git add src/main/java/it/casiraghi/swiftbat/ui/SpectroscopyPane.java \
+                  src/main/java/it/casiraghi/swiftbat/ui/components/ScientificLine3DPane.java \
+                  src/main/java/it/casiraghi/swiftbat/ui/components/Java2DWaterfallPanel.java
+          git commit -m "Rifinisce layout e vista 3D della spettroscopia"
+          git push
