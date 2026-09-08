@@ -63,14 +63,18 @@ public final class SpectralModel3DPane extends BorderPane {
         viewer.heightProperty().addListener((obs, oldValue, newValue) -> syncRendererSize(viewer));
 
         VBox reading = buildReadingPanel(modelCode);
-        reading.setMinWidth(300);
-        reading.setPrefWidth(340);
-        reading.setMaxWidth(385);
+        reading.setMinWidth(320);
+        reading.setPrefWidth(365);
+        reading.setMaxWidth(410);
+        reading.setMaxHeight(Double.MAX_VALUE);
 
-        HBox body = new HBox(14, viewer, reading);
-        body.setPadding(new Insets(0, 14, 0, 14));
+        HBox body = new HBox(12, viewer, reading);
+        body.setPadding(Insets.EMPTY);
+        body.setMinSize(0, 0);
         body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        body.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(viewer, Priority.ALWAYS);
+        HBox.setHgrow(reading, Priority.NEVER);
 
         setTop(buildHeader(modelCode));
         setCenter(body);
@@ -96,23 +100,36 @@ public final class SpectralModel3DPane extends BorderPane {
     }
 
     private VBox buildReadingPanel(String modelCode) {
-        VBox card = new VBox(13);
+        VBox card = new VBox(16);
         card.getStyleClass().addAll("card", "spectroscopy-assistant");
-        card.setPadding(new Insets(18));
+        card.setPadding(new Insets(22, 20, 22, 20));
         card.setFillWidth(true);
+        card.setMaxHeight(Double.MAX_VALUE);
+        card.setStyle(
+                "-fx-background-color: linear-gradient(to bottom right, rgba(18, 40, 60, 0.98), rgba(31, 23, 58, 0.98));"
+                        + "-fx-border-color: rgba(92, 212, 239, 0.42);"
+                        + "-fx-border-width: 1;"
+                        + "-fx-background-radius: 14;"
+                        + "-fx-border-radius: 14;"
+        );
 
         Label title = UiFactory.label("Come leggere la vista 3D", "card-title");
-        title.setStyle("-fx-text-fill: #f4f7ff; -fx-font-size: 16px; -fx-font-weight: bold;");
+        title.setStyle("-fx-text-fill: #f7fbff; -fx-font-size: 18px; -fx-font-weight: bold;");
 
         Label model = paragraph("Modello — Fit " + modelCode
-                + ": la curva è una funzione ricostruita dai parametri ufficiali BAT, non una serie di punti osservati grezzi.");
-        Label axes = paragraph("Assi — X mostra l'energia in keV; Y mostra log₁₀ N(E). I valori negativi sull'asse Y sono normali: indicano N(E) < 1 nelle unità riportate.");
-        Label depth = paragraph("Profondità — il piano arretrato è solo un riferimento prospettico. Non aggiunge una misura scientifica al fit.");
-        Label controls = paragraph("Interazione — trascina direttamente sul grafico per cambiarne la prospettiva, usa la rotella per lo zoom e fai doppio clic per ricentrare.");
-        Label note = paragraph("La cornice principale e gli assi rimangono ancorati: il trascinamento modifica la prospettiva interna, come nelle altre viste 3D dell'app.");
-        note.setStyle("-fx-text-fill: #aebed8; -fx-font-size: 12px; -fx-line-spacing: 2px;");
+                + ": la curva arancione è la funzione spettrale ricostruita dai parametri ufficiali BAT. "
+                + "Non rappresenta punti osservati grezzi e non aggiunge nuovi dati rispetto alla vista 2D.");
+        Label axes = paragraph("Assi — X indica l'energia dei fotoni in keV. Y indica log₁₀ N(E), cioè il logaritmo del flusso fotonico differenziale. "
+                + "Valori negativi sono normali: significano che N(E) è minore di 1 nelle unità riportate.");
+        Label shape = paragraph("Forma della curva — l'andamento mostra come il modello previsto cambia con l'energia. "
+                + "Una discesa più rapida verso destra corrisponde a una diminuzione più marcata del contributo alle energie elevate.");
+        Label depth = paragraph("Profondità — il piano arretrato e i collegamenti prospettici servono esclusivamente a rendere la visualizzazione tridimensionale. "
+                + "La profondità non corrisponde a tempo, distanza, intensità o a una terza variabile fisica.");
+        Label controls = paragraph("Interazione — trascina sul grafico per cambiare la prospettiva interna, usa la rotellina per lo zoom e fai doppio clic per riportare la vista alla posizione iniziale.");
+        Label note = paragraph("Interpretazione — zoom e prospettiva modificano soltanto il modo in cui il modello viene mostrato: energie, valori di N(E) e parametri del fit rimangono invariati.");
+        note.setStyle("-fx-text-fill: #bfd0ea; -fx-font-size: 13px; -fx-line-spacing: 3px;");
 
-        card.getChildren().addAll(title, model, axes, depth, controls, note);
+        card.getChildren().addAll(title, model, axes, shape, depth, controls, note);
         VBox.setVgrow(card, Priority.ALWAYS);
         return card;
     }
@@ -121,7 +138,7 @@ public final class SpectralModel3DPane extends BorderPane {
         Label label = UiFactory.wrappedLabel(text, "assistant-copy");
         label.setMinHeight(Region.USE_PREF_SIZE);
         label.setMaxWidth(Double.MAX_VALUE);
-        label.setStyle("-fx-text-fill: #d7e3f7; -fx-font-size: 12px; -fx-line-spacing: 2px;");
+        label.setStyle("-fx-text-fill: #e3edfc; -fx-font-size: 13.5px; -fx-line-spacing: 3px;");
         return label;
     }
 
