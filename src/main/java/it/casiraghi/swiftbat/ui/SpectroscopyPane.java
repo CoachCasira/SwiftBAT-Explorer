@@ -121,15 +121,21 @@ public final class SpectroscopyPane extends BorderPane {
                 new Tab("Risultati ufficiali", resultHost),
                 new Tab("Mappa tempo–energia", buildTimeEnergyTab()),
                 new Tab("Guida scientifica", buildGuide()));
-        tabs.setMinHeight(590);
-        tabs.setPrefHeight(720);
-        VBox.setVgrow(tabs, Priority.ALWAYS);
+        // Lascia che la scheda assuma l'altezza reale del contenuto quando i grafici vengono impilati.
+        resultHost.setMinHeight(Region.USE_PREF_SIZE);
+        resultHost.setMaxHeight(Double.MAX_VALUE);
+        tabs.setMinHeight(Region.USE_PREF_SIZE);
+        tabs.setPrefHeight(Region.USE_COMPUTED_SIZE);
+        tabs.setMaxHeight(Double.MAX_VALUE);
+        VBox.setVgrow(tabs, Priority.NEVER);
 
         root.getChildren().addAll(heading, controls, tabs);
         ScrollPane scroll = new ScrollPane(root);
         scroll.getStyleClass().add("page-scroll");
         scroll.setFitToWidth(true);
+        scroll.setFitToHeight(false);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
         return scroll;
     }
 
@@ -215,6 +221,8 @@ public final class SpectroscopyPane extends BorderPane {
                                      List<EnergyFluxBand> fluxes) {
         VBox content = new VBox(12);
         content.setPadding(new Insets(12, 4, 18, 4));
+        content.setMinHeight(Region.USE_PREF_SIZE);
+        content.setMaxWidth(Double.MAX_VALUE);
 
         FlowPane metrics = new FlowPane(9, 9);
         metrics.getChildren().addAll(
