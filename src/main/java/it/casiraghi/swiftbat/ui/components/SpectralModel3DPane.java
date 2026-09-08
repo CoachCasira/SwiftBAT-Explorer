@@ -25,7 +25,6 @@ import java.awt.FontMetrics;
 import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.Point;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -66,7 +65,7 @@ public final class SpectralModel3DPane extends BorderPane {
         VBox reading = buildReadingPanel(modelCode);
         reading.setMinWidth(300);
         reading.setPrefWidth(340);
-        reading.setMaxWidth(370);
+        reading.setMaxWidth(385);
 
         HBox body = new HBox(14, viewer, reading);
         body.setPadding(new Insets(0, 14, 0, 14));
@@ -97,18 +96,21 @@ public final class SpectralModel3DPane extends BorderPane {
     }
 
     private VBox buildReadingPanel(String modelCode) {
-        VBox card = new VBox(12);
+        VBox card = new VBox(13);
         card.getStyleClass().addAll("card", "spectroscopy-assistant");
-        card.setPadding(new Insets(17));
+        card.setPadding(new Insets(18));
+        card.setFillWidth(true);
 
         Label title = UiFactory.label("Come leggere la vista 3D", "card-title");
+        title.setStyle("-fx-text-fill: #f4f7ff; -fx-font-size: 16px; -fx-font-weight: bold;");
+
         Label model = paragraph("Modello — Fit " + modelCode
                 + ": la curva è una funzione ricostruita dai parametri ufficiali BAT, non una serie di punti osservati grezzi.");
         Label axes = paragraph("Assi — X mostra l'energia in keV; Y mostra log₁₀ N(E). I valori negativi sull'asse Y sono normali: indicano N(E) < 1 nelle unità riportate.");
-        Label depth = paragraph("Profondità — il secondo piano è solo un riferimento prospettico. Non aggiunge una misura scientifica al fit.");
-        Label controls = paragraph("Interazione — trascina con il mouse per spostare il grafico, Shift + trascina per cambiare leggermente la prospettiva, usa la rotella per lo zoom e fai doppio clic per centrare.");
-        Label note = paragraph("Cambiare zoom, posizione o prospettiva modifica soltanto la visualizzazione; i valori del modello rimangono invariati.");
-        note.getStyleClass().add("assistant-disclaimer");
+        Label depth = paragraph("Profondità — il piano arretrato è solo un riferimento prospettico. Non aggiunge una misura scientifica al fit.");
+        Label controls = paragraph("Interazione — trascina direttamente sul grafico per cambiarne la prospettiva, usa la rotella per lo zoom e fai doppio clic per ricentrare.");
+        Label note = paragraph("La cornice principale e gli assi rimangono ancorati: il trascinamento modifica la prospettiva interna, come nelle altre viste 3D dell'app.");
+        note.setStyle("-fx-text-fill: #aebed8; -fx-font-size: 12px; -fx-line-spacing: 2px;");
 
         card.getChildren().addAll(title, model, axes, depth, controls, note);
         VBox.setVgrow(card, Priority.ALWAYS);
@@ -119,12 +121,13 @@ public final class SpectralModel3DPane extends BorderPane {
         Label label = UiFactory.wrappedLabel(text, "assistant-copy");
         label.setMinHeight(Region.USE_PREF_SIZE);
         label.setMaxWidth(Double.MAX_VALUE);
+        label.setStyle("-fx-text-fill: #d7e3f7; -fx-font-size: 12px; -fx-line-spacing: 2px;");
         return label;
     }
 
     private HBox buildFooter() {
         Label interaction = UiFactory.wrappedLabel(
-                "Trascina: sposta · Shift + trascina: prospettiva · Rotella: zoom · Doppio clic: centra",
+                "Trascina: prospettiva · Rotella: zoom · Doppio clic: centra",
                 "subtle-text");
         interaction.setMinHeight(Region.USE_PREF_SIZE);
         interaction.setMaxWidth(Double.MAX_VALUE);
@@ -169,17 +172,12 @@ public final class SpectralModel3DPane extends BorderPane {
         private final double[] energies;
         private final double[] values;
         private double zoom = 1.0;
-        private double panX;
-        private double panY;
         private double perspectiveX = 54;
         private double perspectiveY = -34;
         private int dragX;
         private int dragY;
-        private double dragPanX;
-        private double dragPanY;
         private double dragPerspectiveX;
         private double dragPerspectiveY;
-        private boolean perspectiveDrag;
         private DoubleConsumer zoomListener = value -> { };
 
         private SpectralRenderer(double[] energies, double[] values) {
@@ -196,11 +194,8 @@ public final class SpectralModel3DPane extends BorderPane {
                 public void mousePressed(MouseEvent event) {
                     dragX = event.getX();
                     dragY = event.getY();
-                    dragPanX = panX;
-                    dragPanY = panY;
                     dragPerspectiveX = perspectiveX;
                     dragPerspectiveY = perspectiveY;
-                    perspectiveDrag = event.isShiftDown();
                     setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
                 }
 
@@ -208,13 +203,8 @@ public final class SpectralModel3DPane extends BorderPane {
                 public void mouseDragged(MouseEvent event) {
                     double dx = event.getX() - dragX;
                     double dy = event.getY() - dragY;
-                    if (perspectiveDrag) {
-                        perspectiveX = clamp(dragPerspectiveX + dx * 0.30, 18, 115);
-                        perspectiveY = clamp(dragPerspectiveY + dy * 0.22, -90, -12);
-                    } else {
-                        panX = clamp(dragPanX + dx, -getWidth() * 0.34, getWidth() * 0.34);
-                        panY = clamp(dragPanY + dy, -getHeight() * 0.30, getHeight() * 0.30);
-                    }
+                    perspectiveX = clamp(dragPerspectiveX + dx * 0.28, -105, 120);
+                    perspectiveY = clamp(dragPerspectiveY + dy * 0.24, -95, 70);
                     repaint();
                 }
 
@@ -235,6 +225,7 @@ public final class SpectralModel3DPane extends BorderPane {
                     zoom = clamp(zoom * Math.pow(1.08, -event.getPreciseWheelRotation()), 0.65, 1.75);
                     zoomListener.accept(zoom);
                     repaint();
+                    event.consume();
                 }
             };
             addMouseListener(mouse);
@@ -249,8 +240,6 @@ public final class SpectralModel3DPane extends BorderPane {
 
         private void resetView() {
             zoom = 1.0;
-            panX = 0;
-            panY = 0;
             perspectiveX = 54;
             perspectiveY = -34;
             zoomListener.accept(zoom);
@@ -305,8 +294,8 @@ public final class SpectralModel3DPane extends BorderPane {
 
             double baseWidth = Math.max(520, getWidth() * 0.69) * zoom;
             double baseHeight = Math.max(300, getHeight() * 0.60) * zoom;
-            double left = getWidth() * 0.47 - baseWidth / 2.0 + panX;
-            double top = getHeight() * 0.47 - baseHeight / 2.0 + panY;
+            double left = getWidth() * 0.47 - baseWidth / 2.0;
+            double top = getHeight() * 0.47 - baseHeight / 2.0;
             double right = left + baseWidth;
             double bottom = top + baseHeight;
 
@@ -404,7 +393,8 @@ public final class SpectralModel3DPane extends BorderPane {
                     curve.lineTo(x, y);
                 }
             }
-            g.setColor(new Color(CURVE.getRed(), CURVE.getGreen(), CURVE.getBlue(), Math.max(0, Math.min(255, alpha))));
+            g.setColor(new Color(CURVE.getRed(), CURVE.getGreen(), CURVE.getBlue(),
+                    Math.max(0, Math.min(255, alpha))));
             g.setStroke(new BasicStroke(width, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             g.draw(curve);
         }
