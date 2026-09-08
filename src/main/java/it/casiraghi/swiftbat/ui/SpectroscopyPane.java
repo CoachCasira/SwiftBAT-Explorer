@@ -7,6 +7,10 @@ import it.casiraghi.swiftbat.model.SpectralData.Fit;
 import it.casiraghi.swiftbat.model.SpectralData.Interval;
 import it.casiraghi.swiftbat.model.SpectralData.Model;
 import it.casiraghi.swiftbat.service.SpectralCatalogService;
+import it.casiraghi.swiftbat.ui.components.Java2DGroupedBarPanel;
+import it.casiraghi.swiftbat.ui.components.Java2DWaterfallPanel;
+import it.casiraghi.swiftbat.ui.components.ScientificBar3DPane;
+import it.casiraghi.swiftbat.ui.components.ScientificLine3DPane;
 import it.casiraghi.swiftbat.ui.components.ThreeDChartPane;
 import it.casiraghi.swiftbat.ui.components.TimeEnergyHeatmapPane;
 import javafx.application.HostServices;
@@ -28,10 +32,12 @@ import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.StringConverter;
@@ -95,12 +101,13 @@ public final class SpectroscopyPane extends BorderPane {
 
         Button source = UiFactory.button("Apri tabella ufficiale ↗", "ghost-button");
         source.setOnAction(event -> hostServices.showDocument(sourceUrl()));
-        HBox controls = new HBox(10,
+        FlowPane controls = new FlowPane(10, 10);
+        controls.getChildren().addAll(
                 controlBox("Intervallo del fit", intervalChoice,
                         "T100 usa l'intervallo complessivo del burst; Picco 1 s usa il secondo più intenso."),
                 controlBox("Modello del fit", modelChoice,
                         "Automatico segue la scelta BAT; PL e CPL permettono di confrontare i due fit pubblicati."),
-                UiFactory.spacer(), source);
+                source);
         controls.setAlignment(Pos.BOTTOM_LEFT);
         controls.getStyleClass().add("spectroscopy-controls");
 
@@ -128,9 +135,12 @@ public final class SpectroscopyPane extends BorderPane {
 
     private VBox controlBox(String label, Node control, String help) {
         Label explanation = UiFactory.wrappedLabel(help, "spectroscopy-control-help");
-        explanation.setMaxWidth(270);
+        explanation.setMinHeight(Region.USE_PREF_SIZE);
+        explanation.setMaxWidth(Double.MAX_VALUE);
         VBox box = new VBox(5, UiFactory.label(label, "filter-label"), control, explanation);
         box.getStyleClass().add("spectroscopy-control-box");
+        box.setFillWidth(true);
+        box.setMaxWidth(Double.MAX_VALUE);
         return box;
     }
 
@@ -204,18 +214,17 @@ public final class SpectroscopyPane extends BorderPane {
                         + "Sono due rappresentazioni dello stesso fit ufficiale, non quattro curve di luce sommate.",
                 "spectroscopy-reading-intro");
 
-        HBox charts = new HBox(12);
-        Node modelChart = buildModelChart(fit);
-        Node fluxChart = buildFluxChart(fluxes);
-        HBox.setHgrow(modelChart, Priority.ALWAYS);
-        HBox.setHgrow(fluxChart, Priority.ALWAYS);
-        charts.getChildren().addAll(modelChart, fluxChart);
+        readingIntro.setMinHeight(Region.USE_PREF_SIZE);
+        readingIntro.setMaxWidth(Double.MAX_VALUE);
 
-        HBox lower = new HBox(12,
+        GridPane charts = responsiveGrid(1320, 2,
+                buildModelChart(fit, true),
+                buildFluxChart(fluxes, model, true));
+
+        GridPane lower = responsiveGrid(1180, 3,
                 buildParameterCard(result, fit, model),
                 buildFluxTable(fluxes),
                 buildAssistant(result, fit, model, fluxes));
-        for (Node node : lower.getChildren()) HBox.setHgrow(node, Priority.ALWAYS);
 
         Label scientificNote = UiFactory.wrappedLabel(
                 "I flussi sono quelli pubblicati dal catalogo Swift/BAT in erg cm⁻² s⁻¹, con limiti al 90%. "
@@ -232,14 +241,71 @@ public final class SpectroscopyPane extends BorderPane {
         return card;
     }
 
-    private Node buildModelChart(Fit fit) {
+    private GridPane responsiveGrid(double wideBreakpoint, int wideColumns, Node... nodes) {
+        GridPane grid = new GridPane();
+        grid.getStyleClass().add("spectroscopy-responsive-grid");
+        grid.setHgap(12);
+        grid.setVgap(12);
+        grid.setMinWidth(0);
+        grid.setMaxWidth(Double.MAX_VALUE);
+        for (Node node : nodes) {
+            GridPane.setHgrow(node, Priority.ALWAYS);
+            GridPane.setVgrow(node, Priority.ALWAYS);
+            if (node instanceof Region region) {
+                region.setMinWidth(0);
+                region.setMaxWidth(Double.MAX_VALUE);
+            }
+        }
+        grid.widthProperty().addListener((obs, oldWidth, newWidth) ->
+                reflowResponsiveGrid(grid, newWidth.doubleValue(), wideBreakpoint, wideColumns, nodes));
+        Platform.runLater(() ->
+                reflowResponsiveGrid(grid, grid.getWidth(), wideBreakpoint, wideColumns, nodes));
+        return grid;
+    }
+
+    private void reflowResponsiveGrid(GridPane grid, double width, double wideBreakpoint,
+                                      int wideColumns, Node[] nodes) {
+        int columns;
+        if (width >= wideBreakpoint) {
+            columns = wideColumns;
+        } else if (nodes.length > 2 && width >= 760) {
+            columns = 2;
+        } else {
+            columns = 1;
+        }
+        Object current = grid.getProperties().get("spectroscopy-column-count");
+        if (current instanceof Integer activeColumns && activeColumns == columns) {
+            return;
+        }
+        grid.getProperties().put("spectroscopy-column-count", columns);
+        grid.getChildren().clear();
+        grid.getColumnConstraints().clear();
+        for (int column = 0; column < columns; column++) {
+            ColumnConstraints constraints = new ColumnConstraints();
+            constraints.setPercentWidth(100.0 / columns);
+            constraints.setHgrow(Priority.ALWAYS);
+            constraints.setFillWidth(true);
+            grid.getColumnConstraints().add(constraints);
+        }
+        for (int index = 0; index < nodes.length; index++) {
+            grid.add(nodes[index], index % columns, index / columns);
+        }
+    }
+
+    private Node buildModelChart(Fit fit, boolean showActions) {
         VBox card = new VBox(7);
         card.getStyleClass().addAll("card", "spectroscopy-chart-card");
         card.setPadding(new Insets(12));
+        card.setMinWidth(0);
+        card.setMaxWidth(Double.MAX_VALUE);
+
         Label explanation = UiFactory.wrappedLabel(
                 "Asse X = energia dei fotoni. Asse Y = log₁₀ del flusso fotonico differenziale previsto dal fit. "
                         + "La linea è il modello ricostruito, non una serie di misure grezze.",
                 "card-subtitle");
+        explanation.setMinHeight(Region.USE_PREF_SIZE);
+        explanation.setMaxWidth(Double.MAX_VALUE);
+
         NumberAxis xAxis = new NumberAxis(15, 150, 15);
         NumberAxis yAxis = new NumberAxis();
         xAxis.setLabel("Energia (keV)");
@@ -250,9 +316,11 @@ public final class SpectroscopyPane extends BorderPane {
         chart.setCreateSymbols(false);
         chart.setLegendVisible(false);
         chart.setTitle(fit == null ? "Modello non disponibile" : "Curva del fit " + fit.model().code() + " · 15–150 keV");
-        chart.setMinHeight(300);
-        chart.setPrefHeight(340);
+        chart.setMinWidth(0);
+        chart.setMinHeight(showActions ? 300 : 520);
+        chart.setPrefHeight(showActions ? 340 : 680);
         chart.setMaxWidth(Double.MAX_VALUE);
+        chart.setMaxHeight(Double.MAX_VALUE);
         VBox.setVgrow(chart, Priority.ALWAYS);
         if (fit != null && fit.normalization() != null && fit.alpha() != null) {
             XYChart.Series<Number, Number> series = new XYChart.Series<>();
@@ -264,18 +332,39 @@ public final class SpectroscopyPane extends BorderPane {
             }
             chart.getData().add(series);
         }
-        card.getChildren().addAll(UiFactory.label("Modello spettrale ricostruito", "card-title"), explanation, chart);
+
+        card.getChildren().addAll(
+                UiFactory.label("Modello spettrale ricostruito", "card-title"),
+                explanation);
+        if (showActions) {
+            Button threeD = UiFactory.button("Vista 3D", "secondary-button");
+            threeD.setDisable(fit == null || fit.normalization() == null || fit.alpha() == null);
+            threeD.setOnAction(event -> openModel3D(fit));
+            Button fullscreen = UiFactory.button("Schermo intero", "ghost-button");
+            fullscreen.setOnAction(event -> openModelFullscreen(fit));
+            FlowPane actions = new FlowPane(8, 8);
+            actions.getStyleClass().add("spectroscopy-chart-actions");
+            actions.getChildren().addAll(threeD, fullscreen);
+            card.getChildren().add(actions);
+        }
+        card.getChildren().add(chart);
         return card;
     }
 
-    private Node buildFluxChart(List<EnergyFluxBand> fluxes) {
+    private Node buildFluxChart(List<EnergyFluxBand> fluxes, Model model, boolean showActions) {
         VBox card = new VBox(7);
         card.getStyleClass().addAll("card", "spectroscopy-chart-card");
         card.setPadding(new Insets(12));
+        card.setMinWidth(0);
+        card.setMaxWidth(Double.MAX_VALUE);
+
         Label explanation = UiFactory.wrappedLabel(
                 "Asse X = banda energetica; asse Y = energia ricevuta per unità di area e di tempo. "
-                        + "Una barra più alta indica un flusso maggiore in quella banda; i limiti al 90% sono nella tabella e nel tooltip.",
+                        + "Una barra più alta indica un flusso maggiore; i limiti al 90% sono nella tabella e nel tooltip.",
                 "card-subtitle");
+        explanation.setMinHeight(Region.USE_PREF_SIZE);
+        explanation.setMaxWidth(Double.MAX_VALUE);
+
         CategoryAxis xAxis = new CategoryAxis();
         NumberAxis yAxis = new NumberAxis();
         yAxis.setLabel("Flusso energetico (erg cm⁻² s⁻¹)");
@@ -284,12 +373,15 @@ public final class SpectroscopyPane extends BorderPane {
         chart.getStyleClass().addAll("distribution-chart", "spectral-flux-chart");
         chart.setAnimated(false);
         chart.setLegendVisible(false);
-        chart.setTitle("Flusso per banda · limiti al 90% nel dettaglio");
+        chart.setTitle("Flusso energetico per banda");
         chart.setCategoryGap(18);
         chart.setBarGap(3);
-        chart.setMinHeight(300);
-        chart.setPrefHeight(340);
+        chart.setMinWidth(0);
+        chart.setMinHeight(showActions ? 300 : 520);
+        chart.setPrefHeight(showActions ? 340 : 680);
         chart.setMaxWidth(Double.MAX_VALUE);
+        chart.setMaxHeight(Double.MAX_VALUE);
+
         XYChart.Series<String, Number> series = new XYChart.Series<>();
         for (EnergyFluxBand band : fluxes) {
             if (!band.available()) continue;
@@ -306,8 +398,112 @@ public final class SpectroscopyPane extends BorderPane {
         }
         chart.getData().add(series);
         VBox.setVgrow(chart, Priority.ALWAYS);
-        card.getChildren().addAll(UiFactory.label("Flusso energetico", "card-title"), explanation, chart);
+
+        card.getChildren().addAll(UiFactory.label("Flusso energetico", "card-title"), explanation);
+        if (showActions) {
+            Button threeD = UiFactory.button("Vista 3D", "secondary-button");
+            threeD.setDisable(fluxes.stream().noneMatch(EnergyFluxBand::available));
+            threeD.setOnAction(event -> openFlux3D(fluxes, model));
+            Button fullscreen = UiFactory.button("Schermo intero", "ghost-button");
+            fullscreen.setOnAction(event -> openFluxFullscreen(fluxes, model));
+            FlowPane actions = new FlowPane(8, 8);
+            actions.getStyleClass().add("spectroscopy-chart-actions");
+            actions.getChildren().addAll(threeD, fullscreen);
+            card.getChildren().add(actions);
+        }
+        card.getChildren().add(chart);
         return card;
+    }
+
+    private void openModelFullscreen(Fit fit) {
+        Node view = buildModelChart(fit, false);
+        InPlaceFullscreen.show(this, grbData.grbName() + " · Modello spettrale", view);
+    }
+
+    private void openFluxFullscreen(List<EnergyFluxBand> fluxes, Model model) {
+        Node view = buildFluxChart(fluxes, model, false);
+        InPlaceFullscreen.show(this, grbData.grbName() + " · Flusso energetico per banda", view);
+    }
+
+    private void openModel3D(Fit fit) {
+        if (fit == null || fit.normalization() == null || fit.alpha() == null) {
+            return;
+        }
+        List<Double> energies = new ArrayList<>();
+        List<Double> logFluxes = new ArrayList<>();
+        for (double energy = 15; energy <= 150.001; energy += 2.5) {
+            double photons = photonModel(fit, energy);
+            if (Double.isFinite(photons) && photons > 0) {
+                energies.add(energy);
+                logFluxes.add(Math.log10(photons));
+            }
+        }
+        double[] xValues = new double[energies.size()];
+        double[][] yValues = new double[][]{new double[energies.size()]};
+        for (int index = 0; index < energies.size(); index++) {
+            xValues[index] = energies.get(index);
+            yValues[0][index] = logFluxes.get(index);
+        }
+        Java2DWaterfallPanel.Dataset dataset = new Java2DWaterfallPanel.Dataset(
+                xValues,
+                yValues,
+                new String[]{"Fit " + fit.model().code()},
+                new java.awt.Color[]{new java.awt.Color(255, 173, 82)});
+        Java2DWaterfallPanel.Presentation presentation = new Java2DWaterfallPanel.Presentation(
+                "Modello spettrale non disponibile.",
+                "Energia (keV)",
+                "log10 N(E)",
+                "Modello visualizzato",
+                "log10 flusso fotonico",
+                "",
+                false,
+                false,
+                false,
+                4);
+        ScientificLine3DPane view = new ScientificLine3DPane(
+                "Modello spettrale ricostruito · " + fit.model().code(),
+                "La stessa curva 2D è resa ruotabile. X = energia, Y = log₁₀ N(E); la profondità separa "
+                        + "graficamente il modello e non rappresenta una terza grandezza fisica.",
+                dataset,
+                presentation,
+                "Vista prospettica dello stesso fit ufficiale: ruota trascinando, usa la rotella per lo zoom.");
+        InPlaceFullscreen.show(this, grbData.grbName() + " · Modello spettrale 3D", view);
+    }
+
+    private void openFlux3D(List<EnergyFluxBand> fluxes, Model model) {
+        List<EnergyFluxBand> available = fluxes.stream()
+                .filter(EnergyFluxBand::available)
+                .toList();
+        if (available.isEmpty()) {
+            return;
+        }
+        String[] categories = new String[available.size()];
+        int[][] scaledFluxes = new int[][]{new int[available.size()]};
+        for (int index = 0; index < available.size(); index++) {
+            EnergyFluxBand band = available.get(index);
+            categories[index] = band.label();
+            double scaled = Math.max(0, band.value() * 1_000_000_000_000d);
+            scaledFluxes[0][index] = scaled >= Integer.MAX_VALUE
+                    ? Integer.MAX_VALUE : (int) Math.round(scaled);
+        }
+        java.awt.Color color = model == Model.CUTOFF_POWER_LAW
+                ? new java.awt.Color(155, 117, 239)
+                : new java.awt.Color(59, 186, 218);
+        Java2DGroupedBarPanel.Dataset dataset = new Java2DGroupedBarPanel.Dataset(
+                categories,
+                new String[]{"Fit " + model.code()},
+                scaledFluxes,
+                new java.awt.Color[]{color},
+                "Banda energetica",
+                "Modello",
+                "Flusso [10⁻¹² erg cm⁻² s⁻¹]");
+        ScientificBar3DPane view = new ScientificBar3DPane(
+                "Flusso energetico per banda · " + model.code(),
+                "Le barre sono le stesse della vista 2D. X = banda, altezza = flusso energetico; "
+                        + "la profondità è solo prospettica e non aggiunge una nuova variabile fisica.",
+                dataset,
+                "Scala dell'altezza: unità di 10⁻¹² erg cm⁻² s⁻¹. I limiti al 90% restano consultabili nella tabella 2D.");
+        InPlaceFullscreen.show(this, grbData.grbName() + " · Flusso energetico 3D", view);
     }
 
     private VBox buildParameterCard(SpectralData.Result result, Fit fit, Model model) {
@@ -427,10 +623,11 @@ public final class SpectroscopyPane extends BorderPane {
         Button threeD = UiFactory.button("Apri vista 3D dei rate", "primary-button");
         threeD.setDisable(grbData.asciiData().isEmpty());
         threeD.setOnAction(event -> openTimeEnergy3D());
-        HBox controls = new HBox(10,
+        FlowPane controls = new FlowPane(10, 10);
+        controls.getChildren().addAll(
                 controlBox("Finestra temporale", window,
                         "Limita la mappa ai secondi prima e dopo t = 0; non modifica i parametri del fit ufficiale."),
-                UiFactory.spacer(), threeD);
+                threeD);
         controls.setAlignment(Pos.BOTTOM_LEFT);
 
         VBox chartCard = new VBox(9,
