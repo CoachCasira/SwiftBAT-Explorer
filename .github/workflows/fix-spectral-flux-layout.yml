@@ -31,29 +31,30 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
+          import re
 
           spectroscopy = Path('src/main/java/it/casiraghi/swiftbat/ui/SpectroscopyPane.java')
           text = spectroscopy.read_text(encoding='utf-8')
 
-          old_lower = '''        GridPane lower = responsiveGrid(1180, 3,
-                  buildParameterCard(result, fit, model),
-                  buildFluxTable(fluxes),
-                  buildAssistant(result, fit, model, fluxes));
-
-          Label scientificNote = UiFactory.wrappedLabel('''
-          new_lower = '''        Label scientificNote = UiFactory.wrappedLabel('''
-          if old_lower not in text:
+          pattern = re.compile(
+              r'\n\s*GridPane lower = responsiveGrid\(1180, 3,\s*'
+              r'buildParameterCard\(result, fit, model\),\s*'
+              r'buildFluxTable\(fluxes\),\s*'
+              r'buildAssistant\(result, fit, model, fluxes\)\);\s*',
+              re.MULTILINE
+          )
+          text, count = pattern.subn('\n\n', text, count=1)
+          if count != 1:
               raise SystemExit('Blocco dettagli inferiori spettroscopia non trovato')
-          text = text.replace(old_lower, new_lower, 1)
 
-          old_children = '        content.getChildren().addAll(metrics, readingIntro, charts, lower, scientificNote);'
-          new_children = '        content.getChildren().addAll(metrics, readingIntro, charts, scientificNote);'
+          old_children = 'content.getChildren().addAll(metrics, readingIntro, charts, lower, scientificNote);'
+          new_children = 'content.getChildren().addAll(metrics, readingIntro, charts, scientificNote);'
           if old_children not in text:
               raise SystemExit('Lista contenuti risultati ufficiali non trovata')
           text = text.replace(old_children, new_children, 1)
 
-          old_value_label = '                "Flusso [10⁻¹² erg cm⁻² s⁻¹]");'
-          new_value_label = '                "Flusso energetico [10⁻¹² erg cm⁻² s⁻¹]");'
+          old_value_label = '"Flusso [10⁻¹² erg cm⁻² s⁻¹]");'
+          new_value_label = '"Flusso energetico [10⁻¹² erg cm⁻² s⁻¹]");'
           if old_value_label not in text:
               raise SystemExit('Etichetta flusso dataset 3D non trovata')
           text = text.replace(old_value_label, new_value_label, 1)
@@ -61,8 +62,8 @@ jobs:
 
           renderer = Path('src/main/java/it/casiraghi/swiftbat/ui/components/Java2DGroupedBarPanel.java')
           text = renderer.read_text(encoding='utf-8')
-          old_axis = '        g.drawString("Numero di GRB", (float) yEnd.getX() - 40, (float) yEnd.getY() - 12);'
-          new_axis = '''        String yLabel = dataset.valueLabel();
+          old_axis = 'g.drawString("Numero di GRB", (float) yEnd.getX() - 40, (float) yEnd.getY() - 12);'
+          new_axis = '''String yLabel = dataset.valueLabel();
           g.drawString(yLabel, (float) yEnd.getX() - 40, (float) yEnd.getY() - 12);'''
           if old_axis not in text:
               raise SystemExit('Etichetta asse Y 3D non trovata')
