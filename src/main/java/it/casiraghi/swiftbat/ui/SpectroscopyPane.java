@@ -134,11 +134,17 @@ public final class SpectroscopyPane extends BorderPane {
     }
 
     private VBox controlBox(String label, Node control, String help) {
+        return controlBox(label, control, help, 270);
+    }
+
+    private VBox controlBox(String label, Node control, String help, double preferredWidth) {
         Label explanation = UiFactory.wrappedLabel(help, "spectroscopy-control-help");
+        explanation.setPrefWidth(preferredWidth);
         explanation.setMinHeight(Region.USE_PREF_SIZE);
         explanation.setMaxWidth(Double.MAX_VALUE);
         VBox box = new VBox(5, UiFactory.label(label, "filter-label"), control, explanation);
         box.getStyleClass().add("spectroscopy-control-box");
+        box.setPrefWidth(preferredWidth);
         box.setFillWidth(true);
         box.setMaxWidth(Double.MAX_VALUE);
         return box;
@@ -626,7 +632,8 @@ public final class SpectroscopyPane extends BorderPane {
         FlowPane controls = new FlowPane(10, 10);
         controls.getChildren().addAll(
                 controlBox("Finestra temporale", window,
-                        "Limita la mappa ai secondi prima e dopo t = 0; non modifica i parametri del fit ufficiale."),
+                        "Limita la mappa ai secondi prima e dopo t = 0; non modifica i parametri del fit ufficiale.",
+                        620),
                 threeD);
         controls.setAlignment(Pos.BOTTOM_LEFT);
 
