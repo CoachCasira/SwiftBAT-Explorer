@@ -75,7 +75,7 @@ public final class TimeEnergyHeatmapPane extends Region {
         plotLeft = 112;
         plotTop = 34;
         plotWidth = Math.max(20, width - plotLeft - 28);
-        plotHeight = Math.max(40, height - plotTop - 72);
+        plotHeight = Math.max(40, height - plotTop - 92);
         if (visibleRows.isEmpty()) {
             graphics.setFill(Color.web("#94a3bd"));
             graphics.setFont(Font.font("System", FontWeight.BOLD, 14));
@@ -145,11 +145,24 @@ public final class TimeEnergyHeatmapPane extends Region {
 
         graphics.setFill(Color.web("#b9c7df"));
         graphics.setFont(Font.font("System", FontWeight.BOLD, 11));
-        graphics.fillText("Tempo dal trigger (s)", plotLeft + plotWidth / 2 - 54, height - 15);
+        graphics.fillText("Tempo dal trigger (s)", plotLeft + plotWidth / 2 - 54, height - 38);
+
+        double legendY = height - 13;
+        double legendColumnWidth = plotWidth / 3.0;
+        drawLegendItem(graphics, plotLeft, legendY, Color.web("#3b82f6"), "Fluttuazione negativa");
+        drawLegendItem(graphics, plotLeft + legendColumnWidth, legendY, Color.web("#101a2b"), "Rate circa zero");
+        drawLegendItem(graphics, plotLeft + 2 * legendColumnWidth, legendY, Color.web("#ff9f43"), "Rate positivo");
+    }
+
+    private void drawLegendItem(GraphicsContext graphics, double x, double y, Color color, String text) {
+        graphics.setFill(color);
+        graphics.fillRoundRect(x, y - 9, 11, 11, 3, 3);
+        graphics.setStroke(Color.web("#8293b1"));
+        graphics.setLineWidth(0.8);
+        graphics.strokeRoundRect(x, y - 9, 11, 11, 3, 3);
+        graphics.setFill(Color.web("#8da2c4"));
         graphics.setFont(Font.font("System", 10));
-        graphics.setFill(Color.web("#6f88aa"));
-        graphics.fillText("blu = fluttuazione negativa · scuro = circa zero · arancio = rate positivo",
-                plotLeft, height - 1);
+        graphics.fillText(text, x + 17, y);
     }
 
     private List<Row> readRows() {
