@@ -94,6 +94,7 @@ public final class ExplorerPage extends BorderPane {
     private final StackPane workspace = new StackPane();
     private CatalogEntry selectedEntry;
     private GrbData currentData;
+    private String preferredTab = "Curva 2D";
     private final PauseTransition catalogFilterDebounce = new PauseTransition(Duration.millis(900));
 
     public ExplorerPage(HostServices hostServices, BiConsumer<CatalogEntry, Boolean> loadRequest,
@@ -131,6 +132,15 @@ public final class ExplorerPage extends BorderPane {
         spectralCatalog = catalog == null ? Map.of() : Map.copyOf(catalog);
         if (currentData != null) {
             setWorkspace(buildDashboard(currentData));
+        }
+    }
+
+    public void showTab(String title) {
+        preferredTab = title == null || title.isBlank() ? "Curva 2D" : title;
+        if (currentData != null) {
+            setWorkspace(buildDashboard(currentData));
+        } else {
+            showEmptyState();
         }
     }
 
@@ -463,6 +473,10 @@ public final class ExplorerPage extends BorderPane {
                 tab("Dati", buildDataWorkspace(data)),
                 tab("Metadati", buildMetadata(data)),
                 tab("Guida", buildUnderstand(data)));
+        tabs.getTabs().stream()
+                .filter(candidate -> candidate.getText().equals(preferredTab))
+                .findFirst()
+                .ifPresent(tabs.getSelectionModel()::select);
         VBox.setVgrow(tabs, Priority.ALWAYS);
 
         dashboard.getChildren().addAll(eventHeader, metrics, tabs);
