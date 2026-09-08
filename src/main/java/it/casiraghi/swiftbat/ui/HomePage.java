@@ -13,6 +13,10 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 public final class HomePage extends ScrollPane {
+    private final Label catalogValue = UiFactory.label("…", "home-stat-value");
+    private final Label spectralValue = UiFactory.label("…", "home-stat-value");
+    private final Label cacheValue = UiFactory.label("0", "home-stat-value");
+
     public HomePage(Runnable openExplorer, Runnable openSky, Runnable openCompare, Runnable openInfo) {
         getStyleClass().addAll("page-scroll", "home-page-scroll");
         setFitToWidth(true);
@@ -20,24 +24,65 @@ public final class HomePage extends ScrollPane {
         setContent(buildContent(openExplorer, openSky, openCompare, openInfo));
     }
 
+    public void updateCatalogSummary(int count, boolean fallback) {
+        catalogValue.setText(String.valueOf(Math.max(0, count)));
+        catalogValue.setAccessibleText((fallback ? "Catalogo di emergenza: " : "Catalogo online: ")
+                + Math.max(0, count) + " GRB");
+    }
+
+    public void updateSpectralSummary(int count) {
+        spectralValue.setText(String.valueOf(Math.max(0, count)));
+        spectralValue.setAccessibleText(Math.max(0, count) + " fit spettroscopici disponibili");
+    }
+
+    public void updateCacheSummary(int ramCount, int localCount) {
+        cacheValue.setText(Math.max(0, ramCount) + " / " + Math.max(0, localCount));
+        cacheValue.setAccessibleText(Math.max(0, ramCount) + " eventi in RAM e "
+                + Math.max(0, localCount) + " nella cache locale");
+    }
+
     private Node buildContent(Runnable openExplorer, Runnable openSky, Runnable openCompare, Runnable openInfo) {
-        VBox page = new VBox(24);
+        VBox page = new VBox(20);
         page.getStyleClass().addAll("page-content", "home-content");
-        page.setPadding(new Insets(28, 34, 42, 34));
+        page.setPadding(new Insets(26, 30, 42, 30));
+
+        HBox welcome = new HBox(16);
+        welcome.setAlignment(Pos.CENTER_LEFT);
+        VBox welcomeCopy = new VBox(4,
+                UiFactory.label("Bentornato in SwiftBAT", "home-welcome-title"),
+                UiFactory.wrappedLabel(
+                        "Esplora il catalogo, confronta i burst e leggi i prodotti spettroscopici ufficiali.",
+                        "home-welcome-subtitle"));
+        Region welcomeSpacer = new Region();
+        HBox.setHgrow(welcomeSpacer, Priority.ALWAYS);
+        HBox availability = new HBox(8,
+                microPill("● DATI LIVE"),
+                microPill("NASA / GSFC"));
+        welcome.getChildren().addAll(welcomeCopy, welcomeSpacer, availability);
+
+        HBox stats = new HBox(12,
+                statCard("CATALOGO GRB", catalogValue, "eventi indicizzati", "catalog-stat"),
+                statCard("FIT SPETTRALI", spectralValue, "modelli ufficiali BAT", "spectral-stat"),
+                statCard("COPERTURA", UiFactory.label("T90 · z", "home-stat-value"),
+                        "durata, cielo e redshift", "coverage-stat"),
+                statCard("CACHE", cacheValue, "RAM / locale", "cache-stat"));
+        for (Node node : stats.getChildren()) {
+            HBox.setHgrow(node, Priority.ALWAYS);
+        }
 
         HBox hero = new HBox(28);
         hero.getStyleClass().add("event-horizon-hero");
         hero.setAlignment(Pos.CENTER_LEFT);
-        hero.setPadding(new Insets(34, 34, 34, 38));
-        hero.setMinHeight(430);
+        hero.setPadding(new Insets(32, 34, 32, 38));
+        hero.setMinHeight(390);
 
         VBox copy = new VBox(16);
         copy.setAlignment(Pos.CENTER_LEFT);
         copy.setMaxWidth(690);
-        Label kicker = UiFactory.label("SWIFT / BAT  ·  LIVE DATA", "home-kicker");
-        Label title = UiFactory.wrappedLabel("SwiftBAT\nExplorer", "home-title");
+        Label kicker = UiFactory.label("EVENT HORIZON  ·  SWIFT / BAT", "home-kicker");
+        Label title = UiFactory.wrappedLabel("Dal catalogo\nal segnale.", "home-title");
         Label subtitle = UiFactory.wrappedLabel(
-                "Esplora i Gamma-Ray Burst dal catalogo al cielo. Curve di luce, dati FITS e coordinate celesti in un'unica app.",
+                "Curve di luce, coordinate celesti, analisi di popolazione e spettroscopia descrittiva in un unico ambiente scientifico.",
                 "home-subtitle");
         subtitle.setMaxWidth(620);
 
@@ -47,12 +92,14 @@ public final class HomePage extends ScrollPane {
         explore.setOnAction(event -> openExplorer.run());
         Button sky = UiFactory.button("Apri la mappa celeste", "secondary-button");
         sky.setOnAction(event -> openSky.run());
-        actions.getChildren().addAll(explore, sky);
+        Button info = UiFactory.button("Come si usa", "ghost-button");
+        info.setOnAction(event -> openInfo.run());
+        actions.getChildren().addAll(explore, sky, info);
 
         HBox trust = new HBox(12,
-                microPill("● Online"),
-                microPill("1 s binning"),
-                microPill("DAT + FITS"));
+                microPill("CURVE DAT"),
+                microPill("PRODOTTI FITS"),
+                microPill("PL · CPL"));
         copy.getChildren().addAll(kicker, title, subtitle, actions, trust);
         HBox.setHgrow(copy, Priority.ALWAYS);
 
@@ -95,8 +142,19 @@ public final class HomePage extends ScrollPane {
         HBox.setHgrow(info, Priority.ALWAYS);
         lower.getChildren().addAll(workflow, info);
 
-        page.getChildren().addAll(hero, quickActions, lower);
+        page.getChildren().addAll(welcome, stats, hero, quickActions, lower);
         return page;
+    }
+
+    private VBox statCard(String title, Label value, String detail, String accentClass) {
+        VBox card = new VBox(6,
+                UiFactory.label(title, "home-stat-label"),
+                value,
+                UiFactory.label(detail, "home-stat-detail"));
+        card.getStyleClass().addAll("home-stat-card", accentClass);
+        card.setMaxWidth(Double.MAX_VALUE);
+        card.setMinWidth(0);
+        return card;
     }
 
     private VBox actionCard(String glyph, String title, String text, String action, Runnable runnable) {

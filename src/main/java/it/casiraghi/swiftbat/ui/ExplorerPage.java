@@ -144,6 +144,15 @@ public final class ExplorerPage extends BorderPane {
         }
     }
 
+    /** Porta la ricerca globale dell'header nel catalogo dell'Explorer. */
+    public void focusCatalogSearch(String query) {
+        catalogSearch.setText(query == null ? "" : query.trim());
+        Platform.runLater(() -> {
+            catalogSearch.requestFocus();
+            catalogSearch.positionCaret(catalogSearch.getText().length());
+        });
+    }
+
     public void setSelectedEntry(CatalogEntry entry) {
         selectedEntry = entry;
         catalogList.getSelectionModel().select(entry);

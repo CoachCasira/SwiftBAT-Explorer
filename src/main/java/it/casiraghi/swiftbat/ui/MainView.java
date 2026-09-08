@@ -10,6 +10,7 @@ import it.casiraghi.swiftbat.service.RedshiftCatalogService;
 import it.casiraghi.swiftbat.service.SkyCatalogService;
 import it.casiraghi.swiftbat.service.SpectralCatalogService;
 import it.casiraghi.swiftbat.service.SwiftCatalogService;
+import it.casiraghi.swiftbat.ui.components.BlackHoleBackdropPane;
 import javafx.application.HostServices;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -21,6 +22,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
+import javafx.scene.control.TextField;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -113,27 +115,23 @@ public final class MainView {
     }
 
     private void buildLayout() {
-        root.getStyleClass().add("app-root");
+        root.getStyleClass().addAll("app-root", "black-hole-redesign");
         root.setLeft(buildNavigation());
         root.setTop(buildTopBar());
         pageHost.getStyleClass().add("page-host");
-        root.setCenter(pageHost);
+        BlackHoleBackdropPane backdrop = new BlackHoleBackdropPane();
+        StackPane workspace = new StackPane(backdrop, pageHost);
+        workspace.getStyleClass().add("workspace-shell");
+        root.setCenter(workspace);
     }
 
     private Node buildNavigation() {
         navigation.getStyleClass().add("main-navigation");
-        navigation.setPadding(new Insets(20, 12, 16, 12));
-        navigation.setPrefWidth(218);
-        navigation.setMinWidth(204);
+        navigation.setPadding(new Insets(22, 14, 18, 14));
+        navigation.setPrefWidth(248);
+        navigation.setMinWidth(226);
 
-        HBox brand = new HBox(10);
-        brand.getStyleClass().add("nav-brand");
-        brand.setAlignment(Pos.CENTER_LEFT);
-        Label logo = UiFactory.label("◉", "nav-logo");
-        VBox brandText = new VBox(0,
-                UiFactory.label("SwiftBAT", "nav-brand-title"),
-                UiFactory.label("GRB EXPLORER", "nav-brand-subtitle"));
-        brand.getChildren().addAll(logo, brandText);
+        Label section = UiFactory.label("NAVIGAZIONE", "nav-section-label");
 
         Button home = navButton("⌂", "Home", "home");
         Button explorer = navButton("✦", "Esplora", "explorer");
@@ -147,13 +145,19 @@ public final class MainView {
 
         Separator separator = new Separator();
         separator.getStyleClass().add("soft-separator");
+        VBox projectStatus = new VBox(5,
+                UiFactory.label("SWIFT / BAT", "nav-project-kicker"),
+                UiFactory.label("Event Horizon", "nav-project-title"),
+                UiFactory.wrappedLabel("Esplorazione locale con dati scientifici ufficiali.", "nav-project-copy"));
+        projectStatus.getStyleClass().add("nav-project-card");
+
         Label online = UiFactory.wrappedLabel("Dati scientifici online\nNASA/GSFC Swift/BAT", "nav-source");
         Button source = UiFactory.button("Fonte ufficiale  ↗", "nav-source-button");
         source.setMaxWidth(Double.MAX_VALUE);
         source.setOnAction(event -> hostServices.showDocument(SwiftCatalogService.CATALOG_URL));
 
-        navigation.getChildren().addAll(brand, home, explorer, sky, population, compare, about,
-                spacer, separator, online, source);
+        navigation.getChildren().addAll(section, home, explorer, sky, population, compare, about,
+                spacer, projectStatus, separator, online, source);
         return navigation;
     }
 
@@ -182,15 +186,41 @@ public final class MainView {
     }
 
     private Node buildTopBar() {
-        HBox bar = new HBox(11);
+        HBox bar = new HBox(16);
         bar.getStyleClass().add("top-bar");
-        bar.setPadding(new Insets(11, 18, 11, 20));
+        bar.setPadding(new Insets(12, 18, 12, 20));
         bar.setAlignment(Pos.CENTER_LEFT);
 
-        Label product = UiFactory.label("SwiftBAT Explorer · 1.3 SPECTRAL", "top-product-title");
-        Label live = UiFactory.label("LIVE", "top-live-badge");
+        Label mark = UiFactory.label("◉", "top-brand-mark");
+        VBox brandCopy = new VBox(0,
+                UiFactory.label("SwiftBAT Explorer", "top-product-title"),
+                UiFactory.label("BLACK HOLE DATA STUDIO", "top-product-subtitle"));
+        HBox brand = new HBox(10, mark, brandCopy);
+        brand.setAlignment(Pos.CENTER_LEFT);
+        brand.getStyleClass().add("top-brand");
+
+        TextField globalSearch = new TextField();
+        globalSearch.setPromptText("Cerca GRB o Trigger ID…");
+        globalSearch.getStyleClass().add("global-search-field");
+        globalSearch.setMinWidth(220);
+        globalSearch.setPrefWidth(410);
+        globalSearch.setMaxWidth(540);
+        HBox.setHgrow(globalSearch, Priority.ALWAYS);
+        globalSearch.setOnAction(event -> {
+            navigate("explorer");
+            explorerPage.focusCatalogSearch(globalSearch.getText());
+        });
+
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        Button catalog = UiFactory.button("Catalogo", "top-nav-button");
+        catalog.setOnAction(event -> {
+            navigate("explorer");
+            explorerPage.focusCatalogSearch("");
+        });
+        Button guide = UiFactory.button("Guida", "top-nav-button");
+        guide.setOnAction(event -> navigate("glossary"));
 
         Button refresh = UiFactory.iconButton("↻", "Aggiorna il catalogo online");
         refresh.setOnAction(event -> {
@@ -200,7 +230,8 @@ public final class MainView {
         Button official = UiFactory.iconButton("↗", "Apri il catalogo ufficiale");
         official.setOnAction(event -> hostServices.showDocument(SwiftCatalogService.CATALOG_URL));
 
-        bar.getChildren().addAll(product, live, spacer, catalogStatus, sessionStatus, connectionStatus, refresh, official);
+        bar.getChildren().addAll(brand, globalSearch, spacer, catalog, guide,
+                catalogStatus, sessionStatus, connectionStatus, refresh, official);
         return bar;
     }
 
@@ -250,6 +281,7 @@ public final class MainView {
             skyMapPage.setBaseCatalog(entries);
             populationPage.setCatalog(entries);
             catalogStatus.setText(entries.size() + " GRB");
+            homePage.updateCatalogSummary(entries.size(), false);
             setConnection("Online", "status-online");
             loadSkyCatalog();
         });
@@ -259,6 +291,7 @@ public final class MainView {
             skyMapPage.setBaseCatalog(fallback);
             populationPage.setCatalog(fallback);
             catalogStatus.setText(fallback.size() + " GRB ridotti");
+            homePage.updateCatalogSummary(fallback.size(), true);
             setConnection("Offline parziale", "status-warning");
             loadSkyCatalog();
         });
@@ -311,10 +344,16 @@ public final class MainView {
                 return spectralCatalogService.fetchCatalog(forceRefresh);
             }
         };
-        task.setOnSucceeded(event -> explorerPage.setSpectralCatalog(task.getValue()));
-        // Senza rete o cache la mappa tempo-energia resta utilizzabile e la scheda
-        // segnala esplicitamente l'assenza dei fit ufficiali.
-        task.setOnFailed(event -> explorerPage.setSpectralCatalog(Map.of()));
+        task.setOnSucceeded(event -> {
+            explorerPage.setSpectralCatalog(task.getValue());
+            homePage.updateSpectralSummary(task.getValue().size());
+        });
+        // Se rete e cache non sono disponibili, la scheda resta comunque utilizzabile
+        // per la mappa tempo-energia e segnala chiaramente l'assenza dei fit ufficiali.
+        task.setOnFailed(event -> {
+            explorerPage.setSpectralCatalog(Map.of());
+            homePage.updateSpectralSummary(0);
+        });
         BACKGROUND_EXECUTOR.execute(task);
     }
 
@@ -355,8 +394,9 @@ public final class MainView {
     }
 
     private void updateCacheStatus() {
-        sessionStatus.setText(sessionData.size() + " RAM · "
-                + grbService.persistentCachedCount() + " locali");
+        int localCount = grbService.persistentCachedCount();
+        sessionStatus.setText(sessionData.size() + " RAM · " + localCount + " locali");
+        homePage.updateCacheSummary(sessionData.size(), localCount);
     }
 
     private void setConnection(String text, String styleClass) {

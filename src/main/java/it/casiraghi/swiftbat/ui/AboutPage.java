@@ -6,8 +6,7 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.layout.ColumnConstraints;
-import javafx.scene.layout.GridPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
@@ -34,40 +33,23 @@ public final class AboutPage extends ScrollPane {
                 UiFactory.wrappedLabel(
                         "SwiftBAT Explorer è l'applicazione sviluppata per la tesi di Matteo Casiraghi per consultare e comprendere i prodotti pubblici Swift/BAT dei Gamma-Ray Burst.",
                         "page-subtitle"),
-                UiFactory.label("Versione 1.2.0 · Java 17 · dati online", "definition-kicker"));
+                UiFactory.label("Versione 1.3.0 · Java 17 · dati online", "definition-kicker"));
         HBox.setHgrow(copy, Priority.ALWAYS);
         Button guide = UiFactory.button("Apri guida ai dati  →", "primary-button");
         guide.setOnAction(event -> openGlossary.run());
         hero.getChildren().addAll(copy, guide);
 
-        GridPane cards = new GridPane();
-        cards.setHgap(14);
-        cards.setVgap(14);
-        ColumnConstraints firstColumn = new ColumnConstraints();
-        firstColumn.setPercentWidth(50);
-        firstColumn.setHgrow(Priority.ALWAYS);
-        ColumnConstraints secondColumn = new ColumnConstraints();
-        secondColumn.setPercentWidth(50);
-        secondColumn.setHgrow(Priority.ALWAYS);
-        cards.getColumnConstraints().addAll(firstColumn, secondColumn);
-        cards.add(infoCard("Dati", "Catalogo ufficiale NASA/GSFC Swift/BAT e prodotti DAT/FITS a binning di 1 secondo. I valori restano riconducibili alle sorgenti pubbliche usate dall'app."), 0, 0);
-        cards.add(infoCard("Curve", "Visualizzazione delle curve di luce totali e nelle quattro bande energetiche, con finestre temporali, zoom e viste dedicate per leggere meglio la struttura del burst."), 1, 0);
-        cards.add(infoCard("Volta celeste", "Mollweide 2D e sfera 3D costruite con le coordinate RA/DEC pubblicate da Swift/BAT. Le due viste mostrano lo stesso campione con rappresentazioni differenti."), 0, 1);
-        cards.add(infoCard("Sessione", "Gli eventi aperti restano in memoria finché l'app è in esecuzione. La cache locale evita download ripetuti senza modificare i prodotti scientifici sorgente."), 1, 1);
+        FlowPane cards = new FlowPane(14, 14);
+        cards.getChildren().addAll(
+                infoCard("Dati", "Catalogo ufficiale NASA/GSFC Swift/BAT e prodotti DAT/FITS a binning di 1 secondo."),
+                infoCard("Curve", "Visualizzazione delle curve di luce totali e nelle quattro bande energetiche disponibili."),
+                infoCard("Volta celeste", "Mollweide 2D e sfera 3D costruite con le coordinate RA/DEC pubblicate da Swift/BAT."),
+                infoCard("Sessione", "Gli eventi aperti restano in memoria finché l'app è in esecuzione, senza modificare i file sorgente."));
 
         VBox scope = UiFactory.card("Scopo scientifico", null,
                 UiFactory.wrappedLabel(
                         "L'app facilita consultazione, controllo e confronto descrittivo dei dati. Gli indicatori e la soglia T90 = 2 s mostrati nell'interfaccia non sostituiscono una classificazione astrofisica validata.",
                         "explanation-text"));
-        VBox reading = UiFactory.card("Lettura dei risultati", null,
-                UiFactory.wrappedLabel(
-                        "Grafici, mappe, filtri e assistenti di lettura servono a mettere in evidenza pattern e differenze nel campione. Le viste 2D e 3D sono strumenti esplorativi e mantengono sempre separata la rappresentazione grafica dall'interpretazione fisica.",
-                        "explanation-text"));
-        scope.setMaxWidth(Double.MAX_VALUE);
-        reading.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(scope, Priority.ALWAYS);
-        HBox.setHgrow(reading, Priority.ALWAYS);
-        HBox scienceRow = new HBox(14, scope, reading);
 
         HBox actions = new HBox(10);
         actions.setAlignment(Pos.CENTER_LEFT);
@@ -80,16 +62,15 @@ public final class AboutPage extends ScrollPane {
                 "https://swift.gsfc.nasa.gov/results/batgrbcat/summary_cflux/summary_general_info/GRBlist_redshift_BAT.txt"));
         actions.getChildren().addAll(catalog, redshift, fits);
 
-        page.getChildren().addAll(hero, cards, scienceRow, actions);
+        page.getChildren().addAll(hero, cards, scope, actions);
         return page;
     }
 
     private VBox infoCard(String title, String text) {
         VBox card = new VBox(8);
-        card.getStyleClass().add("info-static-card");
-        card.setPadding(new Insets(21));
-        card.setMinWidth(0);
-        card.setMaxWidth(Double.MAX_VALUE);
+        card.getStyleClass().add("home-action-card");
+        card.setPadding(new Insets(18));
+        card.setPrefWidth(310);
         card.getChildren().addAll(
                 UiFactory.label(title, "home-action-title"),
                 UiFactory.wrappedLabel(text, "home-action-text"));

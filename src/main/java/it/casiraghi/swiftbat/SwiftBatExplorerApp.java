@@ -1,6 +1,7 @@
 package it.casiraghi.swiftbat;
 
 import it.casiraghi.swiftbat.ui.MainView;
+import it.casiraghi.swiftbat.ui.FullTextTooltip;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
@@ -11,10 +12,11 @@ public final class SwiftBatExplorerApp extends Application {
     public void start(Stage stage) {
         MainView mainView = new MainView(getHostServices(), stage);
         Scene scene = new Scene(mainView.getRoot(), 1580, 960);
+        FullTextTooltip.install(scene);
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/app.css").toExternalForm());
 
-        stage.setTitle("SwiftBAT Explorer 1.3.0 — Spectral Preview");
+        stage.setTitle("SwiftBAT Explorer 1.3.0 — Black Hole Preview");
         var iconStream = SwiftBatExplorerApp.class.getResourceAsStream("/app-icon.png");
         if (iconStream != null) {
             stage.getIcons().add(new Image(iconStream));

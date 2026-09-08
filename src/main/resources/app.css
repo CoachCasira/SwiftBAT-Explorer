@@ -2177,3 +2177,552 @@
     -fx-border-radius: 11px;
     -fx-padding: 10 12;
 }
+
+
+/* ========================================================================== */
+/* Black Hole UI preview — tema isolato del branch feature/black-hole-ui-redesign */
+/* ========================================================================== */
+
+.black-hole-redesign {
+    -fx-background-color:
+        radial-gradient(center 82% 15%, radius 72%, rgba(105, 58, 194, 0.14), transparent),
+        radial-gradient(center 70% 105%, radius 78%, rgba(10, 111, 159, 0.10), transparent),
+        linear-gradient(to bottom right, #02040b, #050a16 48%, #030711);
+    -fx-accent: #50dfff;
+    -fx-default-button: #ff9f50;
+}
+
+.black-hole-redesign .workspace-shell {
+    -fx-background-color: rgba(2, 6, 15, 0.36);
+}
+
+.black-hole-redesign .black-hole-backdrop {
+    -fx-opacity: 0.92;
+}
+
+/* Header */
+.black-hole-redesign .top-bar {
+    -fx-min-height: 76px;
+    -fx-pref-height: 76px;
+    -fx-background-color: linear-gradient(to right, rgba(2, 6, 14, 0.985), rgba(6, 10, 22, 0.965));
+    -fx-border-color: transparent transparent rgba(65, 207, 242, 0.16) transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.48), 22, 0.20, 0, 7);
+}
+
+.black-hole-redesign .top-brand {
+    -fx-min-width: 218px;
+    -fx-pref-width: 218px;
+}
+
+.black-hole-redesign .top-brand-mark {
+    -fx-text-fill: #ffad58;
+    -fx-font-size: 28px;
+    -fx-effect: dropshadow(gaussian, rgba(255, 132, 42, 0.62), 18, 0.42, 0, 0);
+}
+
+.black-hole-redesign .top-product-title {
+    -fx-text-fill: #f8fbff;
+    -fx-font-size: 16px;
+    -fx-font-weight: 800;
+}
+
+.black-hole-redesign .top-product-subtitle {
+    -fx-text-fill: #7183a7;
+    -fx-font-size: 8px;
+    -fx-font-weight: bold;
+}
+
+.black-hole-redesign .global-search-field {
+    -fx-background-color: rgba(9, 17, 34, 0.86);
+    -fx-text-fill: #edf7ff;
+    -fx-prompt-text-fill: #667897;
+    -fx-highlight-fill: rgba(57, 210, 244, 0.34);
+    -fx-background-radius: 12px;
+    -fx-border-color: rgba(82, 148, 194, 0.28);
+    -fx-border-radius: 12px;
+    -fx-padding: 11px 15px;
+    -fx-font-size: 12px;
+}
+
+.black-hole-redesign .global-search-field:focused {
+    -fx-border-color: rgba(69, 220, 250, 0.70);
+    -fx-background-color: rgba(10, 21, 42, 0.96);
+    -fx-effect: dropshadow(gaussian, rgba(36, 200, 235, 0.19), 14, 0.28, 0, 0);
+}
+
+.black-hole-redesign .top-nav-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #91a3c3;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-padding: 10px 8px;
+    -fx-cursor: hand;
+}
+
+.black-hole-redesign .top-nav-button:hover {
+    -fx-text-fill: #63e5ff;
+}
+
+.black-hole-redesign .top-info {
+    -fx-background-color: rgba(12, 25, 46, 0.76);
+    -fx-text-fill: #93a9cb;
+    -fx-border-color: rgba(73, 137, 184, 0.22);
+    -fx-border-radius: 999px;
+    -fx-padding: 7px 10px;
+}
+
+.black-hole-redesign .icon-button {
+    -fx-background-color: rgba(10, 22, 42, 0.86);
+    -fx-border-color: rgba(79, 143, 188, 0.32);
+    -fx-text-fill: #cde9ff;
+}
+
+.black-hole-redesign .icon-button:hover {
+    -fx-background-color: rgba(28, 68, 91, 0.78);
+    -fx-border-color: rgba(75, 221, 247, 0.58);
+}
+
+/* Sidebar */
+.black-hole-redesign .main-navigation {
+    -fx-background-color: linear-gradient(to bottom, rgba(2, 6, 14, 0.985), rgba(3, 7, 17, 0.975));
+    -fx-border-color: transparent rgba(57, 177, 213, 0.15) transparent transparent;
+    -fx-border-width: 0 1 0 0;
+}
+
+.black-hole-redesign .nav-section-label {
+    -fx-text-fill: #536888;
+    -fx-font-size: 9px;
+    -fx-font-weight: bold;
+    -fx-padding: 2px 10px 10px 10px;
+}
+
+.black-hole-redesign .nav-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #8191af;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-padding: 14px 16px;
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+    -fx-border-width: 1px;
+    -fx-border-color: transparent;
+}
+
+.black-hole-redesign .nav-button:hover {
+    -fx-background-color: rgba(15, 37, 59, 0.70);
+    -fx-border-color: rgba(62, 198, 232, 0.18);
+    -fx-text-fill: #d8f5ff;
+}
+
+.black-hole-redesign .nav-button-active {
+    -fx-background-color:
+        linear-gradient(to right, rgba(255, 143, 54, 0.17), rgba(128, 70, 213, 0.16)),
+        rgba(9, 23, 40, 0.90);
+    -fx-border-color: rgba(255, 164, 78, 0.52) rgba(102, 102, 218, 0.42) rgba(102, 102, 218, 0.42) rgba(255, 164, 78, 0.52);
+    -fx-text-fill: #ffffff;
+    -fx-effect: dropshadow(gaussian, rgba(245, 119, 32, 0.15), 15, 0.32, 0, 3);
+}
+
+.black-hole-redesign .nav-project-card {
+    -fx-background-color: linear-gradient(to bottom right, rgba(26, 19, 42, 0.82), rgba(8, 24, 39, 0.82));
+    -fx-background-radius: 13px;
+    -fx-border-color: rgba(255, 157, 66, 0.20);
+    -fx-border-radius: 13px;
+    -fx-padding: 12px 13px;
+}
+
+.black-hole-redesign .nav-project-kicker {
+    -fx-text-fill: #ffab5b;
+    -fx-font-size: 8px;
+    -fx-font-weight: bold;
+}
+
+.black-hole-redesign .nav-project-title {
+    -fx-text-fill: #f5f7ff;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.black-hole-redesign .nav-project-copy {
+    -fx-text-fill: #7182a2;
+    -fx-font-size: 9px;
+    -fx-line-spacing: 2px;
+}
+
+.black-hole-redesign .nav-source-button {
+    -fx-background-color: rgba(8, 19, 34, 0.86);
+    -fx-border-color: rgba(67, 156, 196, 0.22);
+}
+
+.black-hole-redesign .nav-source-button:hover {
+    -fx-text-fill: #63e4ff;
+    -fx-border-color: rgba(71, 211, 239, 0.48);
+}
+
+/* Superfici, tipografia e controlli condivisi */
+.black-hole-redesign .page-root,
+.black-hole-redesign .page-host,
+.black-hole-redesign .page-content,
+.black-hole-redesign .page-scroll,
+.black-hole-redesign .page-scroll > .viewport,
+.black-hole-redesign .detail-scroll,
+.black-hole-redesign .detail-scroll > .viewport {
+    -fx-background-color: transparent;
+    -fx-background: transparent;
+}
+
+.black-hole-redesign .page-title {
+    -fx-text-fill: #f8fbff;
+    -fx-font-size: 28px;
+    -fx-font-weight: 800;
+    -fx-effect: dropshadow(gaussian, rgba(65, 196, 234, 0.10), 10, 0.2, 0, 0);
+}
+
+.black-hole-redesign .page-subtitle,
+.black-hole-redesign .section-caption,
+.black-hole-redesign .card-subtitle {
+    -fx-text-fill: #889bbb;
+}
+
+.black-hole-redesign .section-title,
+.black-hole-redesign .card-title {
+    -fx-text-fill: #f1f7ff;
+}
+
+.black-hole-redesign .card,
+.black-hole-redesign .metric-card,
+.black-hole-redesign .catalog-panel,
+.black-hole-redesign .dictionary-sidebar,
+.black-hole-redesign .field-explanation-panel,
+.black-hole-redesign .learning-card,
+.black-hole-redesign .concept-card,
+.black-hole-redesign .simple-panel,
+.black-hole-redesign .compare-control-bar,
+.black-hole-redesign .population-filter-card,
+.black-hole-redesign .sky-metric-card {
+    -fx-background-color:
+        linear-gradient(to bottom right, rgba(10, 21, 40, 0.92), rgba(6, 13, 28, 0.94));
+    -fx-background-radius: 16px;
+    -fx-border-color: rgba(70, 155, 198, 0.22);
+    -fx-border-radius: 16px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.36), 24, 0.16, 0, 8);
+}
+
+.black-hole-redesign .card:hover,
+.black-hole-redesign .home-action-card:hover {
+    -fx-border-color: rgba(67, 214, 244, 0.34);
+}
+
+.black-hole-redesign .primary-button {
+    -fx-background-color: linear-gradient(to right, #ff8b3e, #d85cad 58%, #855cf0);
+    -fx-text-fill: white;
+    -fx-background-radius: 11px;
+    -fx-border-radius: 11px;
+    -fx-padding: 11px 17px;
+    -fx-effect: dropshadow(gaussian, rgba(255, 117, 50, 0.25), 18, 0.30, 0, 5);
+}
+
+.black-hole-redesign .primary-button:hover {
+    -fx-effect: dropshadow(gaussian, rgba(255, 139, 57, 0.42), 24, 0.34, 0, 6);
+}
+
+.black-hole-redesign .secondary-button,
+.black-hole-redesign .ghost-button {
+    -fx-background-color: rgba(9, 24, 43, 0.86);
+    -fx-border-color: rgba(71, 166, 207, 0.32);
+    -fx-text-fill: #d8eaff;
+}
+
+.black-hole-redesign .secondary-button:hover,
+.black-hole-redesign .ghost-button:hover {
+    -fx-background-color: rgba(19, 52, 73, 0.88);
+    -fx-border-color: rgba(76, 218, 245, 0.58);
+}
+
+.black-hole-redesign .search-field,
+.black-hole-redesign .modern-text-field,
+.black-hole-redesign .choice-box-modern,
+.black-hole-redesign .text-field,
+.black-hole-redesign .combo-box-base {
+    -fx-background-color: rgba(7, 16, 31, 0.90);
+    -fx-text-fill: #eaf5ff;
+    -fx-prompt-text-fill: #667997;
+    -fx-background-radius: 10px;
+    -fx-border-color: rgba(66, 145, 187, 0.26);
+    -fx-border-radius: 10px;
+}
+
+.black-hole-redesign .search-field:focused,
+.black-hole-redesign .modern-text-field:focused,
+.black-hole-redesign .choice-box-modern:focused,
+.black-hole-redesign .text-field:focused,
+.black-hole-redesign .combo-box-base:focused {
+    -fx-border-color: rgba(72, 219, 248, 0.64);
+    -fx-effect: dropshadow(gaussian, rgba(45, 198, 230, 0.14), 12, 0.26, 0, 0);
+}
+
+.black-hole-redesign .choice-box .label,
+.black-hole-redesign .combo-box .list-cell {
+    -fx-text-fill: #dce9fa;
+}
+
+.black-hole-redesign .list-view,
+.black-hole-redesign .table-view,
+.black-hole-redesign .tree-view,
+.black-hole-redesign .split-pane {
+    -fx-background-color: rgba(3, 10, 22, 0.55);
+    -fx-border-color: rgba(57, 133, 178, 0.16);
+}
+
+.black-hole-redesign .list-cell,
+.black-hole-redesign .table-row-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #b9c9df;
+}
+
+.black-hole-redesign .list-cell:hover,
+.black-hole-redesign .table-row-cell:hover {
+    -fx-background-color: rgba(21, 58, 82, 0.58);
+}
+
+.black-hole-redesign .list-cell:selected,
+.black-hole-redesign .table-row-cell:selected {
+    -fx-background-color: linear-gradient(to right, rgba(29, 172, 209, 0.31), rgba(115, 71, 205, 0.28));
+    -fx-border-color: rgba(75, 219, 244, 0.38);
+}
+
+.black-hole-redesign .tab-pane .tab-header-area .tab-header-background {
+    -fx-background-color: rgba(4, 10, 22, 0.42);
+}
+
+.black-hole-redesign .main-tabs .tab {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+
+.black-hole-redesign .main-tabs .tab .tab-label {
+    -fx-text-fill: #8192b1;
+}
+
+.black-hole-redesign .main-tabs .tab:selected {
+    -fx-background-color: linear-gradient(to bottom, rgba(255, 139, 57, 0.13), rgba(113, 65, 195, 0.17));
+    -fx-border-color: transparent transparent #ff9c4d transparent;
+    -fx-border-width: 0 0 2 0;
+}
+
+.black-hole-redesign .main-tabs .tab:selected .tab-label {
+    -fx-text-fill: #ffbe77;
+}
+
+.black-hole-redesign .chart {
+    -fx-background-color: rgba(2, 9, 21, 0.56);
+    -fx-background-radius: 12px;
+}
+
+.black-hole-redesign .chart-plot-background {
+    -fx-background-color: rgba(3, 12, 27, 0.62);
+}
+
+.black-hole-redesign .chart-title,
+.black-hole-redesign .axis-label {
+    -fx-text-fill: #e9f4ff;
+}
+
+.black-hole-redesign .axis {
+    -fx-tick-label-fill: #8199ba;
+}
+
+.black-hole-redesign .chart-horizontal-grid-lines,
+.black-hole-redesign .chart-vertical-grid-lines {
+    -fx-stroke: rgba(58, 112, 154, 0.23);
+}
+
+.black-hole-redesign .scroll-bar:vertical,
+.black-hole-redesign .scroll-bar:horizontal {
+    -fx-background-color: transparent;
+}
+
+.black-hole-redesign .scroll-bar .thumb {
+    -fx-background-color: rgba(62, 111, 156, 0.64);
+    -fx-background-radius: 999px;
+}
+
+.black-hole-redesign .scroll-bar .thumb:hover {
+    -fx-background-color: rgba(61, 201, 232, 0.70);
+}
+
+/* Home */
+.black-hole-redesign .home-welcome-title {
+    -fx-text-fill: #f7fbff;
+    -fx-font-size: 22px;
+    -fx-font-weight: 800;
+}
+
+.black-hole-redesign .home-welcome-subtitle {
+    -fx-text-fill: #7f92b2;
+    -fx-font-size: 12px;
+}
+
+.black-hole-redesign .home-stat-card {
+    -fx-background-color: linear-gradient(to bottom right, rgba(9, 23, 43, 0.93), rgba(6, 14, 29, 0.95));
+    -fx-background-radius: 14px;
+    -fx-border-color: rgba(71, 160, 203, 0.22);
+    -fx-border-radius: 14px;
+    -fx-padding: 16px 18px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.30), 18, 0.15, 0, 6);
+}
+
+.black-hole-redesign .catalog-stat {
+    -fx-border-color: rgba(70, 220, 246, 0.36);
+}
+
+.black-hole-redesign .spectral-stat {
+    -fx-border-color: rgba(156, 105, 244, 0.36);
+}
+
+.black-hole-redesign .coverage-stat {
+    -fx-border-color: rgba(255, 158, 73, 0.32);
+}
+
+.black-hole-redesign .cache-stat {
+    -fx-border-color: rgba(69, 205, 160, 0.30);
+}
+
+.black-hole-redesign .home-stat-label {
+    -fx-text-fill: #6f86a8;
+    -fx-font-size: 8px;
+    -fx-font-weight: bold;
+}
+
+.black-hole-redesign .home-stat-value {
+    -fx-text-fill: #f7fbff;
+    -fx-font-size: 22px;
+    -fx-font-weight: 800;
+}
+
+.black-hole-redesign .home-stat-detail {
+    -fx-text-fill: #7386a5;
+    -fx-font-size: 9px;
+}
+
+.black-hole-redesign .event-horizon-hero {
+    -fx-background-color:
+        radial-gradient(center 78% 42%, radius 52%, rgba(123, 66, 207, 0.20), transparent),
+        radial-gradient(center 70% 58%, radius 46%, rgba(255, 129, 45, 0.12), transparent),
+        linear-gradient(to bottom right, rgba(8, 19, 37, 0.97), rgba(7, 9, 22, 0.96));
+    -fx-background-radius: 21px;
+    -fx-border-color: rgba(255, 155, 70, 0.32) rgba(96, 104, 213, 0.22) rgba(76, 189, 221, 0.20) rgba(255, 155, 70, 0.32);
+    -fx-border-radius: 21px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.48), 30, 0.18, 0, 10);
+}
+
+.black-hole-redesign .home-kicker {
+    -fx-text-fill: #ffad5d;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.black-hole-redesign .home-title {
+    -fx-text-fill: #ffffff;
+    -fx-font-size: 42px;
+    -fx-font-weight: 800;
+    -fx-line-spacing: 0px;
+}
+
+.black-hole-redesign .home-subtitle {
+    -fx-text-fill: #9aabc4;
+    -fx-font-size: 14px;
+    -fx-line-spacing: 3px;
+}
+
+.black-hole-redesign .home-micro-pill {
+    -fx-background-color: rgba(8, 27, 43, 0.82);
+    -fx-background-radius: 999px;
+    -fx-border-color: rgba(75, 197, 227, 0.25);
+    -fx-border-radius: 999px;
+    -fx-text-fill: #8fcde0;
+    -fx-font-size: 8px;
+    -fx-font-weight: bold;
+    -fx-padding: 6px 9px;
+}
+
+.black-hole-redesign .home-action-card {
+    -fx-background-color: linear-gradient(to bottom right, rgba(9, 22, 41, 0.94), rgba(6, 13, 29, 0.95));
+    -fx-background-radius: 15px;
+    -fx-border-color: rgba(67, 155, 196, 0.22);
+    -fx-border-radius: 15px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.32), 19, 0.14, 0, 6);
+}
+
+.black-hole-redesign .home-action-icon {
+    -fx-text-fill: #5be2ff;
+    -fx-font-size: 20px;
+    -fx-effect: dropshadow(gaussian, rgba(54, 213, 246, 0.32), 12, 0.28, 0, 0);
+}
+
+.black-hole-redesign .home-action-title {
+    -fx-text-fill: #f0f7ff;
+}
+
+.black-hole-redesign .home-link-button {
+    -fx-text-fill: #ffb467;
+}
+
+/* Explorer, popolazione, cielo e spettroscopia */
+.black-hole-redesign .catalog-panel,
+.black-hole-redesign .workspace-host {
+    -fx-background-color: rgba(4, 11, 24, 0.77);
+    -fx-border-color: rgba(61, 150, 194, 0.20);
+}
+
+.black-hole-redesign .metric-card-compact,
+.black-hole-redesign .spectroscopy-metric {
+    -fx-background-color: linear-gradient(to bottom right, rgba(11, 31, 53, 0.96), rgba(7, 17, 34, 0.96));
+    -fx-border-color: rgba(64, 193, 226, 0.22);
+}
+
+.black-hole-redesign .spectroscopy-controls,
+.black-hole-redesign .data-toolbar {
+    -fx-background-color: rgba(5, 15, 30, 0.82);
+    -fx-border-color: rgba(68, 157, 199, 0.22);
+}
+
+.black-hole-redesign .spectral-model-chart .chart-series-line {
+    -fx-stroke: #ff9f4b;
+    -fx-stroke-width: 3px;
+    -fx-effect: dropshadow(gaussian, rgba(255, 139, 54, 0.42), 11, 0.28, 0, 0);
+}
+
+.black-hole-redesign .spectral-flux-chart .default-color0.chart-bar {
+    -fx-background-color: linear-gradient(to top, #26c8ea, #786ff1 66%, #c176f0);
+}
+
+.black-hole-redesign .lightcurve-chart .default-color0.chart-series-line,
+.black-hole-redesign .population-chart .default-color0.chart-series-line {
+    -fx-stroke: #49daf6;
+}
+
+.black-hole-redesign .sky-toggle:selected,
+.black-hole-redesign .modern-check:selected {
+    -fx-text-fill: #9ceeff;
+}
+
+.black-hole-redesign .population-filter-section,
+.black-hole-redesign .spectroscopy-reading-intro,
+.black-hole-redesign .spectroscopy-note {
+    -fx-background-color: rgba(12, 34, 54, 0.70);
+    -fx-border-color: rgba(66, 194, 226, 0.23);
+}
+
+.black-hole-redesign .in-place-fullscreen,
+.black-hole-redesign .fullscreen-layout {
+    -fx-background-color:
+        radial-gradient(center 84% 14%, radius 72%, rgba(104, 57, 194, 0.16), transparent),
+        linear-gradient(to bottom right, #02050d, #061022 58%, #030711);
+}
+
+.black-hole-redesign .fullscreen-toolbar {
+    -fx-background-color: rgba(2, 8, 18, 0.96);
+    -fx-border-color: transparent transparent rgba(66, 190, 224, 0.20) transparent;
+}
