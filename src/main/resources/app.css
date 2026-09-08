@@ -2142,8 +2142,23 @@
 }
 
 .spectral-flux-chart .default-color0.chart-bar {
-    -fx-bar-fill: linear-gradient(to top, #3bbada, #9b75ef);
+    -fx-bar-fill: #797ce8;
+    -fx-background-color: linear-gradient(to top, #3bbada, #9b75ef);
 }
 
-.app-root {
-    -fx-background-color:
+.spectroscopy-control-help {
+    -fx-text-fill: #7f91b1;
+    -fx-font-size: 10px;
+    -fx-line-spacing: 1px;
+}
+
+.spectroscopy-reading-intro {
+    -fx-text-fill: #c8d5ec;
+    -fx-font-size: 12px;
+    -fx-line-spacing: 2px;
+    -fx-background-color: rgba(34, 52, 82, 0.58);
+    -fx-background-radius: 11px;
+    -fx-border-color: rgba(88, 210, 237, 0.18);
+    -fx-border-radius: 11px;
+    -fx-padding: 10 12;
+}
