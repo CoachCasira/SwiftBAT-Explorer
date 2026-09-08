@@ -14,7 +14,7 @@ public final class SwiftBatExplorerApp extends Application {
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/app.css").toExternalForm());
 
-        stage.setTitle("SwiftBAT Explorer 1.2.0 — Event Horizon");
+        stage.setTitle("SwiftBAT Explorer 1.3.0 — Spectral Preview");
         var iconStream = SwiftBatExplorerApp.class.getResourceAsStream("/app-icon.png");
         if (iconStream != null) {
             stage.getIcons().add(new Image(iconStream));
