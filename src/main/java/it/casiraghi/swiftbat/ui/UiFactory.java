@@ -37,7 +37,8 @@ public final class UiFactory {
     }
 
     public static Button button(String text, String styleClass) {
-        Button button = new Button(text);
+        String displayText = "Schermo intero".equals(text) ? "Schermo intero ⛶" : text;
+        Button button = new Button(displayText);
         button.getStyleClass().add(styleClass);
         button.setCursor(javafx.scene.Cursor.HAND);
         autoTooltip(button);
