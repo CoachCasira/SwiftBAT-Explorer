@@ -747,8 +747,13 @@ public final class ExplorerPage extends BorderPane {
         VBox side = new VBox(12);
         side.setPrefWidth(380);
         side.setMinWidth(320);
-        side.getStyleClass().add("field-explanation-panel");
-        side.setPadding(new Insets(18));
+        side.setPadding(new Insets(16));
+        side.setStyle(
+                "-fx-background-color: transparent;"
+                        + "-fx-border-color: transparent;"
+                        + "-fx-background-radius: 0;"
+                        + "-fx-border-radius: 0;"
+        );
         showMetadataIntro(side);
         table.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, item) -> {
             if (item != null) {
@@ -989,6 +994,7 @@ public final class ExplorerPage extends BorderPane {
                         "explanation-text"),
                 miniExplanation("HDU", "Un FITS può contenere più sezioni. PRIMARY è l'intestazione generale; RATE è la tabella della curva di luce."),
                 miniExplanation("Keyword", "È il nome breve del parametro, per esempio OBS_ID, TRIGTIME o TIMEDEL."),
+                miniExplanation("Valore", "È il contenuto associato alla keyword nella riga selezionata: può essere un numero, una data, un identificativo, una stringa o un valore logico."),
                 miniExplanation("Commento originale", "È la descrizione scritta dal software che ha prodotto il FITS."));
     }
 

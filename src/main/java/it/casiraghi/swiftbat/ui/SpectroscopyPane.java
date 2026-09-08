@@ -330,7 +330,9 @@ public final class SpectroscopyPane extends BorderPane {
         explanation.setMaxWidth(Double.MAX_VALUE);
 
         NumberAxis xAxis = new NumberAxis(15, 150, 15);
-        NumberAxis yAxis = new NumberAxis();
+        double[] yBounds = spectralYAxisBounds(fit);
+        NumberAxis yAxis = new NumberAxis(yBounds[0], yBounds[1], yBounds[2]);
+        yAxis.setForceZeroInRange(false);
         xAxis.setLabel("Energia (keV)");
         yAxis.setLabel("log₁₀ N(E) [ph cm⁻² s⁻¹ keV⁻¹]");
         LineChart<Number, Number> chart = new LineChart<>(xAxis, yAxis);
@@ -340,8 +342,8 @@ public final class SpectroscopyPane extends BorderPane {
         chart.setLegendVisible(false);
         chart.setTitle(fit == null ? "Modello non disponibile" : "Curva del fit " + fit.model().code() + " · 15–150 keV");
         chart.setMinWidth(0);
-        chart.setMinHeight(showActions ? 300 : 520);
-        chart.setPrefHeight(showActions ? 340 : 680);
+        chart.setMinHeight(showActions ? 410 : 560);
+        chart.setPrefHeight(showActions ? 470 : 720);
         chart.setMaxWidth(Double.MAX_VALUE);
         chart.setMaxHeight(Double.MAX_VALUE);
         VBox.setVgrow(chart, Priority.ALWAYS);
@@ -739,6 +741,32 @@ public final class SpectroscopyPane extends BorderPane {
         return intervalChoice.getValue() == Interval.PEAK_ONE_SECOND
                 ? SpectralCatalogService.PEAK_ONE_SECOND_URL
                 : SpectralCatalogService.T100_URL;
+    }
+
+    private double[] spectralYAxisBounds(Fit fit) {
+        double min = Double.POSITIVE_INFINITY;
+        double max = Double.NEGATIVE_INFINITY;
+        if (fit != null && fit.normalization() != null && fit.alpha() != null) {
+            for (double energy = 15; energy <= 150.001; energy += 2.5) {
+                double photons = photonModel(fit, energy);
+                if (Double.isFinite(photons) && photons > 0) {
+                    double value = Math.log10(photons);
+                    min = Math.min(min, value);
+                    max = Math.max(max, value);
+                }
+            }
+        }
+        if (!Double.isFinite(min) || !Double.isFinite(max)) {
+            return new double[]{-3.5, 0.5, 0.5};
+        }
+        double lower = Math.floor((min - 0.25) * 2.0) / 2.0;
+        double upper = Math.max(0.5, Math.ceil((max + 0.15) * 2.0) / 2.0);
+        if (upper - lower < 1.5) {
+            lower -= 0.5;
+            upper += 0.5;
+        }
+        double tick = upper - lower > 5.0 ? 1.0 : 0.5;
+        return new double[]{lower, upper, tick};
     }
 
     private double photonModel(Fit fit, double energyKeV) {
