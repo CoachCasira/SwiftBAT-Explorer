@@ -92,9 +92,9 @@ public final class HomePage extends ScrollPane {
         explore.setOnAction(event -> openExplorer.run());
         Button sky = UiFactory.button("Apri la mappa celeste", "secondary-button");
         sky.setOnAction(event -> openSky.run());
-        Button info = UiFactory.button("Come si usa", "ghost-button");
-        info.setOnAction(event -> openInfo.run());
-        actions.getChildren().addAll(explore, sky, info);
+        Button guideButton = UiFactory.button("Come si usa", "ghost-button");
+        guideButton.setOnAction(event -> openInfo.run());
+        actions.getChildren().addAll(explore, sky, guideButton);
 
         HBox trust = new HBox(12,
                 microPill("CURVE DAT"),
