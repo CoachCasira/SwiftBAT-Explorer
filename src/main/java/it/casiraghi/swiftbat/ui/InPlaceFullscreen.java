@@ -1,5 +1,6 @@
 package it.casiraghi.swiftbat.ui;
 
+import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
