@@ -252,16 +252,11 @@ public final class SpectroscopyPane extends BorderPane {
                 buildModelChart(fit, true),
                 buildFluxChart(fluxes, model, true));
 
-        GridPane lower = responsiveGrid(1180, 3,
-                buildParameterCard(result, fit, model),
-                buildFluxTable(fluxes),
-                buildAssistant(result, fit, model, fluxes));
-
-        Label scientificNote = UiFactory.wrappedLabel(
+Label scientificNote = UiFactory.wrappedLabel(
                 "I flussi sono quelli pubblicati dal catalogo Swift/BAT in erg cm⁻² s⁻¹, con limiti al 90%. "
                         + "La curva a sinistra ricostruisce il modello fotonico del fit; non è ricavata sommando i quattro rate della curva di luce.",
                 "spectroscopy-note");
-        content.getChildren().addAll(metrics, readingIntro, charts, lower, scientificNote);
+        content.getChildren().addAll(metrics, readingIntro, charts, scientificNote);
         return content;
     }
 
@@ -507,7 +502,7 @@ public final class SpectroscopyPane extends BorderPane {
                 new java.awt.Color[]{color},
                 "Banda energetica",
                 "Modello",
-                "Flusso [10⁻¹² erg cm⁻² s⁻¹]");
+                "Flusso energetico [10⁻¹² erg cm⁻² s⁻¹]");
         ScientificBar3DPane view = new ScientificBar3DPane(
                 "Flusso energetico per banda · " + model.code(),
                 "Le barre sono le stesse della vista 2D. X = banda, altezza = flusso energetico; "
