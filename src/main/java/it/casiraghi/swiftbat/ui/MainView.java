@@ -137,7 +137,6 @@ public final class MainView {
 
         Button home = navButton("⌂", "Home", "home");
         Button explorer = navButton("✦", "Esplora", "explorer");
-        Button spectroscopy = navButton("λ", "Spettroscopia", "spectroscopy");
         Button sky = navButton("◎", "Mappa celeste", "sky");
         Button population = navButton("≋", "Analisi di popolazione", "population");
         Button compare = navButton("⇄", "Confronta", "compare");
@@ -153,7 +152,7 @@ public final class MainView {
         source.setMaxWidth(Double.MAX_VALUE);
         source.setOnAction(event -> hostServices.showDocument(SwiftCatalogService.CATALOG_URL));
 
-        navigation.getChildren().addAll(brand, home, explorer, spectroscopy, sky, population, compare, about,
+        navigation.getChildren().addAll(brand, home, explorer, sky, population, compare, about,
                 spacer, separator, online, source);
         return navigation;
     }
@@ -207,14 +206,7 @@ public final class MainView {
 
     private void navigate(String page) {
         Node node = switch (page) {
-            case "explorer" -> {
-                explorerPage.showTab("Curva 2D");
-                yield explorerPage;
-            }
-            case "spectroscopy" -> {
-                explorerPage.showTab("Spettroscopia");
-                yield explorerPage;
-            }
+            case "explorer" -> explorerPage;
             case "compare" -> comparePage;
             case "population" -> populationPage;
             case "sky" -> skyMapPage;
@@ -330,9 +322,7 @@ public final class MainView {
         if (entry == null) {
             return;
         }
-        boolean spectroscopyOpen = activeNavigationButton != null
-                && "spectroscopy".equals(activeNavigationButton.getUserData());
-        navigate(spectroscopyOpen ? "spectroscopy" : "explorer");
+        navigate("explorer");
         explorerPage.setSelectedEntry(entry);
 
         if (!forceRefresh) {
