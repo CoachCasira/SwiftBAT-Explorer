@@ -2069,6 +2069,12 @@
     -fx-padding: 10px;
 }
 
+.excel-export-button:hover {
+    -fx-background-color: rgba(45, 151, 103, 0.18);
+    -fx-border-color: rgba(74, 190, 132, 0.42);
+    -fx-text-fill: #bcefd2;
+}
+
 /* ---------- Spectroscopy ---------- */
 .spectroscopy-pane, .spectroscopy-content {
     -fx-background-color: transparent;
@@ -2151,7 +2157,7 @@
 }
 
 .spectral-flux-chart .default-color0.chart-bar {
-    -fx-bar-fill: #797ce8;
+    /* Conserva il colore interno standard di Modena e personalizza solo il riempimento visibile. */
     -fx-background-color: linear-gradient(to top, #3bbada, #9b75ef);
 }
 

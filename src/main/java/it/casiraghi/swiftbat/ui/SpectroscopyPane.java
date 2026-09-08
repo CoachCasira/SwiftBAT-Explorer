@@ -282,10 +282,12 @@ Label scientificNote = UiFactory.wrappedLabel(
                 region.setMaxWidth(Double.MAX_VALUE);
             }
         }
+        // Popola subito la griglia: se resta vuota fino al primo pulse JavaFX,
+        // lo ScrollPane può memorizzare un'altezza preferita troppo bassa e
+        // troncare la parte inferiore dell'ultimo grafico.
+        reflowResponsiveGrid(grid, 0, wideBreakpoint, wideColumns, nodes);
         grid.widthProperty().addListener((obs, oldWidth, newWidth) ->
                 reflowResponsiveGrid(grid, newWidth.doubleValue(), wideBreakpoint, wideColumns, nodes));
-        Platform.runLater(() ->
-                reflowResponsiveGrid(grid, grid.getWidth(), wideBreakpoint, wideColumns, nodes));
         return grid;
     }
 
@@ -316,6 +318,7 @@ Label scientificNote = UiFactory.wrappedLabel(
         for (int index = 0; index < nodes.length; index++) {
             grid.add(nodes[index], index % columns, index / columns);
         }
+        grid.requestLayout();
     }
 
     private Node buildModelChart(Fit fit, boolean showActions) {
@@ -384,6 +387,7 @@ Label scientificNote = UiFactory.wrappedLabel(
         card.getStyleClass().addAll("card", "spectroscopy-chart-card");
         card.setPadding(new Insets(12));
         card.setMinWidth(0);
+        card.setMinHeight(Region.USE_PREF_SIZE);
         card.setMaxWidth(Double.MAX_VALUE);
 
         Label explanation = UiFactory.wrappedLabel(
@@ -394,6 +398,7 @@ Label scientificNote = UiFactory.wrappedLabel(
         explanation.setMaxWidth(Double.MAX_VALUE);
 
         CategoryAxis xAxis = new CategoryAxis();
+        xAxis.setLabel("Banda energetica (keV)");
         NumberAxis yAxis = new NumberAxis();
         yAxis.setLabel("Flusso energetico (erg cm⁻² s⁻¹)");
         yAxis.setTickLabelFormatter(scientificConverter());
@@ -405,8 +410,10 @@ Label scientificNote = UiFactory.wrappedLabel(
         chart.setCategoryGap(18);
         chart.setBarGap(3);
         chart.setMinWidth(0);
-        chart.setMinHeight(showActions ? 300 : 520);
-        chart.setPrefHeight(showActions ? 340 : 680);
+        // Lo spazio aggiuntivo preserva tick, categorie e titolo dell'asse X
+        // anche quando la scheda è dentro i due ScrollPane dell'Explorer.
+        chart.setMinHeight(showActions ? 410 : 560);
+        chart.setPrefHeight(showActions ? 470 : 720);
         chart.setMaxWidth(Double.MAX_VALUE);
         chart.setMaxHeight(Double.MAX_VALUE);
 

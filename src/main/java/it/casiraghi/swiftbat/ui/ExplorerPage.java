@@ -661,9 +661,11 @@ public final class ExplorerPage extends BorderPane {
         UiFactory.autoTooltip(fieldChoice);
 
         Button exportAscii = UiFactory.button("ASCII → Excel", "ghost-button");
+        exportAscii.getStyleClass().add("excel-export-button");
         exportAscii.setDisable(data.asciiData().isEmpty());
         exportAscii.setOnAction(event -> exportExcel(data, true));
         Button exportFits = UiFactory.button("FITS + metadati → Excel", "ghost-button");
+        exportFits.getStyleClass().add("excel-export-button");
         exportFits.setDisable(data.fitsData().isEmpty());
         exportFits.setOnAction(event -> exportExcel(data, false));
         HBox sourceRow = new HBox(10, sourceChoice, filter);
@@ -672,10 +674,11 @@ public final class ExplorerPage extends BorderPane {
 
         HBox explainControl = new HBox(8,
                 UiFactory.label("Spiega il campo:", "toolbar-label"), fieldChoice);
-        explainControl.setAlignment(Pos.CENTER_LEFT);
-        FlowPane actionRow = new FlowPane(10, 8);
+        explainControl.setAlignment(Pos.CENTER_RIGHT);
+        Region actionSpacer = UiFactory.spacer();
+        HBox actionRow = new HBox(10, exportAscii, exportFits, actionSpacer, explainControl);
         actionRow.setAlignment(Pos.CENTER_LEFT);
-        actionRow.getChildren().addAll(exportAscii, exportFits, explainControl);
+        HBox.setHgrow(actionSpacer, Priority.ALWAYS);
 
         VBox toolbar = new VBox(8, sourceRow, actionRow);
         toolbar.getStyleClass().add("data-toolbar");

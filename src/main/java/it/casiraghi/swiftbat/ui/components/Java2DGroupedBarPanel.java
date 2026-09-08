@@ -268,7 +268,14 @@ public final class Java2DGroupedBarPanel extends JPanel {
                 (float) ((origin.getX() + xEnd.getX()) / 2.0 - g.getFontMetrics().stringWidth(xLabel) / 2.0),
                 (float) Math.max(origin.getY(), xEnd.getY()) + 43);
         String yLabel = dataset.valueLabel();
-g.drawString(yLabel, (float) yEnd.getX() - 40, (float) yEnd.getY() - 12);
+        Graphics2D verticalAxis = (Graphics2D) g.create();
+        verticalAxis.rotate(-Math.PI / 2);
+        double yCenter = (origin.getY() + yEnd.getY()) / 2.0;
+        double labelX = Math.max(24, yEnd.getX() - 64);
+        verticalAxis.drawString(yLabel,
+                (float) (-yCenter - verticalAxis.getFontMetrics().stringWidth(yLabel) / 2.0),
+                (float) labelX);
+        verticalAxis.dispose();
         g.setColor(new Color(198, 174, 250));
         g.drawString(dataset.depthAxisLabel(), (float) zEnd.getX() - 20, (float) zEnd.getY() - 10);
 
