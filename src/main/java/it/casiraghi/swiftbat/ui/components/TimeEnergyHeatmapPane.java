@@ -33,6 +33,8 @@ public final class TimeEnergyHeatmapPane extends Region {
     private double plotHeight;
     private double minimumTime;
     private double maximumTime;
+    private int hoveredRowIndex = -1;
+    private int hoveredBandIndex = -1;
 
     public TimeEnergyHeatmapPane() {
         hoverCard.setManaged(false);
@@ -55,16 +57,22 @@ public final class TimeEnergyHeatmapPane extends Region {
         widthProperty().addListener(ignored -> draw());
         heightProperty().addListener(ignored -> draw());
         setOnMouseMoved(event -> updateHover(event.getX(), event.getY()));
-        setOnMouseExited(event -> hoverCard.setVisible(false));
+        setOnMouseExited(event -> clearHover());
     }
 
     public void setData(TabularData data) {
         this.data = data == null ? TabularData.empty() : data;
+        hoveredRowIndex = -1;
+        hoveredBandIndex = -1;
+        hoverCard.setVisible(false);
         draw();
     }
 
     public void setHalfWindowSeconds(double seconds) {
         halfWindowSeconds = seconds > 0 ? seconds : Double.POSITIVE_INFINITY;
+        hoveredRowIndex = -1;
+        hoveredBandIndex = -1;
+        hoverCard.setVisible(false);
         draw();
     }
 
@@ -95,6 +103,8 @@ public final class TimeEnergyHeatmapPane extends Region {
             graphics.setFont(Font.font("System", FontWeight.BOLD, 14));
             graphics.fillText("Mappa non disponibile: servono i quattro canali ASCII.", 24, 64);
             hoverCard.setVisible(false);
+            hoveredRowIndex = -1;
+            hoveredBandIndex = -1;
             return;
         }
 
@@ -122,6 +132,7 @@ public final class TimeEnergyHeatmapPane extends Region {
         }
 
         drawAxes(graphics, width, height, bandHeight);
+        drawHoverHighlight(graphics, bandHeight);
     }
 
     private void drawAxes(GraphicsContext graphics, double width, double height, double bandHeight) {
@@ -167,6 +178,35 @@ public final class TimeEnergyHeatmapPane extends Region {
         drawLegendItem(graphics, plotLeft, legendY, Color.web("#3b82f6"), "Fluttuazione negativa");
         drawLegendItem(graphics, plotLeft + legendColumnWidth, legendY, Color.web("#101a2b"), "Rate circa zero");
         drawLegendItem(graphics, plotLeft + 2 * legendColumnWidth, legendY, Color.web("#ff9f43"), "Rate positivo");
+    }
+
+    private void drawHoverHighlight(GraphicsContext graphics, double bandHeight) {
+        if (hoveredRowIndex < 0 || hoveredRowIndex >= visibleRows.size()
+                || hoveredBandIndex < 0 || hoveredBandIndex >= BANDS.size()) {
+            return;
+        }
+
+        Row row = visibleRows.get(hoveredRowIndex);
+        double previous = hoveredRowIndex == 0 ? minimumTime
+                : (visibleRows.get(hoveredRowIndex - 1).time() + row.time()) / 2.0;
+        double next = hoveredRowIndex == visibleRows.size() - 1 ? maximumTime
+                : (row.time() + visibleRows.get(hoveredRowIndex + 1).time()) / 2.0;
+        double x1 = xFor(previous);
+        double x2 = Math.max(x1 + 1, xFor(next));
+        double y = plotTop + hoveredBandIndex * bandHeight + 1;
+        double width = Math.max(1, x2 - x1 + 0.5);
+        double height = Math.max(1, bandHeight - 2);
+
+        graphics.setFill(Color.color(1.0, 0.84, 0.62, 0.10));
+        graphics.fillRect(x1, y, width, height);
+
+        graphics.setStroke(Color.color(1.0, 0.64, 0.28, 0.65));
+        graphics.setLineWidth(4.0);
+        graphics.strokeRect(x1 + 1.5, y + 1.5, Math.max(1, width - 3), Math.max(1, height - 3));
+
+        graphics.setStroke(Color.web("#fff2dc"));
+        graphics.setLineWidth(1.6);
+        graphics.strokeRect(x1 + 1.5, y + 1.5, Math.max(1, width - 3), Math.max(1, height - 3));
     }
 
     private void drawLegendItem(GraphicsContext graphics, double x, double y, Color color, String text) {
@@ -223,15 +263,26 @@ public final class TimeEnergyHeatmapPane extends Region {
     private void updateHover(double x, double y) {
         if (visibleRows.isEmpty() || x < plotLeft || x > plotLeft + plotWidth
                 || y < plotTop || y > plotTop + plotHeight) {
-            hoverCard.setVisible(false);
+            clearHover();
             return;
         }
 
         double time = minimumTime + (x - plotLeft) / plotWidth * (maximumTime - minimumTime);
-        Row nearest = visibleRows.stream().min(Comparator.comparingDouble(row -> Math.abs(row.time() - time)))
-                .orElse(visibleRows.get(0));
+        int rowIndex = nearestRowIndex(time);
+        if (rowIndex < 0) {
+            clearHover();
+            return;
+        }
         int bandIndex = Math.min(BANDS.size() - 1,
                 Math.max(0, (int) ((y - plotTop) / (plotHeight / BANDS.size()))));
+
+        if (rowIndex != hoveredRowIndex || bandIndex != hoveredBandIndex) {
+            hoveredRowIndex = rowIndex;
+            hoveredBandIndex = bandIndex;
+            draw();
+        }
+
+        Row nearest = visibleRows.get(rowIndex);
         Band band = BANDS.get(bandIndex);
         hoverCard.setText(String.format(Locale.ITALIAN,
                 "Banda: %s%nCentro bin: %.3f s%nRate: %.5g count/s%nLarghezza banda: %.0f keV",
@@ -248,6 +299,30 @@ public final class TimeEnergyHeatmapPane extends Region {
         hoverCard.relocate(Math.max(8, targetX), Math.max(8, targetY));
         hoverCard.toFront();
         hoverCard.setVisible(true);
+    }
+
+    private int nearestRowIndex(double time) {
+        if (visibleRows.isEmpty()) return -1;
+        int bestIndex = 0;
+        double bestDistance = Math.abs(visibleRows.get(0).time() - time);
+        for (int index = 1; index < visibleRows.size(); index++) {
+            double distance = Math.abs(visibleRows.get(index).time() - time);
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                bestIndex = index;
+            }
+        }
+        return bestIndex;
+    }
+
+    private void clearHover() {
+        boolean hadHighlight = hoveredRowIndex >= 0 || hoveredBandIndex >= 0;
+        hoveredRowIndex = -1;
+        hoveredBandIndex = -1;
+        hoverCard.setVisible(false);
+        if (hadHighlight) {
+            draw();
+        }
     }
 
     private double xFor(double time) {
