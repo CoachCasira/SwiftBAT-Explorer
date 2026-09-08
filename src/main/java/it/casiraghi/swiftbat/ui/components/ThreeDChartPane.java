@@ -70,6 +70,14 @@ public final class ThreeDChartPane extends BorderPane {
         this(true);
     }
 
+    /**
+     * Variante destinata a un contenitore già a schermo intero: evita di mostrare
+     * un secondo comando di fullscreen dentro la stessa vista.
+     */
+    public static ThreeDChartPane fullscreenView() {
+        return new ThreeDChartPane(false);
+    }
+
     private ThreeDChartPane(boolean allowFullscreen) {
         this.allowFullscreen = allowFullscreen;
         getStyleClass().add("three-d-panel");
@@ -218,13 +226,15 @@ public final class ThreeDChartPane extends BorderPane {
 
         HBox titleRow = new HBox(10);
         titleRow.setAlignment(Pos.CENTER_LEFT);
-        Label title = UiFactory.label("Paesaggio tempo–energia", "overlay-title");
+        Label title = UiFactory.label("Curve di luce 3D per banda energetica", "overlay-title");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         titleRow.getChildren().addAll(title, spacer, contextLabel);
 
         Label text = UiFactory.wrappedLabel(
-                "Le quattro bande sono separate in profondità solo per renderle confrontabili. Trascina per cambiare prospettiva, usa la rotella per lo zoom e passa sui dati per leggere tempo e rate.",
+                "Asse X = tempo dal trigger; asse Y = rate; profondità = quattro bande energetiche. "
+                        + "Ogni linea è una curva di luce a bin di 1 secondo: la vista non rappresenta "
+                        + "una distanza nello spazio né uno spettro continuo. Trascina per ruotare e usa la rotella per lo zoom.",
                 "overlay-caption");
         text.setMaxWidth(Double.MAX_VALUE);
 
@@ -246,7 +256,7 @@ public final class ThreeDChartPane extends BorderPane {
         footer.setAlignment(Pos.CENTER_LEFT);
 
         Label note = UiFactory.label(
-                "Profondità = banda energetica, non posizione spaziale.",
+                "Profondità = banda energetica ASCII; non distanza spaziale.",
                 "subtle-text");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -260,7 +270,7 @@ public final class ThreeDChartPane extends BorderPane {
 
         footer.getChildren().addAll(zoomLabel, note, spacer, windowLabel, windowChoice, reset, export);
         if (allowFullscreen) {
-            Button fullscreen = UiFactory.button("Schermo intero  ⛶", "primary-button");
+            Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
             fullscreen.setOnAction(event -> openFullscreen());
             footer.getChildren().add(fullscreen);
         }
@@ -278,7 +288,7 @@ public final class ThreeDChartPane extends BorderPane {
         enlarged.setMinSize(0, 0);
         enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
-        InPlaceFullscreen.show(this, "Vista 3D · " + contextName, enlarged);
+        InPlaceFullscreen.show(this, "Confronto 3D dei rate · " + contextName, enlarged);
     }
 
     private void exportViewerPng() {
