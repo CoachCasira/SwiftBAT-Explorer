@@ -1,10 +1,12 @@
 package it.casiraghi.swiftbat.ui.components;
 
 import it.casiraghi.swiftbat.model.TabularData;
+import it.casiraghi.swiftbat.ui.InPlaceFullscreen;
 import it.casiraghi.swiftbat.ui.UiFactory;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.Tooltip;
+import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
@@ -18,13 +20,15 @@ import java.util.Locale;
 /** Heatmap descrittiva tempo-energia costruita dai quattro rate ASCII a 1 s. */
 public final class TimeEnergyHeatmapPane extends Region {
     private static final List<Band> BANDS = List.of(
-            new Band("100–350 keV", "RATE_100_350_KEV"),
-            new Band("50–100 keV", "RATE_50_100_KEV"),
-            new Band("25–50 keV", "RATE_25_50_KEV"),
-            new Band("15–25 keV", "RATE_15_25_KEV"));
+            new Band("100–350 keV", "RATE_100_350_KEV", 250),
+            new Band("50–100 keV", "RATE_50_100_KEV", 50),
+            new Band("25–50 keV", "RATE_25_50_KEV", 25),
+            new Band("15–25 keV", "RATE_15_25_KEV", 10));
 
     private final Canvas canvas = new Canvas();
-    private final Tooltip tooltip = UiFactory.quickTooltip("");
+    private final Label hoverCard = new Label();
+    private final Button fullscreenButton;
+    private final boolean allowFullscreen;
     private TabularData data = TabularData.empty();
     private double halfWindowSeconds = 60.0;
     private List<Row> visibleRows = List.of();
@@ -36,14 +40,38 @@ public final class TimeEnergyHeatmapPane extends Region {
     private double maximumTime;
 
     public TimeEnergyHeatmapPane() {
-        getChildren().add(canvas);
+        this(true);
+    }
+
+    private TimeEnergyHeatmapPane(boolean allowFullscreen) {
+        this.allowFullscreen = allowFullscreen;
+
+        hoverCard.setManaged(false);
+        hoverCard.setMouseTransparent(true);
+        hoverCard.setVisible(false);
+        hoverCard.setWrapText(false);
+        hoverCard.setStyle(
+                "-fx-background-color: rgba(8, 17, 34, 0.96);"
+                        + "-fx-background-radius: 9;"
+                        + "-fx-border-color: rgba(101, 153, 220, 0.55);"
+                        + "-fx-border-radius: 9;"
+                        + "-fx-text-fill: #e5efff;"
+                        + "-fx-font-size: 11px;"
+                        + "-fx-padding: 8 10;"
+        );
+
+        fullscreenButton = UiFactory.button("Schermo intero  ⛶", "primary-button");
+        fullscreenButton.setManaged(false);
+        fullscreenButton.setVisible(allowFullscreen);
+        fullscreenButton.setOnAction(event -> openFullscreen());
+
+        getChildren().addAll(canvas, hoverCard, fullscreenButton);
         setMinHeight(300);
         setPrefHeight(390);
-        Tooltip.install(this, tooltip);
         widthProperty().addListener(ignored -> draw());
         heightProperty().addListener(ignored -> draw());
-        setOnMouseMoved(event -> updateTooltip(event.getX(), event.getY()));
-        setOnMouseExited(event -> tooltip.hide());
+        setOnMouseMoved(event -> updateHover(event.getX(), event.getY()));
+        setOnMouseExited(event -> hoverCard.setVisible(false));
     }
 
     public void setData(TabularData data) {
@@ -58,9 +86,29 @@ public final class TimeEnergyHeatmapPane extends Region {
 
     @Override
     protected void layoutChildren() {
-        canvas.setWidth(Math.max(0, getWidth()));
-        canvas.setHeight(Math.max(0, getHeight()));
+        double width = Math.max(0, getWidth());
+        double height = Math.max(0, getHeight());
+        canvas.setWidth(width);
+        canvas.setHeight(height);
+
+        if (allowFullscreen) {
+            fullscreenButton.autosize();
+            fullscreenButton.relocate(
+                    Math.max(8, width - fullscreenButton.getWidth() - 12),
+                    6);
+        }
         draw();
+    }
+
+    private void openFullscreen() {
+        if (getScene() == null) return;
+        TimeEnergyHeatmapPane enlarged = new TimeEnergyHeatmapPane(false);
+        enlarged.setData(data);
+        enlarged.setHalfWindowSeconds(halfWindowSeconds);
+        enlarged.setMinSize(0, 0);
+        enlarged.setPrefHeight(760);
+        enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        InPlaceFullscreen.show(this, "Mappa tempo–energia dei rate", enlarged);
     }
 
     private void draw() {
@@ -73,13 +121,14 @@ public final class TimeEnergyHeatmapPane extends Region {
 
         visibleRows = readRows();
         plotLeft = 112;
-        plotTop = 34;
+        plotTop = 44;
         plotWidth = Math.max(20, width - plotLeft - 28);
         plotHeight = Math.max(40, height - plotTop - 92);
         if (visibleRows.isEmpty()) {
             graphics.setFill(Color.web("#94a3bd"));
             graphics.setFont(Font.font("System", FontWeight.BOLD, 14));
-            graphics.fillText("Mappa non disponibile: servono i quattro canali ASCII.", 24, 54);
+            graphics.fillText("Mappa non disponibile: servono i quattro canali ASCII.", 24, 64);
+            hoverCard.setVisible(false);
             return;
         }
 
@@ -205,19 +254,35 @@ public final class TimeEnergyHeatmapPane extends Region {
         return zero.interpolate(target, strength);
     }
 
-    private void updateTooltip(double x, double y) {
+    private void updateHover(double x, double y) {
         if (visibleRows.isEmpty() || x < plotLeft || x > plotLeft + plotWidth
                 || y < plotTop || y > plotTop + plotHeight) {
-            tooltip.setText("Passa sopra una cella per leggere tempo, banda e rate.");
+            hoverCard.setVisible(false);
             return;
         }
+
         double time = minimumTime + (x - plotLeft) / plotWidth * (maximumTime - minimumTime);
         Row nearest = visibleRows.stream().min(Comparator.comparingDouble(row -> Math.abs(row.time() - time)))
                 .orElse(visibleRows.get(0));
         int bandIndex = Math.min(BANDS.size() - 1,
                 Math.max(0, (int) ((y - plotTop) / (plotHeight / BANDS.size()))));
-        tooltip.setText(String.format(Locale.ITALIAN, "%s%nCentro bin: %.3f s%nRate: %.5g count/s",
-                BANDS.get(bandIndex).label(), nearest.time(), nearest.rates()[bandIndex]));
+        Band band = BANDS.get(bandIndex);
+        hoverCard.setText(String.format(Locale.ITALIAN,
+                "Banda: %s%nCentro bin: %.3f s%nRate: %.5g count/s%nLarghezza banda: %.0f keV",
+                band.label(), nearest.time(), nearest.rates()[bandIndex], band.widthKeV()));
+        hoverCard.applyCss();
+        hoverCard.autosize();
+
+        double targetX = x + 14;
+        double targetY = y + 14;
+        double cardWidth = hoverCard.getWidth();
+        double cardHeight = hoverCard.getHeight();
+        if (targetX + cardWidth > getWidth() - 8) targetX = x - cardWidth - 14;
+        if (targetY + cardHeight > getHeight() - 8) targetY = y - cardHeight - 14;
+        hoverCard.relocate(Math.max(8, targetX), Math.max(8, targetY));
+        hoverCard.toFront();
+        if (allowFullscreen) fullscreenButton.toFront();
+        hoverCard.setVisible(true);
     }
 
     private double xFor(double time) {
@@ -233,7 +298,7 @@ public final class TimeEnergyHeatmapPane extends Region {
         }
     }
 
-    private record Band(String label, String column) {
+    private record Band(String label, String column, double widthKeV) {
     }
 
     private record Row(double time, double[] rates) {
