@@ -19,6 +19,9 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /** Mostra un contenuto a schermo intero riutilizzando la finestra principale. */
 public final class InPlaceFullscreen {
     private static final String ACTIVE_SESSION = InPlaceFullscreen.class.getName() + ".activeSession";
@@ -49,6 +52,10 @@ public final class InPlaceFullscreen {
     }
 
     private static final class Session {
+        private static final String[] READING_COLORS = {
+                "#ffb45f", "#6edcff", "#c8a2ff", "#79e7b5", "#ffd36f", "#ff9ec7", "#8fb8ff", "#f7a96b"
+        };
+
         private final Scene scene;
         private final Stage stage;
         private final Node previousFocus;
@@ -126,87 +133,143 @@ public final class InPlaceFullscreen {
             body.setMinSize(0, 0);
             body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
             body.setAlignment(Pos.CENTER_LEFT);
+            body.setFillHeight(true);
             HBox.setHgrow(content, Priority.ALWAYS);
             return body;
         }
 
         private VBox spectroscopyReadingCard(String title, String... paragraphs) {
-            VBox card = new VBox(17);
-            card.getStyleClass().addAll("card", "spectroscopy-assistant");
-            card.setPadding(new Insets(22, 20, 22, 20));
-            card.setMinWidth(330);
-            card.setPrefWidth(380);
-            card.setMaxWidth(430);
-            card.setMaxHeight(Double.MAX_VALUE);
-            card.setFillWidth(true);
-            card.setStyle(
-                    "-fx-background-color: linear-gradient(to bottom right, rgba(18, 40, 60, 0.98), rgba(31, 23, 58, 0.98));"
-                            + "-fx-border-color: rgba(92, 212, 239, 0.42);"
-                            + "-fx-border-width: 1;"
-                            + "-fx-background-radius: 14;"
-                            + "-fx-border-radius: 14;"
-            );
+            VBox card = new VBox(10);
+            configureReadingCard(card);
 
             Label titleLabel = UiFactory.label(title, "card-title");
-            titleLabel.setStyle("-fx-text-fill: #f7fbff; -fx-font-size: 18px; -fx-font-weight: bold;");
+            styleReadingTitle(titleLabel);
             card.getChildren().add(titleLabel);
-            for (String paragraph : paragraphs) {
-                Label label = UiFactory.wrappedLabel(paragraph, "assistant-copy");
-                label.setMinHeight(Region.USE_PREF_SIZE);
-                label.setMaxWidth(Double.MAX_VALUE);
-                label.setStyle("-fx-text-fill: #e3edfc; -fx-font-size: 13.5px; -fx-line-spacing: 3px;");
-                card.getChildren().add(label);
+            for (int index = 0; index < paragraphs.length; index++) {
+                VBox section = readingSection(paragraphs[index], index);
+                VBox.setVgrow(section, Priority.ALWAYS);
+                card.getChildren().add(section);
             }
             return card;
         }
 
+        private void configureReadingCard(VBox card) {
+            card.getStyleClass().addAll("card", "spectroscopy-assistant");
+            card.setSpacing(10);
+            card.setPadding(new Insets(20, 18, 20, 18));
+            card.setMinWidth(340);
+            card.setPrefWidth(395);
+            card.setMaxWidth(440);
+            card.setMinHeight(0);
+            card.setMaxHeight(Double.MAX_VALUE);
+            card.setFillWidth(true);
+            card.setStyle(
+                    "-fx-background-color: linear-gradient(to bottom right, rgba(18, 40, 60, 0.99), rgba(31, 23, 58, 0.99));"
+                            + "-fx-border-color: rgba(92, 212, 239, 0.48);"
+                            + "-fx-border-width: 1;"
+                            + "-fx-background-radius: 14;"
+                            + "-fx-border-radius: 14;"
+            );
+        }
+
+        private VBox readingSection(String paragraph, int index) {
+            String heading = paragraph == null ? "" : paragraph;
+            String body = "";
+            int separator = heading.indexOf(" — ");
+            if (separator >= 0) {
+                body = heading.substring(separator + 3).trim();
+                heading = heading.substring(0, separator).trim();
+            }
+
+            Label sectionTitle = UiFactory.label(heading, "assistant-copy");
+            sectionTitle.setWrapText(true);
+            sectionTitle.setMinHeight(Region.USE_PREF_SIZE);
+            sectionTitle.setMaxWidth(Double.MAX_VALUE);
+            sectionTitle.setStyle("-fx-text-fill: " + READING_COLORS[index % READING_COLORS.length]
+                    + "; -fx-font-size: 13.5px; -fx-font-weight: bold;");
+
+            Label sectionBody = UiFactory.wrappedLabel(body, "assistant-copy");
+            sectionBody.setMinHeight(Region.USE_PREF_SIZE);
+            sectionBody.setMaxWidth(Double.MAX_VALUE);
+            sectionBody.setStyle("-fx-text-fill: #e7f0ff; -fx-font-size: 13.2px; -fx-line-spacing: 3px;");
+
+            VBox section = new VBox(5, sectionTitle, sectionBody);
+            section.setPadding(new Insets(9, 10, 9, 10));
+            section.setFillWidth(true);
+            section.setMinHeight(Region.USE_PREF_SIZE);
+            section.setMaxHeight(Double.MAX_VALUE);
+            section.setStyle(
+                    "-fx-background-color: rgba(255,255,255,0.028);"
+                            + "-fx-background-radius: 9;"
+                            + "-fx-border-color: rgba(255,255,255,0.035);"
+                            + "-fx-border-radius: 9;"
+            );
+            return section;
+        }
+
+        private void styleReadingTitle(Label label) {
+            label.setMinHeight(Region.USE_PREF_SIZE);
+            label.setMaxWidth(Double.MAX_VALUE);
+            label.setStyle("-fx-text-fill: #f8fbff; -fx-font-size: 18px; -fx-font-weight: bold;");
+        }
+
         private void polishSpectroscopyAssistant(Node node, String title) {
             if (node instanceof VBox box && box.getStyleClass().contains("spectroscopy-assistant")) {
-                box.setSpacing(17);
-                box.setPadding(new Insets(22, 20, 22, 20));
-                box.setMinWidth(330);
-                box.setPrefWidth(380);
-                box.setMaxWidth(430);
-                box.setMaxHeight(Double.MAX_VALUE);
-                box.setFillWidth(true);
-                box.setStyle(
-                        "-fx-background-color: linear-gradient(to bottom right, rgba(18, 40, 60, 0.98), rgba(31, 23, 58, 0.98));"
-                                + "-fx-border-color: rgba(92, 212, 239, 0.42);"
-                                + "-fx-border-width: 1;"
-                                + "-fx-background-radius: 14;"
-                                + "-fx-border-radius: 14;"
-                );
-                for (Node child : box.getChildren()) {
-                    if (child instanceof Label label) {
-                        label.setMinHeight(Region.USE_PREF_SIZE);
-                        label.setMaxWidth(Double.MAX_VALUE);
-                        if (label.getStyleClass().contains("card-title")) {
-                            label.setStyle("-fx-text-fill: #f7fbff; -fx-font-size: 18px; -fx-font-weight: bold;");
-                        } else {
-                            label.setStyle("-fx-text-fill: #e3edfc; -fx-font-size: 13.5px; -fx-line-spacing: 3px;");
+                configureReadingCard(box);
+
+                if (title.contains("Mappa tempo–energia")) {
+                    rebuildMapReadingCard(box);
+                } else {
+                    for (Node child : box.getChildren()) {
+                        if (child instanceof Label label) {
+                            label.setMinHeight(Region.USE_PREF_SIZE);
+                            label.setMaxWidth(Double.MAX_VALUE);
+                            if (label.getStyleClass().contains("card-title")) {
+                                styleReadingTitle(label);
+                            } else {
+                                label.setStyle("-fx-text-fill: #e7f0ff; -fx-font-size: 13.2px; -fx-line-spacing: 3px;");
+                            }
                         }
                     }
-                }
-                if (title.contains("Mappa tempo–energia") && box.getChildren().size() < 9) {
-                    Label comparison = UiFactory.wrappedLabel(
-                            "Confronto tra bande — leggendo verticalmente lo stesso istante puoi confrontare come il rate si distribuisce tra 15–25, 25–50, 50–100 e 100–350 keV. Le differenze di colore evidenziano variazioni relative del segnale tra i canali.",
-                            "assistant-copy");
-                    comparison.setMinHeight(Region.USE_PREF_SIZE);
-                    comparison.setMaxWidth(Double.MAX_VALUE);
-                    comparison.setStyle("-fx-text-fill: #e3edfc; -fx-font-size: 13.5px; -fx-line-spacing: 3px;");
-                    Label interpretation = UiFactory.wrappedLabel(
-                            "Interpretazione — una zona arancione intensa individua un intervallo temporale in cui il rate netto è elevato in quella banda. Il confronto resta descrittivo: per ottenere un flusso fisico servono risposta strumentale e fit spettroscopico.",
-                            "assistant-copy");
-                    interpretation.setMinHeight(Region.USE_PREF_SIZE);
-                    interpretation.setMaxWidth(Double.MAX_VALUE);
-                    interpretation.setStyle("-fx-text-fill: #bfd0ea; -fx-font-size: 13px; -fx-line-spacing: 3px;");
-                    box.getChildren().addAll(comparison, interpretation);
                 }
             }
             if (node instanceof Parent parent) {
                 for (Node child : parent.getChildrenUnmodifiable()) {
                     polishSpectroscopyAssistant(child, title);
                 }
+            }
+        }
+
+        private void rebuildMapReadingCard(VBox box) {
+            Label titleLabel = null;
+            List<String> paragraphs = new ArrayList<>();
+            for (Node child : List.copyOf(box.getChildren())) {
+                if (child instanceof Label label) {
+                    if (label.getStyleClass().contains("card-title") && titleLabel == null) {
+                        titleLabel = label;
+                    } else if (label.getText() != null && !label.getText().isBlank()) {
+                        paragraphs.add(label.getText());
+                    }
+                }
+            }
+
+            if (paragraphs.stream().noneMatch(text -> text.startsWith("Confronto tra bande"))) {
+                paragraphs.add("Confronto tra bande — leggendo verticalmente lo stesso istante puoi confrontare come il rate si distribuisce tra 15–25, 25–50, 50–100 e 100–350 keV. Le differenze di colore evidenziano variazioni relative del segnale tra i canali.");
+            }
+            if (paragraphs.stream().noneMatch(text -> text.startsWith("Interpretazione"))) {
+                paragraphs.add("Interpretazione — una zona arancione intensa individua un intervallo temporale in cui il rate netto è elevato in quella banda. Il confronto resta descrittivo: per ottenere un flusso fisico servono risposta strumentale e fit spettroscopico.");
+            }
+
+            box.getChildren().clear();
+            if (titleLabel == null) {
+                titleLabel = UiFactory.label("Come leggere la mappa", "card-title");
+            }
+            styleReadingTitle(titleLabel);
+            box.getChildren().add(titleLabel);
+            for (int index = 0; index < paragraphs.size(); index++) {
+                VBox section = readingSection(paragraphs.get(index), index);
+                VBox.setVgrow(section, Priority.ALWAYS);
+                box.getChildren().add(section);
             }
         }
 
