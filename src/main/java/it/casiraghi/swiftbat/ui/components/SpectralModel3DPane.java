@@ -100,9 +100,9 @@ public final class SpectralModel3DPane extends BorderPane {
     }
 
     private VBox buildReadingPanel(String modelCode) {
-        VBox card = new VBox(16);
+        VBox card = new VBox(10);
         card.getStyleClass().addAll("card", "spectroscopy-assistant");
-        card.setPadding(new Insets(22, 20, 22, 20));
+        card.setPadding(new Insets(18));
         card.setFillWidth(true);
         card.setMaxHeight(Double.MAX_VALUE);
         card.setStyle(
@@ -116,30 +116,68 @@ public final class SpectralModel3DPane extends BorderPane {
         Label title = UiFactory.label("Come leggere la vista 3D", "card-title");
         title.setStyle("-fx-text-fill: #f7fbff; -fx-font-size: 18px; -fx-font-weight: bold;");
 
-        Label model = paragraph("Modello — Fit " + modelCode
-                + ": la curva arancione è la funzione spettrale ricostruita dai parametri ufficiali BAT. "
-                + "Non rappresenta punti osservati grezzi e non aggiunge nuovi dati rispetto alla vista 2D.");
-        Label axes = paragraph("Assi — X indica l'energia dei fotoni in keV. Y indica log₁₀ N(E), cioè il logaritmo del flusso fotonico differenziale. "
-                + "Valori negativi sono normali: significano che N(E) è minore di 1 nelle unità riportate.");
-        Label shape = paragraph("Forma della curva — l'andamento mostra come il modello previsto cambia con l'energia. "
-                + "Una discesa più rapida verso destra corrisponde a una diminuzione più marcata del contributo alle energie elevate.");
-        Label depth = paragraph("Profondità — il piano arretrato e i collegamenti prospettici servono esclusivamente a rendere la visualizzazione tridimensionale. "
-                + "La profondità non corrisponde a tempo, distanza, intensità o a una terza variabile fisica.");
-        Label controls = paragraph("Interazione — trascina sul grafico per cambiare la prospettiva interna, usa la rotellina per lo zoom e fai doppio clic per riportare la vista alla posizione iniziale.");
-        Label note = paragraph("Interpretazione — zoom e prospettiva modificano soltanto il modo in cui il modello viene mostrato: energie, valori di N(E) e parametri del fit rimangono invariati.");
-        note.setStyle("-fx-text-fill: #bfd0ea; -fx-font-size: 13px; -fx-line-spacing: 3px;");
+        VBox model = readingSection(
+                "Modello",
+                "Fit " + modelCode + ": la curva arancione è la funzione spettrale ricostruita dai parametri ufficiali BAT. "
+                        + "Non rappresenta punti osservati grezzi e non aggiunge nuovi dati rispetto alla vista 2D.",
+                "#ffad52");
+        VBox axes = readingSection(
+                "Assi",
+                "X indica l'energia dei fotoni in keV. Y indica log₁₀ N(E), cioè il logaritmo del flusso fotonico differenziale. "
+                        + "Valori negativi sono normali: significano che N(E) è minore di 1 nelle unità riportate.",
+                "#63d7ff");
+        VBox shape = readingSection(
+                "Forma della curva",
+                "L'andamento mostra come il modello previsto cambia con l'energia. Una discesa più rapida verso destra "
+                        + "corrisponde a una diminuzione più marcata del contributo alle energie elevate.",
+                "#d79aff");
+        VBox depth = readingSection(
+                "Profondità",
+                "Il piano arretrato e i collegamenti prospettici servono esclusivamente a rendere la visualizzazione tridimensionale. "
+                        + "La profondità non corrisponde a tempo, distanza, intensità o a una terza variabile fisica.",
+                "#65efae");
+        VBox controls = readingSection(
+                "Interazione",
+                "Trascina sul grafico per cambiare la prospettiva interna, usa la rotellina per lo zoom e fai doppio clic "
+                        + "per riportare la vista alla posizione iniziale.",
+                "#ffd26a");
+        VBox interpretation = readingSection(
+                "Interpretazione",
+                "Zoom e prospettiva modificano soltanto il modo in cui il modello viene mostrato: energie, valori di N(E) "
+                        + "e parametri del fit rimangono invariati.",
+                "#ff84aa");
 
-        card.getChildren().addAll(title, model, axes, shape, depth, controls, note);
-        VBox.setVgrow(card, Priority.ALWAYS);
+        card.getChildren().addAll(title, model, axes, shape, depth, controls, interpretation);
+        for (VBox section : new VBox[]{model, axes, shape, depth, controls, interpretation}) {
+            VBox.setVgrow(section, Priority.ALWAYS);
+        }
         return card;
     }
 
-    private Label paragraph(String text) {
-        Label label = UiFactory.wrappedLabel(text, "assistant-copy");
-        label.setMinHeight(Region.USE_PREF_SIZE);
-        label.setMaxWidth(Double.MAX_VALUE);
-        label.setStyle("-fx-text-fill: #e3edfc; -fx-font-size: 13.5px; -fx-line-spacing: 3px;");
-        return label;
+    private VBox readingSection(String titleText, String bodyText, String accentColor) {
+        Label sectionTitle = UiFactory.label(titleText, "filter-label");
+        sectionTitle.setStyle("-fx-text-fill: " + accentColor + "; -fx-font-size: 13.5px; -fx-font-weight: bold;");
+
+        Label body = UiFactory.wrappedLabel(bodyText, "assistant-copy");
+        body.setMinHeight(Region.USE_PREF_SIZE);
+        body.setMaxWidth(Double.MAX_VALUE);
+        body.setMaxHeight(Double.MAX_VALUE);
+        body.setStyle("-fx-text-fill: #eef5ff; -fx-font-size: 13px; -fx-line-spacing: 3px;");
+
+        VBox section = new VBox(5, sectionTitle, body);
+        section.setPadding(new Insets(10, 11, 10, 11));
+        section.setFillWidth(true);
+        section.setMinHeight(Region.USE_PREF_SIZE);
+        section.setMaxHeight(Double.MAX_VALUE);
+        section.setStyle(
+                "-fx-background-color: rgba(255, 255, 255, 0.035);"
+                        + "-fx-border-color: rgba(118, 151, 205, 0.12);"
+                        + "-fx-border-width: 1;"
+                        + "-fx-background-radius: 10;"
+                        + "-fx-border-radius: 10;"
+        );
+        VBox.setVgrow(body, Priority.ALWAYS);
+        return section;
     }
 
     private HBox buildFooter() {
