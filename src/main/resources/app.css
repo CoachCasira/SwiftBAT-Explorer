@@ -2095,14 +2095,23 @@
     -fx-background-color: linear-gradient(to bottom right, rgba(17, 30, 52, 0.94), rgba(12, 20, 37, 0.94));
 }
 
+.spectroscopy-responsive-grid {
+    -fx-background-color: transparent;
+}
+
 .spectroscopy-chart-card {
-    -fx-min-width: 420px;
-    -fx-pref-width: 620px;
+    -fx-min-width: 0px;
+    -fx-pref-width: 560px;
 }
 
 .spectroscopy-detail-card {
-    -fx-min-width: 300px;
-    -fx-pref-width: 410px;
+    -fx-min-width: 0px;
+    -fx-pref-width: 380px;
+}
+
+.spectroscopy-chart-actions {
+    -fx-alignment: center-left;
+    -fx-padding: 2px 0 3px 0;
 }
 
 .spectroscopy-assistant {
