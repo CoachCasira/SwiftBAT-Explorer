@@ -1,0 +1,257 @@
+name: Applica coerenza fullscreen spettroscopia
+
+on:
+  push:
+    branches:
+      - feature/analysis-population-1.3.0
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'chore: apply fullscreen controls'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Applica modifiche
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new, label):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'Patch non applicabile ({label}) in {path}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          spec = Path('src/main/java/it/casiraghi/swiftbat/ui/SpectroscopyPane.java')
+          heat = Path('src/main/java/it/casiraghi/swiftbat/ui/components/TimeEnergyHeatmapPane.java')
+
+          # 1) La heatmap non contiene più il pulsante fullscreen sovrapposto al grafico.
+          text = heat.read_text(encoding='utf-8')
+          text = text.replace('import it.casiraghi.swiftbat.ui.InPlaceFullscreen;\n', '')
+          text = text.replace('import it.casiraghi.swiftbat.ui.UiFactory;\n', '')
+          text = text.replace('import javafx.scene.control.Button;\n', '')
+          old_ctor = '''    private final Canvas canvas = new Canvas();
+    private final Label hoverCard = new Label();
+    private final Button fullscreenButton;
+    private final boolean allowFullscreen;
+'''
+          new_ctor = '''    private final Canvas canvas = new Canvas();
+    private final Label hoverCard = new Label();
+'''
+          if old_ctor not in text:
+              raise SystemExit('Campi fullscreen heatmap non trovati')
+          text = text.replace(old_ctor, new_ctor, 1)
+
+          old_block = '''    public TimeEnergyHeatmapPane() {
+        this(true);
+    }
+
+    private TimeEnergyHeatmapPane(boolean allowFullscreen) {
+        this.allowFullscreen = allowFullscreen;
+
+        hoverCard.setManaged(false);
+        hoverCard.setMouseTransparent(true);
+        hoverCard.setVisible(false);
+        hoverCard.setWrapText(false);
+        hoverCard.setStyle(
+                "-fx-background-color: rgba(8, 17, 34, 0.96);"
+                        + "-fx-background-radius: 9;"
+                        + "-fx-border-color: rgba(101, 153, 220, 0.55);"
+                        + "-fx-border-radius: 9;"
+                        + "-fx-text-fill: #e5efff;"
+                        + "-fx-font-size: 11px;"
+                        + "-fx-padding: 8 10;"
+        );
+
+        fullscreenButton = UiFactory.button("Schermo intero  ⛶", "primary-button");
+        fullscreenButton.setManaged(false);
+        fullscreenButton.setVisible(allowFullscreen);
+        fullscreenButton.setOnAction(event -> openFullscreen());
+
+        getChildren().addAll(canvas, hoverCard, fullscreenButton);
+        setMinHeight(300);
+        setPrefHeight(390);
+        widthProperty().addListener(ignored -> draw());
+        heightProperty().addListener(ignored -> draw());
+        setOnMouseMoved(event -> updateHover(event.getX(), event.getY()));
+        setOnMouseExited(event -> hoverCard.setVisible(false));
+    }
+'''
+          new_block = '''    public TimeEnergyHeatmapPane() {
+        hoverCard.setManaged(false);
+        hoverCard.setMouseTransparent(true);
+        hoverCard.setVisible(false);
+        hoverCard.setWrapText(false);
+        hoverCard.setStyle(
+                "-fx-background-color: rgba(8, 17, 34, 0.96);"
+                        + "-fx-background-radius: 9;"
+                        + "-fx-border-color: rgba(101, 153, 220, 0.55);"
+                        + "-fx-border-radius: 9;"
+                        + "-fx-text-fill: #e5efff;"
+                        + "-fx-font-size: 11px;"
+                        + "-fx-padding: 8 10;"
+        );
+
+        getChildren().addAll(canvas, hoverCard);
+        setMinHeight(300);
+        setPrefHeight(390);
+        widthProperty().addListener(ignored -> draw());
+        heightProperty().addListener(ignored -> draw());
+        setOnMouseMoved(event -> updateHover(event.getX(), event.getY()));
+        setOnMouseExited(event -> hoverCard.setVisible(false));
+    }
+'''
+          if old_block not in text:
+              raise SystemExit('Costruttore heatmap non trovato')
+          text = text.replace(old_block, new_block, 1)
+
+          old_layout = '''        if (allowFullscreen) {
+            fullscreenButton.autosize();
+            fullscreenButton.relocate(
+                    Math.max(8, width - fullscreenButton.getWidth() - 12),
+                    6);
+        }
+        draw();
+    }
+
+    private void openFullscreen() {
+        if (getScene() == null) return;
+        TimeEnergyHeatmapPane enlarged = new TimeEnergyHeatmapPane(false);
+        enlarged.setData(data);
+        enlarged.setHalfWindowSeconds(halfWindowSeconds);
+        enlarged.setMinSize(0, 0);
+        enlarged.setPrefHeight(760);
+        enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        InPlaceFullscreen.show(this, "Mappa tempo–energia dei rate", enlarged);
+    }
+'''
+          new_layout = '''        draw();
+    }
+'''
+          if old_layout not in text:
+              raise SystemExit('Layout fullscreen heatmap non trovato')
+          text = text.replace(old_layout, new_layout, 1)
+          heat.write_text(text, encoding='utf-8')
+
+          # 2) Pulsante Schermo intero a fianco, prima della Vista 3D; finestra condivisa.
+          text = spec.read_text(encoding='utf-8')
+          old_listener = '''        window.valueProperty().addListener((obs, oldValue, value) -> heatmap.setHalfWindowSeconds(switch (value) {
+            case "±20 s" -> 20;
+            case "±120 s" -> 120;
+            case "Intera osservazione" -> Double.POSITIVE_INFINITY;
+            default -> 60;
+        }));
+        Button threeD = UiFactory.button("Apri vista 3D dei rate", "primary-button");
+        threeD.setDisable(grbData.asciiData().isEmpty());
+        threeD.setOnAction(event -> openTimeEnergy3D());
+'''
+          new_listener = '''        window.valueProperty().addListener((obs, oldValue, value) ->
+                heatmap.setHalfWindowSeconds(timeWindowSeconds(value)));
+        Button fullscreen = UiFactory.button("Schermo intero ⛶", "primary-button");
+        fullscreen.setDisable(grbData.asciiData().isEmpty());
+        fullscreen.setOnAction(event -> openTimeEnergyFullscreen(timeWindowSeconds(window.getValue())));
+        Button threeD = UiFactory.button("Apri vista 3D dei rate", "primary-button");
+        threeD.setDisable(grbData.asciiData().isEmpty());
+        threeD.setOnAction(event -> openTimeEnergy3D());
+'''
+          if old_listener not in text:
+              raise SystemExit('Blocco azioni mappa tempo-energia non trovato')
+          text = text.replace(old_listener, new_listener, 1)
+          text = text.replace('chartActions.getChildren().add(threeD);',
+                              'chartActions.getChildren().addAll(fullscreen, threeD);', 1)
+
+          marker = '''    private void openTimeEnergy3D() {
+'''
+          helper = '''    private double timeWindowSeconds(String value) {
+        return switch (value == null ? "±60 s" : value) {
+            case "±20 s" -> 20;
+            case "±120 s" -> 120;
+            case "Intera osservazione" -> Double.POSITIVE_INFINITY;
+            default -> 60;
+        };
+    }
+
+    private void openTimeEnergyFullscreen(double halfWindowSeconds) {
+        TimeEnergyHeatmapPane enlarged = new TimeEnergyHeatmapPane();
+        enlarged.setData(grbData.asciiData());
+        enlarged.setHalfWindowSeconds(halfWindowSeconds);
+        enlarged.setMinSize(0, 0);
+        enlarged.setPrefHeight(760);
+        enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+
+        VBox reading = new VBox(12);
+        reading.getStyleClass().addAll("card", "spectroscopy-assistant");
+        reading.setPadding(new Insets(18));
+        reading.setMinWidth(300);
+        reading.setPrefWidth(350);
+        reading.setMaxWidth(390);
+        reading.getChildren().addAll(
+                UiFactory.label("Come leggere la mappa", "card-title"),
+                fullscreenReading("Assi — X rappresenta il tempo rispetto al trigger t = 0; Y separa le quattro bande energetiche BAT."),
+                fullscreenReading("Colore — arancio indica un rate netto positivo, blu una fluttuazione negativa dopo la sottrazione del fondo; i toni scuri indicano valori vicini a zero."),
+                fullscreenReading("Dettaglio — spostando il mouse sulla mappa puoi leggere banda energetica, centro del bin, rate e larghezza della banda nel punto osservato."),
+                fullscreenReading("Scala temporale — ogni cella deriva dai rate ASCII a bin di 1 secondo e la finestra visualizzata è la stessa scelta nella scheda Spettroscopia."),
+                fullscreenReading("Da ricordare — questa mappa descrive i rate BAT nel tempo: non è un fit XSPEC e non converte direttamente i conteggi in flusso fisico."));
+
+        HBox body = new HBox(14, enlarged, reading);
+        body.setPadding(new Insets(12, 14, 12, 14));
+        body.setMinSize(0, 0);
+        body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        HBox.setHgrow(enlarged, Priority.ALWAYS);
+        InPlaceFullscreen.show(this, grbData.grbName() + " · Mappa tempo–energia dei rate", body);
+    }
+
+    private Label fullscreenReading(String text) {
+        Label label = UiFactory.wrappedLabel(text, "assistant-copy");
+        label.setMinHeight(Region.USE_PREF_SIZE);
+        label.setMaxWidth(Double.MAX_VALUE);
+        return label;
+    }
+
+'''
+          if marker not in text:
+              raise SystemExit('Marker openTimeEnergy3D non trovato')
+          text = text.replace(marker, helper + marker, 1)
+          spec.write_text(text, encoding='utf-8')
+
+          # 3) Coerenza globale: tutti i pulsanti fullscreen hanno l'icona.
+          for path in Path('src/main/java').rglob('*.java'):
+              source = path.read_text(encoding='utf-8')
+              updated = source.replace('UiFactory.button("Schermo intero",',
+                                       'UiFactory.button("Schermo intero ⛶",')
+              updated = updated.replace('new Button("Schermo intero")',
+                                        'new Button("Schermo intero ⛶")')
+              if updated != source:
+                  path.write_text(updated, encoding='utf-8')
+
+          print('Patch fullscreen e spettroscopia applicata.')
+          PY
+
+      - name: Maven verify
+        run: mvn --batch-mode --no-transfer-progress verify
+
+      - name: Commit e push
+        shell: bash
+        run: |
+          git config user.name "ChatGPT"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/apply-fullscreen-consistency.yml
+          git add src/main/java
+          git commit -m "Riorganizza fullscreen e mappa tempo-energia"
+          git push
