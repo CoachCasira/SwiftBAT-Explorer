@@ -385,7 +385,9 @@ Label scientificNote = UiFactory.wrappedLabel(
     private Node buildFluxChart(List<EnergyFluxBand> fluxes, Model model, boolean showActions) {
         VBox card = new VBox(7);
         card.getStyleClass().addAll("card", "spectroscopy-chart-card");
-        card.setPadding(new Insets(12));
+        // Margine inferiore di sicurezza: il grafico vive dentro due viewport
+        // annidate e i tick dell'asse X devono restare sopra il bordo di clipping.
+        card.setPadding(new Insets(12, 12, 68, 12));
         card.setMinWidth(0);
         card.setMinHeight(Region.USE_PREF_SIZE);
         card.setMaxWidth(Double.MAX_VALUE);
@@ -412,8 +414,8 @@ Label scientificNote = UiFactory.wrappedLabel(
         chart.setMinWidth(0);
         // Lo spazio aggiuntivo preserva tick, categorie e titolo dell'asse X
         // anche quando la scheda è dentro i due ScrollPane dell'Explorer.
-        chart.setMinHeight(showActions ? 410 : 560);
-        chart.setPrefHeight(showActions ? 470 : 720);
+        chart.setMinHeight(showActions ? 500 : 600);
+        chart.setPrefHeight(showActions ? 560 : 760);
         chart.setMaxWidth(Double.MAX_VALUE);
         chart.setMaxHeight(Double.MAX_VALUE);
 
