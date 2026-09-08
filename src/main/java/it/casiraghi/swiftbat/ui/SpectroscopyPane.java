@@ -73,7 +73,8 @@ public final class SpectroscopyPane extends BorderPane {
         VBox copy = new VBox(4,
                 UiFactory.label("Analisi spettroscopica", "section-title"),
                 UiFactory.wrappedLabel(
-                        "Fit PL/CPL e flussi ufficiali Swift/BAT. La mappa tempo–energia usa invece i quattro rate ASCII a bin di 1 secondo.",
+                        "Confronta i fit PL/CPL e i flussi già pubblicati da Swift/BAT. "
+                                + "La mappa tempo–energia, tenuta separata, descrive invece i quattro rate ASCII a bin di 1 secondo.",
                         "section-caption"));
         HBox.setHgrow(copy, Priority.ALWAYS);
         Label provenance = UiFactory.label("DATI UFFICIALI BAT · FIT XSPEC", "status-pill", "status-online");
@@ -95,8 +96,10 @@ public final class SpectroscopyPane extends BorderPane {
         Button source = UiFactory.button("Apri tabella ufficiale ↗", "ghost-button");
         source.setOnAction(event -> hostServices.showDocument(sourceUrl()));
         HBox controls = new HBox(10,
-                controlBox("Intervallo", intervalChoice),
-                controlBox("Modello visualizzato", modelChoice),
+                controlBox("Intervallo del fit", intervalChoice,
+                        "T100 usa l'intervallo complessivo del burst; Picco 1 s usa il secondo più intenso."),
+                controlBox("Modello del fit", modelChoice,
+                        "Automatico segue la scelta BAT; PL e CPL permettono di confrontare i due fit pubblicati."),
                 UiFactory.spacer(), source);
         controls.setAlignment(Pos.BOTTOM_LEFT);
         controls.getStyleClass().add("spectroscopy-controls");
@@ -123,8 +126,10 @@ public final class SpectroscopyPane extends BorderPane {
         return scroll;
     }
 
-    private VBox controlBox(String label, Node control) {
-        VBox box = new VBox(5, UiFactory.label(label, "filter-label"), control);
+    private VBox controlBox(String label, Node control, String help) {
+        Label explanation = UiFactory.wrappedLabel(help, "spectroscopy-control-help");
+        explanation.setMaxWidth(270);
+        VBox box = new VBox(5, UiFactory.label(label, "filter-label"), control, explanation);
         box.getStyleClass().add("spectroscopy-control-box");
         return box;
     }
@@ -193,6 +198,12 @@ public final class SpectroscopyPane extends BorderPane {
                 metric("Esposizione", fit == null ? "n.d." : format(fit.exposureSeconds()) + " s",
                         fit == null ? "intervallo non disponibile" : intervalText(fit)));
 
+        Label readingIntro = UiFactory.wrappedLabel(
+                "Come leggere i grafici: la curva arancione è la forma prevista dal modello selezionato in funzione "
+                        + "dell'energia; le barre confrontano invece il flusso energetico integrato nelle diverse bande. "
+                        + "Sono due rappresentazioni dello stesso fit ufficiale, non quattro curve di luce sommate.",
+                "spectroscopy-reading-intro");
+
         HBox charts = new HBox(12);
         Node modelChart = buildModelChart(fit);
         Node fluxChart = buildFluxChart(fluxes);
@@ -210,7 +221,7 @@ public final class SpectroscopyPane extends BorderPane {
                 "I flussi sono quelli pubblicati dal catalogo Swift/BAT in erg cm⁻² s⁻¹, con limiti al 90%. "
                         + "La curva a sinistra ricostruisce il modello fotonico del fit; non è ricavata sommando i quattro rate della curva di luce.",
                 "spectroscopy-note");
-        content.getChildren().addAll(metrics, charts, lower, scientificNote);
+        content.getChildren().addAll(metrics, readingIntro, charts, lower, scientificNote);
         return content;
     }
 
@@ -226,7 +237,8 @@ public final class SpectroscopyPane extends BorderPane {
         card.getStyleClass().addAll("card", "spectroscopy-chart-card");
         card.setPadding(new Insets(12));
         Label explanation = UiFactory.wrappedLabel(
-                "Forma continua del modello: asse Y = log₁₀ del flusso fotonico differenziale.",
+                "Asse X = energia dei fotoni. Asse Y = log₁₀ del flusso fotonico differenziale previsto dal fit. "
+                        + "La linea è il modello ricostruito, non una serie di misure grezze.",
                 "card-subtitle");
         NumberAxis xAxis = new NumberAxis(15, 150, 15);
         NumberAxis yAxis = new NumberAxis();
@@ -237,7 +249,7 @@ public final class SpectroscopyPane extends BorderPane {
         chart.setAnimated(false);
         chart.setCreateSymbols(false);
         chart.setLegendVisible(false);
-        chart.setTitle(fit == null ? "Modello non disponibile" : "Fit " + fit.model().code() + " · 15–150 keV");
+        chart.setTitle(fit == null ? "Modello non disponibile" : "Curva del fit " + fit.model().code() + " · 15–150 keV");
         chart.setMinHeight(300);
         chart.setPrefHeight(340);
         chart.setMaxWidth(Double.MAX_VALUE);
@@ -252,7 +264,7 @@ public final class SpectroscopyPane extends BorderPane {
             }
             chart.getData().add(series);
         }
-        card.getChildren().addAll(UiFactory.label("Forma spettrale", "card-title"), explanation, chart);
+        card.getChildren().addAll(UiFactory.label("Modello spettrale ricostruito", "card-title"), explanation, chart);
         return card;
     }
 
@@ -261,7 +273,8 @@ public final class SpectroscopyPane extends BorderPane {
         card.getStyleClass().addAll("card", "spectroscopy-chart-card");
         card.setPadding(new Insets(12));
         Label explanation = UiFactory.wrappedLabel(
-                "Ogni barra è il flusso energetico integrato in una banda non sovrapposta.",
+                "Asse X = banda energetica; asse Y = energia ricevuta per unità di area e di tempo. "
+                        + "Una barra più alta indica un flusso maggiore in quella banda; i limiti al 90% sono nella tabella e nel tooltip.",
                 "card-subtitle");
         CategoryAxis xAxis = new CategoryAxis();
         NumberAxis yAxis = new NumberAxis();
@@ -394,8 +407,9 @@ public final class SpectroscopyPane extends BorderPane {
         VBox box = new VBox(12);
         box.setPadding(new Insets(14));
         Label description = UiFactory.wrappedLabel(
-                "Questa è una mappa descrittiva dei rate a 1 secondo: X = tempo dal trigger, Y = quattro bande energetiche, colore = rate. "
-                        + "Non è un fit XSPEC e non converte direttamente i conteggi in flusso fisico.",
+                "Questa vista usa i dati ASCII: X = tempo rispetto al trigger, Y = banda energetica e colore = rate nel bin di 1 secondo. "
+                        + "Arancio significa rate netto positivo, blu fluttuazione negativa dopo la sottrazione del fondo. "
+                        + "Non è un fit XSPEC e non converte i conteggi in flusso fisico.",
                 "section-caption");
         TimeEnergyHeatmapPane heatmap = new TimeEnergyHeatmapPane();
         heatmap.setData(grbData.asciiData());
@@ -410,11 +424,12 @@ public final class SpectroscopyPane extends BorderPane {
             case "Intera osservazione" -> Double.POSITIVE_INFINITY;
             default -> 60;
         }));
-        Button threeD = UiFactory.button("Vista 3D tempo–energia  ⛶", "primary-button");
+        Button threeD = UiFactory.button("Apri vista 3D dei rate", "primary-button");
         threeD.setDisable(grbData.asciiData().isEmpty());
         threeD.setOnAction(event -> openTimeEnergy3D());
         HBox controls = new HBox(10,
-                controlBox("Finestra attorno al trigger", window),
+                controlBox("Finestra temporale", window,
+                        "Limita la mappa ai secondi prima e dopo t = 0; non modifica i parametri del fit ufficiale."),
                 UiFactory.spacer(), threeD);
         controls.setAlignment(Pos.BOTTOM_LEFT);
 
@@ -431,13 +446,13 @@ public final class SpectroscopyPane extends BorderPane {
     }
 
     private void openTimeEnergy3D() {
-        ThreeDChartPane chart = new ThreeDChartPane();
-        chart.setContextName(grbData.grbName() + " · spettroscopia descrittiva");
+        ThreeDChartPane chart = ThreeDChartPane.fullscreenView();
+        chart.setContextName(grbData.grbName() + " · quattro bande ASCII a 1 s");
         chart.setData(grbData.asciiData());
         VBox content = new VBox(chart);
         content.setMinSize(0, 0);
         VBox.setVgrow(chart, Priority.ALWAYS);
-        InPlaceFullscreen.show(this, grbData.grbName() + " · Mappa tempo–energia 3D", content);
+        InPlaceFullscreen.show(this, grbData.grbName() + " · Rate nel tempo per banda · vista 3D", content);
     }
 
     private Node buildGuide() {
