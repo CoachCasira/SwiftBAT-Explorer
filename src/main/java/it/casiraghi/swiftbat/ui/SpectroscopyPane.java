@@ -363,7 +363,7 @@ public final class SpectroscopyPane extends BorderPane {
             Button threeD = UiFactory.button("Vista 3D", "secondary-button");
             threeD.setDisable(fit == null || fit.normalization() == null || fit.alpha() == null);
             threeD.setOnAction(event -> openModel3D(fit));
-            Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
+            Button fullscreen = UiFactory.button("Schermo intero ⛶", "primary-button");
             fullscreen.setOnAction(event -> openModelFullscreen(fit));
             FlowPane actions = new FlowPane(8, 8);
             actions.getStyleClass().add("spectroscopy-chart-actions");
@@ -427,7 +427,7 @@ public final class SpectroscopyPane extends BorderPane {
             Button threeD = UiFactory.button("Vista 3D", "secondary-button");
             threeD.setDisable(fluxes.stream().noneMatch(EnergyFluxBand::available));
             threeD.setOnAction(event -> openFlux3D(fluxes, model));
-            Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
+            Button fullscreen = UiFactory.button("Schermo intero ⛶", "primary-button");
             fullscreen.setOnAction(event -> openFluxFullscreen(fluxes, model));
             FlowPane actions = new FlowPane(8, 8);
             actions.getStyleClass().add("spectroscopy-chart-actions");
@@ -615,15 +615,16 @@ public final class SpectroscopyPane extends BorderPane {
                 "±20 s", "±60 s", "±120 s", "Intera osservazione"));
         window.setValue("±60 s");
         window.getStyleClass().add("choice-box-modern");
-        window.valueProperty().addListener((obs, oldValue, value) -> heatmap.setHalfWindowSeconds(switch (value) {
-            case "±20 s" -> 20;
-            case "±120 s" -> 120;
-            case "Intera osservazione" -> Double.POSITIVE_INFINITY;
-            default -> 60;
-        }));
+        window.valueProperty().addListener((obs, oldValue, value) ->
+                heatmap.setHalfWindowSeconds(timeWindowSeconds(value)));
+
+        Button fullscreen = UiFactory.button("Schermo intero ⛶", "primary-button");
+        fullscreen.setDisable(grbData.asciiData().isEmpty());
+        fullscreen.setOnAction(event -> openTimeEnergyFullscreen(timeWindowSeconds(window.getValue())));
         Button threeD = UiFactory.button("Apri vista 3D dei rate", "primary-button");
         threeD.setDisable(grbData.asciiData().isEmpty());
         threeD.setOnAction(event -> openTimeEnergy3D());
+
         FlowPane controls = new FlowPane(10, 10);
         controls.getChildren().add(
                 controlBox("Finestra temporale", window,
@@ -633,7 +634,7 @@ public final class SpectroscopyPane extends BorderPane {
 
         FlowPane chartActions = new FlowPane(8, 8);
         chartActions.getStyleClass().add("spectroscopy-chart-actions");
-        chartActions.getChildren().add(threeD);
+        chartActions.getChildren().addAll(fullscreen, threeD);
         VBox chartCard = new VBox(9,
                 UiFactory.label("Mappa tempo–energia dei rate", "card-title"),
                 chartActions,
@@ -646,6 +647,52 @@ public final class SpectroscopyPane extends BorderPane {
                         "Nota: i rate BAT sono già corretti per il fondo; piccole celle negative rappresentano fluttuazioni statistiche dopo la sottrazione del fondo.",
                         "spectroscopy-note"));
         return box;
+    }
+
+    private double timeWindowSeconds(String value) {
+        return switch (value == null ? "±60 s" : value) {
+            case "±20 s" -> 20;
+            case "±120 s" -> 120;
+            case "Intera osservazione" -> Double.POSITIVE_INFINITY;
+            default -> 60;
+        };
+    }
+
+    private void openTimeEnergyFullscreen(double halfWindowSeconds) {
+        TimeEnergyHeatmapPane enlarged = new TimeEnergyHeatmapPane();
+        enlarged.setData(grbData.asciiData());
+        enlarged.setHalfWindowSeconds(halfWindowSeconds);
+        enlarged.setMinSize(0, 0);
+        enlarged.setPrefHeight(760);
+        enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+
+        VBox reading = new VBox(12);
+        reading.getStyleClass().addAll("card", "spectroscopy-assistant");
+        reading.setPadding(new Insets(18));
+        reading.setMinWidth(300);
+        reading.setPrefWidth(350);
+        reading.setMaxWidth(390);
+        reading.getChildren().addAll(
+                UiFactory.label("Come leggere la mappa", "card-title"),
+                fullscreenReading("Assi — X rappresenta il tempo rispetto al trigger t = 0; Y separa le quattro bande energetiche BAT."),
+                fullscreenReading("Colore — arancio indica un rate netto positivo, blu una fluttuazione negativa dopo la sottrazione del fondo; i toni scuri indicano valori vicini a zero."),
+                fullscreenReading("Dettaglio — spostando il mouse sulla mappa puoi leggere banda energetica, centro del bin, rate e larghezza della banda nel punto osservato."),
+                fullscreenReading("Scala temporale — ogni cella deriva dai rate ASCII a bin di 1 secondo e la finestra visualizzata è la stessa scelta nella scheda Spettroscopia."),
+                fullscreenReading("Da ricordare — questa mappa descrive i rate BAT nel tempo: non è un fit XSPEC e non converte direttamente i conteggi in flusso fisico."));
+
+        HBox body = new HBox(14, enlarged, reading);
+        body.setPadding(new Insets(12, 14, 12, 14));
+        body.setMinSize(0, 0);
+        body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        HBox.setHgrow(enlarged, Priority.ALWAYS);
+        InPlaceFullscreen.show(this, grbData.grbName() + " · Mappa tempo–energia dei rate", body);
+    }
+
+    private Label fullscreenReading(String text) {
+        Label label = UiFactory.wrappedLabel(text, "assistant-copy");
+        label.setMinHeight(Region.USE_PREF_SIZE);
+        label.setMaxWidth(Double.MAX_VALUE);
+        return label;
     }
 
     private void openTimeEnergy3D() {
