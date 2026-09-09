@@ -1,8 +1,10 @@
 package it.casiraghi.swiftbat.ui.components;
 
 import it.casiraghi.swiftbat.model.TabularData;
+import it.casiraghi.swiftbat.ui.I18n;
 import it.casiraghi.swiftbat.ui.InPlaceFullscreen;
 import it.casiraghi.swiftbat.ui.UiFactory;
+import it.casiraghi.swiftbat.ui.UiTranslations;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.embed.swing.SwingFXUtils;
@@ -38,15 +40,11 @@ import java.util.Map;
 
 /**
  * Contenitore JavaFX per il renderer scientifico Java2D tempo-energia.
- *
- * <p>Il grafico viene disegnato con Java2D dentro uno SwingNode. La vista normale
- * e quella a schermo intero usano lo stesso dataset e le stesse interazioni.
- * Lo schermo intero sostituisce temporaneamente il contenuto della finestra
- * principale, senza creare finestre secondarie.</p>
  */
 public final class ThreeDChartPane extends BorderPane {
+    /** Exact series palette of the Explorer 2D four-band chart. */
     private static final List<Band> BANDS = List.of(
-            new Band("15–25 keV", "RATE_15_25_KEV", new Color(82, 216, 255)),
+            new Band("15–25 keV", "RATE_15_25_KEV", new Color(91, 220, 255)),
             new Band("25–50 keV", "RATE_25_50_KEV", new Color(110, 231, 183)),
             new Band("50–100 keV", "RATE_50_100_KEV", new Color(167, 139, 250)),
             new Band("100–350 keV", "RATE_100_350_KEV", new Color(251, 113, 133)));
@@ -54,8 +52,7 @@ public final class ThreeDChartPane extends BorderPane {
     private static final Map<String, Double> WINDOWS = createWindows();
     private static final String DEFAULT_WINDOW = "±60 s dal trigger";
 
-    private final ChoiceBox<String> windowChoice = new ChoiceBox<>(
-            FXCollections.observableArrayList(WINDOWS.keySet()));
+    private final ChoiceBox<String> windowChoice = new ChoiceBox<>(FXCollections.observableArrayList(WINDOWS.keySet()));
     private final SwingNode swingNode = new SwingNode();
     private final Java2DWaterfallPanel renderer = new Java2DWaterfallPanel();
     private final Label contextLabel = UiFactory.label("GRB", "three-d-context");
@@ -70,10 +67,6 @@ public final class ThreeDChartPane extends BorderPane {
         this(true);
     }
 
-    /**
-     * Variante destinata a un contenitore già a schermo intero: evita di mostrare
-     * un secondo comando di fullscreen dentro la stessa vista.
-     */
     public static ThreeDChartPane fullscreenView() {
         return new ThreeDChartPane(false);
     }
@@ -81,14 +74,13 @@ public final class ThreeDChartPane extends BorderPane {
     private ThreeDChartPane(boolean allowFullscreen) {
         this.allowFullscreen = allowFullscreen;
         getStyleClass().add("three-d-panel");
-        if (!allowFullscreen) {
-            getStyleClass().add("three-d-panel-fullscreen");
-        }
+        if (!allowFullscreen) getStyleClass().add("three-d-panel-fullscreen");
         setMinHeight(allowFullscreen ? 430 : 0);
         setPrefHeight(allowFullscreen ? 500 : 760);
         setMaxHeight(Double.MAX_VALUE);
 
         windowChoice.getStyleClass().add("choice-box-modern");
+        UiTranslations.installChoiceBox(windowChoice);
         windowChoice.setValue(DEFAULT_WINDOW);
         windowChoice.getSelectionModel().selectedItemProperty().addListener(
                 (observable, oldValue, newValue) -> rebuildDataset());
@@ -115,7 +107,7 @@ public final class ThreeDChartPane extends BorderPane {
 
         widthProperty().addListener((observable, oldValue, newValue) -> repaintRenderer());
         heightProperty().addListener((observable, oldValue, newValue) -> repaintRenderer());
-        it.casiraghi.swiftbat.ui.I18n.languageProperty().addListener((obs, oldValue, newValue) -> repaintRenderer());
+        I18n.languageProperty().addListener((obs, oldValue, newValue) -> repaintRenderer());
         Platform.runLater(() -> syncRendererSize(viewer));
     }
 
@@ -136,35 +128,22 @@ public final class ThreeDChartPane extends BorderPane {
     }
 
     private Java2DWaterfallPanel.Dataset toDataset(TabularData data, double selectedWindow) {
-        if (data == null || data.isEmpty()) {
-            return Java2DWaterfallPanel.Dataset.empty();
-        }
-
+        if (data == null || data.isEmpty()) return Java2DWaterfallPanel.Dataset.empty();
         int timeIndex = data.indexOf("TIME_FROM_TRIGGER_CENTER_S");
-        if (timeIndex < 0) {
-            return Java2DWaterfallPanel.Dataset.empty();
-        }
+        if (timeIndex < 0) return Java2DWaterfallPanel.Dataset.empty();
 
         int[] bandIndices = new int[BANDS.size()];
         for (int band = 0; band < BANDS.size(); band++) {
             bandIndices[band] = data.indexOf(BANDS.get(band).field());
-            if (bandIndices[band] < 0) {
-                return Java2DWaterfallPanel.Dataset.empty();
-            }
+            if (bandIndices[band] < 0) return Java2DWaterfallPanel.Dataset.empty();
         }
 
         List<Sample> eligible = new ArrayList<>();
         for (List<String> row : data.rows()) {
-            if (timeIndex >= row.size()) {
-                continue;
-            }
+            if (timeIndex >= row.size()) continue;
             double time = parse(row.get(timeIndex));
-            if (!Double.isFinite(time)) {
-                continue;
-            }
-            if (!Double.isInfinite(selectedWindow) && Math.abs(time) > selectedWindow) {
-                continue;
-            }
+            if (!Double.isFinite(time)) continue;
+            if (!Double.isInfinite(selectedWindow) && Math.abs(time) > selectedWindow) continue;
 
             double[] rates = new double[BANDS.size()];
             boolean valid = true;
@@ -180,14 +159,10 @@ public final class ThreeDChartPane extends BorderPane {
                     break;
                 }
             }
-            if (valid) {
-                eligible.add(new Sample(time, rates));
-            }
+            if (valid) eligible.add(new Sample(time, rates));
         }
 
-        if (eligible.isEmpty()) {
-            return Java2DWaterfallPanel.Dataset.empty();
-        }
+        if (eligible.isEmpty()) return Java2DWaterfallPanel.Dataset.empty();
 
         List<Sample> samples = sampleRows(eligible, 520);
         double[] times = new double[samples.size()];
@@ -195,9 +170,7 @@ public final class ThreeDChartPane extends BorderPane {
         for (int index = 0; index < samples.size(); index++) {
             Sample sample = samples.get(index);
             times[index] = sample.time();
-            for (int band = 0; band < BANDS.size(); band++) {
-                rates[band][index] = sample.rates()[band];
-            }
+            for (int band = 0; band < BANDS.size(); band++) rates[band][index] = sample.rates()[band];
         }
 
         String[] labels = BANDS.stream().map(Band::label).toArray(String[]::new);
@@ -206,23 +179,17 @@ public final class ThreeDChartPane extends BorderPane {
     }
 
     private List<Sample> sampleRows(List<Sample> rows, int maximumSamples) {
-        if (rows.size() <= maximumSamples) {
-            return rows;
-        }
+        if (rows.size() <= maximumSamples) return rows;
         List<Sample> sampled = new ArrayList<>(maximumSamples);
         double step = (rows.size() - 1.0) / (maximumSamples - 1.0);
-        for (int index = 0; index < maximumSamples; index++) {
-            sampled.add(rows.get((int) Math.round(index * step)));
-        }
+        for (int index = 0; index < maximumSamples; index++) sampled.add(rows.get((int) Math.round(index * step)));
         return sampled;
     }
 
     private VBox buildHeader() {
         VBox header = new VBox(allowFullscreen ? 8 : 12);
         header.getStyleClass().add("three-d-header");
-        if (!allowFullscreen) {
-            header.getStyleClass().add("three-d-header-fullscreen");
-        }
+        if (!allowFullscreen) header.getStyleClass().add("three-d-header-fullscreen");
         header.setPadding(allowFullscreen ? new Insets(10, 14, 9, 14) : new Insets(18, 22, 16, 22));
 
         HBox titleRow = new HBox(10);
@@ -256,9 +223,7 @@ public final class ThreeDChartPane extends BorderPane {
         footer.setMinHeight(50);
         footer.setAlignment(Pos.CENTER_LEFT);
 
-        Label note = UiFactory.label(
-                "Profondità = banda energetica ASCII; non distanza spaziale.",
-                "subtle-text");
+        Label note = UiFactory.label("Profondità = banda energetica ASCII; non distanza spaziale.", "subtle-text");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
@@ -279,31 +244,24 @@ public final class ThreeDChartPane extends BorderPane {
     }
 
     private void openFullscreen() {
-        if (getScene() == null) {
-            return;
-        }
+        if (getScene() == null) return;
         ThreeDChartPane enlarged = new ThreeDChartPane(false);
         enlarged.setContextName(contextName);
         enlarged.windowChoice.setValue(windowChoice.getValue());
         enlarged.setData(sourceData);
         enlarged.setMinSize(0, 0);
         enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-
-        InPlaceFullscreen.show(this, "Confronto 3D dei rate · " + contextName, enlarged);
+        InPlaceFullscreen.show(this, UiTranslations.t("Confronto 3D dei rate") + " · " + contextName, enlarged);
     }
 
     private void exportViewerPng() {
-        if (getScene() == null || viewer.getWidth() <= 1 || viewer.getHeight() <= 1) {
-            return;
-        }
+        if (getScene() == null || viewer.getWidth() <= 1 || viewer.getHeight() <= 1) return;
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("Esporta vista 3D");
+        chooser.setTitle(UiTranslations.t("Esporta vista 3D"));
         chooser.setInitialFileName(contextName.replaceAll("[^A-Za-z0-9._-]", "_") + "_vista_3D.png");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Immagine PNG", "*.png"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(UiTranslations.t("Immagine PNG"), "*.png"));
         File file = chooser.showSaveDialog(getScene().getWindow());
-        if (file == null) {
-            return;
-        }
+        if (file == null) return;
         if (!file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".png")) {
             file = new File(file.getParentFile(), file.getName() + ".png");
         }
@@ -312,7 +270,7 @@ public final class ThreeDChartPane extends BorderPane {
             ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", file);
         } catch (IOException | RuntimeException error) {
             new Alert(Alert.AlertType.ERROR,
-                    "Esportazione PNG non riuscita: " + error.getMessage()).showAndWait();
+                    UiTranslations.t("Esportazione PNG non riuscita:") + " " + error.getMessage()).showAndWait();
         }
     }
 
