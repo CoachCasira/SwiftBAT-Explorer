@@ -70,3 +70,19 @@
 .compare-selector-group {
     -fx-alignment: center;
 }
+
+/* Il dizionario non deve scorrere orizzontalmente: i testi delle celle sono gia' wrappati.
+   Nascondere la barra elimina anche il quadratino/corner bianco mostrato da Windows. */
+.dictionary-list .scroll-bar:horizontal {
+    -fx-opacity: 0;
+    -fx-min-height: 0;
+    -fx-pref-height: 0;
+    -fx-max-height: 0;
+    -fx-padding: 0;
+}
+
+.dictionary-list .corner,
+.dictionary-list .virtual-flow .corner {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+}
