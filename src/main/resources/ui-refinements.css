@@ -70,8 +70,3 @@
 .compare-selector-group {
     -fx-alignment: center;
 }
-
-.population-filter-group-wide,
-.population-fracexp-wide {
-    -fx-max-width: infinity;
-}
