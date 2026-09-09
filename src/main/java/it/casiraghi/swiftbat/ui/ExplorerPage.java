@@ -117,7 +117,9 @@ public final class ExplorerPage extends BorderPane {
     public void setCatalog(List<CatalogEntry> entries, boolean fallback) {
         catalog.setAll(entries);
         applyCatalogFilters();
-        catalogCount.setText(entries.size() + (fallback ? " GRB di emergenza" : " GRB nel catalogo online"));
+        I18n.setText(catalogCount,
+                entries.size() + (fallback ? " GRB di emergenza" : " GRB nel catalogo online"),
+                entries.size() + (fallback ? " fallback GRBs" : " GRBs in the online catalog"));
     }
 
     public void setScientificMetadata(List<SkyBurst> bursts) {
@@ -182,9 +184,14 @@ public final class ExplorerPage extends BorderPane {
         box.getStyleClass().addAll("empty-state", "error-state");
         box.setAlignment(Pos.CENTER);
         Label icon = UiFactory.label("!", "error-symbol");
-        Label title = UiFactory.label("Dati non disponibili per " + entry.grbName(), "empty-title");
+        Label title = UiFactory.label(
+                I18n.dynamic("Dati non disponibili per " + entry.grbName(),
+                        "Data unavailable for " + entry.grbName()), "empty-title");
         Label message = UiFactory.wrappedLabel(
-                readableError(error) + "\n\nL'evento rimane nel catalogo, ma la struttura online può essere incompleta o diversa da quella standard.",
+                I18n.dynamic(readableError(error)
+                                + "\n\nL'evento rimane nel catalogo, ma la struttura online può essere incompleta o diversa da quella standard.",
+                        readableError(error)
+                                + "\n\nThe event remains in the catalog, but its online structure may be incomplete or differ from the standard layout."),
                 "empty-message");
         message.setMaxWidth(720);
         HBox actions = new HBox(10);
@@ -378,7 +385,7 @@ public final class ExplorerPage extends BorderPane {
             if (zMin != null && (z == null || z < zMin)) return false;
             return zMax == null || (z != null && z <= zMax);
         });
-        catalogCount.setText(filteredCatalog.size() + " GRB visualizzati");
+        I18n.setText(catalogCount, filteredCatalog.size() + " GRB visualizzati", filteredCatalog.size() + " GRBs shown");
     }
 
     private static TextField compactFilterField(String prompt) {
@@ -500,7 +507,7 @@ public final class ExplorerPage extends BorderPane {
         VBox card = compactMetricCard(title, value, detail);
         if (item != null && item.value() != null && !item.value().isBlank()) {
             String complete = item.value() + (item.unit().isBlank() ? "" : " " + item.unit());
-            Tooltip.install(card, UiFactory.quickTooltip("Valore completo: " + complete));
+            Tooltip.install(card, UiFactory.quickTooltip(I18n.dynamic("Valore completo: " + complete, "Full value: " + complete)));
         }
         return card;
     }
