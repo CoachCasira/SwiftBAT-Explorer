@@ -1,7 +1,8 @@
 package it.casiraghi.swiftbat.ui.components;
 
-import it.casiraghi.swiftbat.ui.UiFactory;
 import it.casiraghi.swiftbat.ui.I18n;
+import it.casiraghi.swiftbat.ui.UiFactory;
+import it.casiraghi.swiftbat.ui.UiTranslations;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingNode;
 import javafx.geometry.Pos;
@@ -37,11 +38,16 @@ import java.util.function.DoubleConsumer;
 
 /** Vista prospettica dedicata al modello spettrale ricostruito. */
 public final class SpectralModel3DPane extends BorderPane {
+    /** Same scientific color used by the 2D reconstructed-fit curve. */
+    private static final String CURVE_HEX = "#12dff7";
+
     private final SwingNode swingNode = new SwingNode();
     private final SpectralRenderer renderer;
     private final Label zoomLabel = UiFactory.label("Zoom 100%", "three-d-zoom-inline");
+    private final String modelCode;
 
     public SpectralModel3DPane(String modelCode, double[] energies, double[] logFluxes) {
+        this.modelCode = modelCode == null || modelCode.isBlank() ? "" : modelCode;
         renderer = new SpectralRenderer(energies, logFluxes);
 
         getStyleClass().addAll("three-d-panel", "three-d-panel-fullscreen");
@@ -68,6 +74,9 @@ public final class SpectralModel3DPane extends BorderPane {
     }
 
     private HBox buildFooter() {
+        Label legend = UiFactory.label("● Fit" + (modelCode.isBlank() ? "" : " " + modelCode), "legend-item");
+        legend.setStyle("-fx-text-fill: " + CURVE_HEX + ";");
+
         Label interaction = UiFactory.wrappedLabel(
                 "Trascina: prospettiva · Rotella: zoom · Doppio clic: centra",
                 "subtle-text");
@@ -78,7 +87,7 @@ public final class SpectralModel3DPane extends BorderPane {
         Button reset = UiFactory.button("Centra vista", "secondary-button");
         reset.setOnAction(event -> SwingUtilities.invokeLater(renderer::resetView));
 
-        HBox footer = new HBox(12, zoomLabel, interaction, reset);
+        HBox footer = new HBox(12, legend, zoomLabel, interaction, reset);
         footer.setAlignment(Pos.CENTER_LEFT);
         footer.getStyleClass().add("three-d-footer");
         return footer;
@@ -103,7 +112,7 @@ public final class SpectralModel3DPane extends BorderPane {
         private static final Color GRID_STRONG = new Color(113, 148, 210, 125);
         private static final Color TEXT = new Color(226, 236, 255);
         private static final Color MUTED = new Color(141, 164, 207);
-        private static final Color CURVE = new Color(255, 173, 82);
+        private static final Color CURVE = new Color(18, 223, 247);
         private static final DecimalFormat AXIS_FORMAT;
 
         static {
@@ -157,9 +166,7 @@ public final class SpectralModel3DPane extends BorderPane {
 
                 @Override
                 public void mouseClicked(MouseEvent event) {
-                    if (event.getClickCount() == 2) {
-                        resetView();
-                    }
+                    if (event.getClickCount() == 2) resetView();
                 }
 
                 @Override
@@ -210,7 +217,7 @@ public final class SpectralModel3DPane extends BorderPane {
         private void paintEmpty(Graphics2D g) {
             g.setFont(new Font("SansSerif", Font.PLAIN, 15));
             g.setColor(MUTED);
-            String text = I18n.t("Modello spettrale non disponibile.");
+            String text = UiTranslations.t("Modello spettrale non disponibile.");
             FontMetrics metrics = g.getFontMetrics();
             g.drawString(text, (getWidth() - metrics.stringWidth(text)) / 2, getHeight() / 2);
         }
@@ -253,12 +260,12 @@ public final class SpectralModel3DPane extends BorderPane {
 
             drawPlane(g, left, top, right, bottom, minX, maxX, minY, maxY, false);
             drawCurve(g, left + perspectiveX, top + perspectiveY, right + perspectiveX,
-                    bottom + perspectiveY, minX, maxX, minY, maxY, 70, 2.0f);
+                    bottom + perspectiveY, minX, maxX, minY, maxY, 68, 2.0f);
             drawCurve(g, left, top, right, bottom, minX, maxX, minY, maxY, 255, 3.2f);
 
             g.setFont(new Font("SansSerif", Font.BOLD, 12));
             g.setColor(TEXT);
-            String xLabel = I18n.t("Energia (keV)");
+            String xLabel = UiTranslations.t("Energia (keV)");
             g.drawString(xLabel,
                     (float) ((left + right) / 2 - g.getFontMetrics().stringWidth(xLabel) / 2.0),
                     (float) bottom + 54);
