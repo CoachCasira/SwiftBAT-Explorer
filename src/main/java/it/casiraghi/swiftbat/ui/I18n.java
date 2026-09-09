@@ -201,6 +201,80 @@ public final class I18n {
         put("Analisi annullata", "Analysis cancelled");
         put("Nessuno", "None");
         put("corrispondenze", "matches");
+        // UX / localizzazione 1.3.0 - stringhe dinamiche e renderer
+        put("RATE massimo", "maximum RATE");
+        put("rispetto al trigger", "relative to trigger");
+        put("proxy alte / basse energie", "high / low energy proxy");
+        put("in memoria nella sessione", "in session memory");
+        put("Short (T90 ≤ 2 s)", "Short (T90 ≤ 2 s)");
+        put("Long (T90 > 2 s)", "Long (T90 > 2 s)");
+        put("z non disponibile", "z unavailable");
+        put("Binning temporale", "Time binning");
+        put("Banda complessiva", "Overall energy band");
+        put("Intervallo temporale", "Time range");
+        put("Righe ASCII", "ASCII rows");
+        put("Righe FITS", "FITS rows");
+        put("Campo da spiegare", "Field to explain");
+        put("Campo metadata", "Metadata field");
+        put("Nascondi colonna", "Hide column");
+        put("Manuale…", "Manual…");
+        put("Qualità FRACEXP", "FRACEXP quality");
+        put("Campione massimo", "Maximum sample");
+        put("Intervallo del fit", "Fit interval");
+        put("Modello del fit", "Fit model");
+        put("Fonte ufficiale BAT", "Official BAT source");
+        put("Evento A", "Event A");
+        put("Evento B", "Event B");
+        put("Confronto temporale", "Time comparison");
+        put("Normalizza ogni curva sul proprio picco", "Normalize each curve to its own peak");
+        put("Caricamento confronto…", "Loading comparison…");
+        put("Errore caricamento confronto", "Comparison load failed");
+        put("Scegli due GRB diversi", "Choose two different GRBs");
+        put("Apri o seleziona almeno due GRB", "Open or select at least two GRBs");
+        put("Caricamento dei GRB selezionati…", "Loading selected GRBs…");
+        put("Mappa non disponibile: servono i quattro canali ASCII.", "Map unavailable: the four ASCII channels are required.");
+        put("Banda", "Band");
+        put("Centro bin", "Bin center");
+        put("Larghezza banda", "Band width");
+        put("Fluttuazione negativa", "Negative fluctuation");
+        put("Rate circa zero", "Rate near zero");
+        put("Rate positivo", "Positive rate");
+        put("Trascina: ruota prospettiva   ·   Rotella: zoom   ·   Doppio clic: centra", "Drag: rotate perspective   ·   Wheel: zoom   ·   Double-click: center");
+        put("Trascina: prospettiva · Rotella: zoom · Doppio clic: centra", "Drag: perspective · Wheel: zoom · Double-click: center");
+        put("Modello spettrale non disponibile.", "Spectral model unavailable.");
+        put("Curve di luce 3D per banda energetica", "3D light curves by energy band");
+        put("Profondità = banda energetica ASCII; non distanza spaziale.", "Depth = ASCII energy band; not spatial distance.");
+        put("Asse X = tempo dal trigger; asse Y = rate; profondità = quattro bande energetiche. Ogni linea è una curva di luce a bin di 1 secondo: la vista non rappresenta una distanza nello spazio né uno spettro continuo. Trascina per ruotare e usa la rotella per lo zoom.",
+                "X axis = time from trigger; Y axis = rate; depth = the four energy bands. Each line is a 1-second-binned light curve: the view does not represent spatial distance or a continuous spectrum. Drag to rotate and use the wheel to zoom.");
+        put("Curva — la linea arancione rappresenta la funzione spettrale ricostruita dal fit ufficiale BAT selezionato. Non è una successione di punti grezzi misurati dal rivelatore.", "Curve — the orange line is the spectral function reconstructed from the selected official BAT fit. It is not a sequence of raw detector measurements.");
+        put("Asse X — mostra l'energia dei fotoni in keV, da 15 a 150 keV nella vista corrente.", "X axis — photon energy in keV, from 15 to 150 keV in the current view.");
+        put("Asse Y — mostra log₁₀ N(E), cioè il logaritmo del flusso fotonico differenziale. Valori negativi sono perfettamente normali e indicano N(E) < 1 nelle unità riportate.", "Y axis — log₁₀ N(E), the logarithm of the differential photon flux. Negative values are normal and mean N(E) < 1 in the displayed units.");
+        put("Forma — la pendenza della curva descrive come il contributo previsto dal modello cambia con l'energia. Un andamento più ripido indica una diminuzione più rapida verso le energie elevate.", "Shape — the curve slope shows how the model contribution changes with energy. A steeper trend means a faster decrease toward higher energies.");
+        put("Confronto — questa è la stessa funzione visualizzata nella vista 3D: il 3D aggiunge soltanto prospettiva grafica e non introduce una nuova grandezza fisica.", "Comparison — this is the same function shown in the 3D view: 3D only adds graphical perspective and does not introduce a new physical quantity.");
+        put("Da ricordare — il grafico visualizza il modello ricostruito dai parametri del fit BAT; non deriva dalla somma delle quattro curve di luce ASCII.", "Remember — the chart shows the model reconstructed from BAT fit parameters; it is not derived by summing the four ASCII light curves.");
+        put("Modello — la curva arancione rappresenta la stessa funzione spettrale ricostruita mostrata nella vista 2D. Non sono aggiunti nuovi punti osservativi.", "Model — the orange curve is the same reconstructed spectral function shown in 2D. No new observed points are added.");
+        put("Assi — X indica l'energia dei fotoni in keV; Y indica log₁₀ N(E), il logaritmo del flusso fotonico differenziale previsto dal fit.", "Axes — X is photon energy in keV; Y is log₁₀ N(E), the logarithm of the differential photon flux predicted by the fit.");
+        put("Forma della curva — la pendenza mostra come il contributo del modello diminuisce o varia passando verso energie più elevate.", "Curve shape — the slope shows how the model contribution decreases or changes toward higher energies.");
+        put("Profondità — il piano arretrato e i collegamenti servono soltanto alla prospettiva. Non rappresentano tempo, distanza, intensità o una terza variabile fisica.", "Depth — the rear plane and connectors are only for perspective. They do not represent time, distance, intensity, or a third physical variable.");
+        put("Interazione — trascina per cambiare la prospettiva interna, usa la rotellina per lo zoom e fai doppio clic per ricentrare la vista.", "Interaction — drag to change perspective, use the wheel to zoom, and double-click to recenter the view.");
+        put("Interpretazione — zoom e prospettiva cambiano soltanto la visualizzazione: energia, N(E) e parametri del fit rimangono invariati.", "Interpretation — zoom and perspective only change the visualization: energy, N(E), and fit parameters remain unchanged.");
+        put("Barre — ogni barra rappresenta il flusso energetico integrato pubblicato da BAT per una specifica banda energetica.", "Bars — each bar is the integrated energy flux published by BAT for a specific energy band.");
+        put("Asse X — separa le bande di energia riportate dal catalogo, così da confrontare rapidamente dove il modello concentra più flusso.", "X axis — separates the catalog energy bands so you can quickly compare where the model carries more flux.");
+        put("Asse Y — misura il flusso energetico in erg cm⁻² s⁻¹. Una barra più alta indica un flusso integrato maggiore nella banda corrispondente.", "Y axis — energy flux in erg cm⁻² s⁻¹. A taller bar means a larger integrated flux in that band.");
+        put("Intervalli al 90% — i limiti di confidenza ufficiali restano disponibili nella tabella e nel tooltip delle barre; l'altezza mostra il valore centrale pubblicato.", "90% intervals — official confidence limits remain available in the table and bar tooltip; bar height shows the published central value.");
+        put("Confronto — questo istogramma e la curva spettrale descrivono due aspetti dello stesso fit ufficiale, ma non sono quattro curve di luce sommate.", "Comparison — this histogram and the spectral curve describe two aspects of the same official fit; they are not four summed light curves.");
+        put("Da ricordare — le barre derivano dai prodotti spettroscopici BAT/XSPEC e non dai rate ASCII a bin di un secondo.", "Remember — the bars come from BAT/XSPEC spectral products, not from 1-second ASCII rates.");
+        put("Barre — sono gli stessi valori dell'istogramma 2D, disposti in prospettiva per facilitare il confronto visivo tra le bande energetiche.", "Bars — these are the same values as the 2D histogram, arranged in perspective to make energy-band comparison easier.");
+        put("Assi — X identifica la banda energetica; l'altezza della barra rappresenta il flusso energetico integrato pubblicato da BAT.", "Axes — X identifies the energy band; bar height is the integrated energy flux published by BAT.");
+        put("Scala — i valori sono mostrati in unità di 10⁻¹² erg cm⁻² s⁻¹ per mantenere una scala numerica leggibile senza alterare i rapporti tra le bande.", "Scale — values are shown in units of 10⁻¹² erg cm⁻² s⁻¹ to keep the numeric scale readable without changing ratios between bands.");
+        put("Profondità — serve esclusivamente a separare graficamente le barre. Non è una distanza e non aggiunge una nuova grandezza fisica.", "Depth — only separates the bars graphically. It is not a distance and does not add a new physical quantity.");
+        put("Interazione — trascina per cambiare prospettiva, usa la rotellina per lo zoom e il pulsante Centra vista per tornare all'inquadratura iniziale.", "Interaction — drag to change perspective, use the wheel to zoom, and Center view to return to the initial framing.");
+        put("Da ricordare — i limiti al 90% restano consultabili nella tabella 2D; la vista 3D mostra i valori centrali del fit ufficiale.", "Remember — 90% limits remain available in the 2D table; the 3D view shows the official fit central values.");
+        put("Assi — X rappresenta il tempo rispetto al trigger t = 0; Y separa le quattro bande energetiche BAT.", "Axes — X is time relative to trigger t = 0; Y separates the four BAT energy bands.");
+        put("Colore — arancio indica un rate netto positivo, blu una fluttuazione negativa dopo la sottrazione del fondo; i toni scuri indicano valori vicini a zero.", "Color — orange indicates positive net rate, blue a negative fluctuation after background subtraction; dark tones are values near zero.");
+        put("Dettaglio — spostando il mouse sulla mappa puoi leggere banda energetica, centro del bin, rate e larghezza della banda nel punto osservato.", "Detail — move the pointer over the map to read energy band, bin center, rate, and band width at that point.");
+        put("Scala temporale — ogni cella deriva dai rate ASCII a bin di 1 secondo e la finestra visualizzata è la stessa scelta nella scheda Spettroscopia.", "Time scale — each cell comes from 1-second ASCII rates and the displayed window is the one selected in the Spectroscopy tab.");
+        put("Da ricordare — questa mappa descrive i rate BAT nel tempo: non è un fit XSPEC e non converte direttamente i conteggi in flusso fisico.", "Remember — this map shows BAT rates over time: it is not an XSPEC fit and does not directly convert counts into physical flux.");
         // STRICT_I18N_EXPLORER_BATCH
         put("Catalogo in caricamento…", "Loading catalog…");
         put("Apri Data Product", "Open Data Product");
@@ -348,6 +422,8 @@ public final class I18n {
         String translated = translateDirect(text, EN, IT);
         if (!translated.equals(text)) return translated;
         if (IT.containsKey(text)) return text;
+        String composed = translateComposedEnglish(text);
+        if (!composed.equals(text)) return composed;
         return requiresTranslation(text) ? "[Missing English translation]" : text;
     }
 
@@ -367,6 +443,19 @@ public final class I18n {
             if (reverse.containsKey(tail)) return text;
         }
         return text;
+    }
+
+    private static String translateComposedEnglish(String text) {
+        String result = text;
+        java.util.List<Map.Entry<String, String>> entries = new java.util.ArrayList<>(EN.entrySet());
+        entries.sort((left, right) -> Integer.compare(right.getKey().length(), left.getKey().length()));
+        for (Map.Entry<String, String> entry : entries) {
+            String italian = entry.getKey();
+            String english = entry.getValue();
+            if (italian == null || english == null || italian.equals(english) || italian.length() < 3) continue;
+            if (result.contains(italian)) result = result.replace(italian, english);
+        }
+        return result;
     }
 
     public static String english(String italian) {

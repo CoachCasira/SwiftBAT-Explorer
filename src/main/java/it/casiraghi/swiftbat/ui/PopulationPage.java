@@ -118,6 +118,7 @@ public final class PopulationPage extends BorderPane {
     private final BarChart<String, Number> t90Histogram = histogram("T90");
     private final BarChart<String, Number> redshiftHistogram = histogram("Redshift");
     private final TableView<PopulationEvent> resultTable = new TableView<>();
+    private FlowPane resultColumnBar;
     private final TabPane resultTabs = new TabPane();
     private final Button profile3D = UiFactory.button("Vista 3D interattiva", "secondary-button");
     private final Button exposure3D = UiFactory.button("Vista 3D", "secondary-button");
@@ -185,13 +186,15 @@ public final class PopulationPage extends BorderPane {
         VBox filterCard = buildFilters();
         configureChart();
         configureTable();
+        VBox includedTable = new VBox(6, resultColumnBar, resultTable);
+        VBox.setVgrow(resultTable, Priority.ALWAYS);
 
         resultTabs.getStyleClass().add("main-tabs");
         resultTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
         resultTabs.getTabs().addAll(
                 new Tab("Profilo temporale", chartCard()),
                 new Tab("Distribuzioni del campione", distributionPane()),
-                new Tab("GRB inclusi", resultTable));
+                new Tab("GRB inclusi", includedTable));
         resultTabs.setMinHeight(450);
         resultTabs.setPrefHeight(500);
         resultTabs.setMaxHeight(560);
@@ -225,16 +228,6 @@ public final class PopulationPage extends BorderPane {
         Node windowControl = compactRadioChoice(window,
                 List.of("±20 s", "±60 s", "±120 s"), List.of("±20 s", "±60 s", "±120 s"));
 
-        FlowPane primary = new FlowPane(9, 7);
-        primary.getStyleClass().add("population-filter-grid");
-        primary.getChildren().addAll(
-                filterGroup("Durata T90", "Classe temporale", duration, 185),
-                filterGroup("Redshift", "", redshiftControl, 245),
-                filterGroup("Finestra temporale", "", windowControl, 230),
-                filterGroup("Campione massimo", "GRB più recenti dopo i filtri", limit, 150));
-        primary.setMinWidth(650);
-        primary.setPrefWrapLength(690);
-
         HBox advancedContent = new HBox(10);
         advancedContent.setAlignment(Pos.TOP_LEFT);
         advancedContent.getChildren().addAll(
@@ -261,17 +254,20 @@ public final class PopulationPage extends BorderPane {
         HBox.setHgrow(maximum, Priority.ALWAYS);
 
         VBox exposureIntro = new VBox(2,
-                UiFactory.label("Qualità della copertura FRACEXP", "population-section-title"));
-        VBox exposureBox = new VBox(7, exposureIntro, exposureControls);
+                UiFactory.label("Qualità FRACEXP", "population-section-title"));
+        VBox exposureBox = new VBox(6, exposureIntro, exposureControls);
         exposureBox.setAlignment(Pos.TOP_LEFT);
-        exposureBox.getStyleClass().addAll("population-filter-section", "population-filter-side");
-        exposureBox.setMinWidth(430);
-        exposureBox.setPrefWidth(500);
+        exposureBox.getStyleClass().addAll("population-filter-section", "population-filter-side", "population-fracexp-inline");
+        exposureBox.setMinWidth(300);
+        exposureBox.setPrefWidth(350);
         exposureBox.setMaxWidth(Double.MAX_VALUE);
 
-        HBox topFilters = new HBox(12, primary, exposureBox);
+        VBox durationGroup = filterGroup("Durata T90", "", duration, 170);
+        VBox redshiftGroup = filterGroup("Redshift", "", redshiftControl, 220);
+        VBox windowGroup = filterGroup("Finestra temporale", "", windowControl, 215);
+        VBox limitGroup = filterGroup("Campione massimo", "", limit, 135);
+        HBox topFilters = new HBox(8, durationGroup, redshiftGroup, windowGroup, exposureBox, limitGroup);
         topFilters.setAlignment(Pos.TOP_LEFT);
-        HBox.setHgrow(primary, Priority.ALWAYS);
         HBox.setHgrow(exposureBox, Priority.ALWAYS);
 
         HBox actions = new HBox(8);
@@ -678,7 +674,7 @@ public final class PopulationPage extends BorderPane {
 
     private void configureTable() {
         resultTable.getStyleClass().add("data-table");
-        TablePreferences.install(resultTable, "population.results");
+        resultColumnBar = TablePreferences.install(resultTable, "population.results");
         resultTable.setPlaceholder(UiFactory.wrappedLabel(
                 "Nessun GRB incluso. Controlla i filtri oppure esegui una nuova analisi.",
                 "empty-message"));
@@ -1319,8 +1315,8 @@ public final class PopulationPage extends BorderPane {
         HBox.setHgrow(slider, Priority.ALWAYS);
         VBox box = new VBox(5, heading, slider);
         box.getStyleClass().add("percentage-control");
-        box.setMinWidth(185);
-        box.setPrefWidth(215);
+        box.setMinWidth(125);
+        box.setPrefWidth(150);
         box.setMaxWidth(Double.MAX_VALUE);
         return box;
     }

@@ -256,13 +256,33 @@ public final class ExplorerPage extends BorderPane {
         cacheFilter.getStyleClass().add("choice-box-modern");
         cacheFilter.setMaxWidth(Double.MAX_VALUE);
 
+        ChoiceBox<String> t90Preset = new ChoiceBox<>(FXCollections.observableArrayList(
+                "Tutti", "≤ 2 s", "2–10 s", "10–50 s", "50–100 s", "> 100 s", "Manuale…"));
+        ChoiceBox<String> redshiftPreset = new ChoiceBox<>(FXCollections.observableArrayList(
+                "Tutti", "0–1", "1–2", "2–3", "3–4", "4–6", "> 6", "Manuale…"));
+        for (ChoiceBox<String> preset : List.of(t90Preset, redshiftPreset)) {
+            preset.getStyleClass().add("choice-box-modern");
+            preset.setMaxWidth(Double.MAX_VALUE);
+            UiFactory.autoTooltip(preset);
+        }
+        t90Preset.setValue("Tutti");
+        redshiftPreset.setValue("Tutti");
+        HBox t90Manual = filterRange(t90MinFilter, t90MaxFilter);
+        HBox redshiftManual = filterRange(redshiftMinFilter, redshiftMaxFilter);
+        t90Manual.setVisible(false); t90Manual.setManaged(false);
+        redshiftManual.setVisible(false); redshiftManual.setManaged(false);
+        t90Preset.valueProperty().addListener((obs, oldValue, value) ->
+                applyRangePreset(value, t90MinFilter, t90MaxFilter, t90Manual, true));
+        redshiftPreset.valueProperty().addListener((obs, oldValue, value) ->
+                applyRangePreset(value, redshiftMinFilter, redshiftMaxFilter, redshiftManual, false));
+
         GridPane extraGrid = new GridPane();
         extraGrid.setHgap(8);
         extraGrid.setVgap(6);
         extraGrid.add(UiFactory.label("T90 (s)", "filter-label"), 0, 0);
         extraGrid.add(UiFactory.label("Redshift z", "filter-label"), 1, 0);
-        extraGrid.add(filterRange(t90MinFilter, t90MaxFilter), 0, 1);
-        extraGrid.add(filterRange(redshiftMinFilter, redshiftMaxFilter), 1, 1);
+        extraGrid.add(new VBox(5, t90Preset, t90Manual), 0, 1);
+        extraGrid.add(new VBox(5, redshiftPreset, redshiftManual), 1, 1);
         var extraFirst = new javafx.scene.layout.ColumnConstraints();
         extraFirst.setPercentWidth(50);
         extraFirst.setHgrow(Priority.ALWAYS);
@@ -278,6 +298,8 @@ public final class ExplorerPage extends BorderPane {
             t90MaxFilter.clear();
             redshiftMinFilter.clear();
             redshiftMaxFilter.clear();
+            t90Preset.setValue("Tutti");
+            redshiftPreset.setValue("Tutti");
             applyCatalogFilters();
         });
         VBox extraBox = new VBox(8,
@@ -403,6 +425,38 @@ public final class ExplorerPage extends BorderPane {
         HBox.setHgrow(minimum, Priority.ALWAYS);
         HBox.setHgrow(maximum, Priority.ALWAYS);
         return box;
+    }
+
+    private void applyRangePreset(String preset, TextField minimum, TextField maximum,
+                                  HBox manualBox, boolean t90) {
+        String value = preset == null ? "Tutti" : preset;
+        boolean manual = "Manuale…".equals(value);
+        manualBox.setVisible(manual);
+        manualBox.setManaged(manual);
+        if (manual) return;
+        minimum.clear();
+        maximum.clear();
+        if (t90) {
+            switch (value) {
+                case "≤ 2 s" -> maximum.setText("2");
+                case "2–10 s" -> { minimum.setText("2"); maximum.setText("10"); }
+                case "10–50 s" -> { minimum.setText("10"); maximum.setText("50"); }
+                case "50–100 s" -> { minimum.setText("50"); maximum.setText("100"); }
+                case "> 100 s" -> minimum.setText("100");
+                default -> { }
+            }
+        } else {
+            switch (value) {
+                case "0–1" -> { minimum.setText("0"); maximum.setText("1"); }
+                case "1–2" -> { minimum.setText("1"); maximum.setText("2"); }
+                case "2–3" -> { minimum.setText("2"); maximum.setText("3"); }
+                case "3–4" -> { minimum.setText("3"); maximum.setText("4"); }
+                case "4–6" -> { minimum.setText("4"); maximum.setText("6"); }
+                case "> 6" -> minimum.setText("6");
+                default -> { }
+            }
+        }
+        scheduleCatalogFilters();
     }
 
     private static Double optionalNumber(TextField field) {
@@ -636,20 +690,14 @@ public final class ExplorerPage extends BorderPane {
         pane.setPadding(new Insets(18));
 
         ChoiceBox<String> sourceChoice = new ChoiceBox<>();
-        if (!data.asciiData().isEmpty()) {
-            sourceChoice.getItems().add("ASCII — quattro bande");
-        }
-        if (!data.fitsData().isEmpty()) {
-            sourceChoice.getItems().add("FITS — un canale e qualità");
-        }
+        if (!data.asciiData().isEmpty()) sourceChoice.getItems().add("ASCII — quattro bande");
+        if (!data.fitsData().isEmpty()) sourceChoice.getItems().add("FITS — un canale e qualità");
         sourceChoice.getStyleClass().add("choice-box-modern");
         sourceChoice.setMinWidth(190);
         sourceChoice.setPrefWidth(215);
         sourceChoice.setMaxWidth(250);
         UiFactory.autoTooltip(sourceChoice);
-        if (!sourceChoice.getItems().isEmpty()) {
-            sourceChoice.setValue(sourceChoice.getItems().get(0));
-        }
+        if (!sourceChoice.getItems().isEmpty()) sourceChoice.setValue(sourceChoice.getItems().get(0));
 
         TextField filter = new TextField();
         filter.setPromptText("Filtra le righe per valore testuale…");
@@ -657,13 +705,6 @@ public final class ExplorerPage extends BorderPane {
         filter.setMinWidth(170);
         filter.setPrefWidth(360);
         filter.setMaxWidth(Double.MAX_VALUE);
-
-        ChoiceBox<String> fieldChoice = new ChoiceBox<>();
-        fieldChoice.getStyleClass().add("choice-box-modern");
-        fieldChoice.setMinWidth(215);
-        fieldChoice.setPrefWidth(285);
-        fieldChoice.setMaxWidth(340);
-        UiFactory.autoTooltip(fieldChoice);
 
         Button exportAscii = UiFactory.button("ASCII → Excel", "ghost-button");
         exportAscii.getStyleClass().add("excel-export-button");
@@ -673,41 +714,71 @@ public final class ExplorerPage extends BorderPane {
         exportFits.getStyleClass().add("excel-export-button");
         exportFits.setDisable(data.fitsData().isEmpty());
         exportFits.setOnAction(event -> exportExcel(data, false));
-        HBox sourceRow = new HBox(10, sourceChoice, filter);
-        sourceRow.setAlignment(Pos.CENTER_LEFT);
-        HBox.setHgrow(filter, Priority.ALWAYS);
 
-        HBox explainControl = new HBox(8,
-                UiFactory.label("Spiega il campo:", "toolbar-label"), fieldChoice);
-        explainControl.setAlignment(Pos.CENTER_RIGHT);
-        Region actionSpacer = UiFactory.spacer();
-        HBox actionRow = new HBox(10, exportAscii, exportFits, actionSpacer, explainControl);
-        actionRow.setAlignment(Pos.CENTER_LEFT);
-        HBox.setHgrow(actionSpacer, Priority.ALWAYS);
-
-        VBox toolbar = new VBox(8, sourceRow, actionRow);
+        HBox toolbar = new HBox(10, sourceChoice, filter, exportAscii, exportFits);
         toolbar.getStyleClass().add("data-toolbar");
+        toolbar.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(filter, Priority.ALWAYS);
         pane.setTop(toolbar);
-        BorderPane.setMargin(toolbar, new Insets(0, 0, 14, 0));
+        BorderPane.setMargin(toolbar, new Insets(0, 0, 12, 0));
 
         TableView<ObservableList<String>> table = new TableView<>();
         table.getStyleClass().add("data-table");
         table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
-        TablePreferences.install(table, "explorer.data");
+        FlowPane hiddenColumns = TablePreferences.install(table, "explorer.data." + data.grbName());
+
+        ChoiceBox<String> fieldChoice = new ChoiceBox<>();
+        fieldChoice.getStyleClass().add("choice-box-modern");
+        fieldChoice.setMinWidth(220);
+        fieldChoice.setPrefWidth(300);
+        fieldChoice.setMaxWidth(Double.MAX_VALUE);
+        UiFactory.autoTooltip(fieldChoice);
 
         VBox explanation = new VBox(12);
         explanation.getStyleClass().add("field-explanation-panel");
-        explanation.setPadding(new Insets(18));
-        explanation.setPrefWidth(350);
+        explanation.setPadding(new Insets(16));
+        VBox side = new VBox(10,
+                UiFactory.label("Campo da spiegare", "filter-label"), fieldChoice, explanation);
+        side.setPadding(new Insets(4, 0, 4, 10));
+        side.setMinWidth(300);
+        side.setPrefWidth(365);
+        side.setMaxWidth(410);
+        ScrollPane explanationScroll = scrollableSide(side);
+        explanationScroll.setMinWidth(300);
+        explanationScroll.setPrefWidth(365);
+        explanationScroll.setMaxWidth(410);
+
+        ToggleButton explanationToggle = new ToggleButton(I18n.t("Mostra spiegazione"));
+        explanationToggle.getStyleClass().addAll("ghost-button", "help-toggle");
+        HBox tableTools = new HBox(8, hiddenColumns, UiFactory.spacer(), explanationToggle);
+        tableTools.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(hiddenColumns, Priority.ALWAYS);
+        VBox tableArea = new VBox(7, tableTools, table);
+        VBox.setVgrow(table, Priority.ALWAYS);
+        BorderPane content = new BorderPane(tableArea);
+        content.setMinWidth(0);
+
+        explanationToggle.selectedProperty().addListener((obs, oldValue, selected) -> {
+            explanationToggle.setText(I18n.t(selected ? "Nascondi spiegazione" : "Mostra spiegazione"));
+            if (selected) {
+                content.setRight(explanationScroll);
+                BorderPane.setMargin(explanationScroll, new Insets(0, 0, 0, 10));
+            } else {
+                content.setRight(null);
+            }
+        });
+        I18n.languageProperty().addListener((obs, oldValue, newValue) ->
+                explanationToggle.setText(I18n.t(explanationToggle.isSelected()
+                        ? "Nascondi spiegazione" : "Mostra spiegazione")));
 
         Runnable refresh = () -> {
             TabularData selected = sourceChoice.getValue() != null && sourceChoice.getValue().startsWith("FITS")
                     ? data.fitsData() : data.asciiData();
             populateTable(table, selected, data, filter.getText());
+            String previous = fieldChoice.getValue();
             fieldChoice.setItems(FXCollections.observableArrayList(selected.headers()));
-            if (!selected.headers().isEmpty()) {
-                fieldChoice.setValue(selected.headers().get(0));
-            }
+            if (previous != null && selected.headers().contains(previous)) fieldChoice.setValue(previous);
+            else if (!selected.headers().isEmpty()) fieldChoice.setValue(selected.headers().get(0));
         };
         sourceChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refresh.run());
         filter.textProperty().addListener((obs, oldValue, newValue) -> refresh.run());
@@ -715,11 +786,7 @@ public final class ExplorerPage extends BorderPane {
                 showFieldExplanation(explanation, data.definition(newValue), newValue));
         refresh.run();
 
-        ScrollPane explanationScroll = scrollableSide(explanation);
-        SplitPane split = new SplitPane(table, explanationScroll);
-        split.getStyleClass().add("clean-split");
-        split.setDividerPositions(0.72);
-        pane.setCenter(split);
+        pane.setCenter(content);
         return pane;
     }
 
@@ -730,12 +797,12 @@ public final class ExplorerPage extends BorderPane {
         search.setPromptText("Cerca keyword, valore, HDU o commento…");
         search.getStyleClass().add("search-field");
         pane.setTop(search);
-        BorderPane.setMargin(search, new Insets(0, 0, 13, 0));
+        BorderPane.setMargin(search, new Insets(0, 0, 12, 0));
 
         TableView<MetadataItem> table = new TableView<>();
         table.getStyleClass().add("data-table");
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        TablePreferences.install(table, "explorer.metadata");
+        FlowPane hiddenColumns = TablePreferences.install(table, "explorer.metadata." + data.grbName());
         TableColumn<MetadataItem, String> hdu = metadataColumn("HDU", item -> item.hduName(), 95);
         hdu.setMinWidth(75);
         TableColumn<MetadataItem, String> keyword = metadataColumn("Keyword", item -> item.keyword(), 145);
@@ -745,6 +812,7 @@ public final class ExplorerPage extends BorderPane {
         TableColumn<MetadataItem, String> comment = metadataColumn("Commento originale", item -> item.comment(), 440);
         comment.setMinWidth(240);
         table.getColumns().addAll(hdu, keyword, value, comment);
+
         FilteredList<MetadataItem> filtered = new FilteredList<>(FXCollections.observableArrayList(data.metadata()), ignored -> true);
         table.setItems(filtered);
         search.textProperty().addListener((obs, oldValue, newValue) -> {
@@ -754,29 +822,68 @@ public final class ExplorerPage extends BorderPane {
                     .toLowerCase(Locale.ROOT).contains(query));
         });
 
-        VBox side = new VBox(12);
-        side.setPrefWidth(380);
-        side.setMinWidth(320);
-        side.setPadding(new Insets(16));
-        side.setStyle(
-                "-fx-background-color: transparent;"
-                        + "-fx-border-color: transparent;"
-                        + "-fx-background-radius: 0;"
-                        + "-fx-border-radius: 0;"
-        );
-        showMetadataIntro(side);
-        table.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, item) -> {
-            if (item != null) {
-                FieldDefinition definition = findMetadataDefinition(data, item.keyword());
-                showMetadataExplanation(side, item, definition);
-            }
-        });
+        ChoiceBox<String> metadataField = new ChoiceBox<>();
+        metadataField.getStyleClass().add("choice-box-modern");
+        metadataField.setItems(FXCollections.observableArrayList(
+                data.metadata().stream().map(MetadataItem::keyword).filter(valueText -> valueText != null && !valueText.isBlank())
+                        .distinct().toList()));
+        metadataField.setMinWidth(220);
+        metadataField.setPrefWidth(300);
+        metadataField.setMaxWidth(Double.MAX_VALUE);
+        UiFactory.autoTooltip(metadataField);
 
+        VBox explanation = new VBox(12);
+        explanation.setPadding(new Insets(16));
+        explanation.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
+        showMetadataIntro(explanation);
+        VBox side = new VBox(10,
+                UiFactory.label("Campo metadata", "filter-label"), metadataField, explanation);
+        side.setPadding(new Insets(4, 0, 4, 10));
+        side.setMinWidth(300);
+        side.setPrefWidth(380);
+        side.setMaxWidth(420);
         ScrollPane sideScroll = scrollableSide(side);
-        SplitPane split = new SplitPane(table, sideScroll);
-        split.getStyleClass().add("clean-split");
-        split.setDividerPositions(0.70);
-        pane.setCenter(split);
+        sideScroll.setMinWidth(300);
+        sideScroll.setPrefWidth(380);
+        sideScroll.setMaxWidth(420);
+
+        table.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, item) -> {
+            if (item == null) return;
+            if (!item.keyword().equals(metadataField.getValue())) metadataField.setValue(item.keyword());
+            FieldDefinition definition = findMetadataDefinition(data, item.keyword());
+            showMetadataExplanation(explanation, item, definition);
+        });
+        metadataField.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, selectedField) -> {
+            if (selectedField == null) return;
+            data.metadata().stream().filter(item -> selectedField.equals(item.keyword())).findFirst().ifPresent(item -> {
+                table.getSelectionModel().select(item);
+                table.scrollTo(item);
+                showMetadataExplanation(explanation, item, findMetadataDefinition(data, item.keyword()));
+            });
+        });
+        if (!metadataField.getItems().isEmpty()) metadataField.setValue(metadataField.getItems().get(0));
+
+        ToggleButton explanationToggle = new ToggleButton(I18n.t("Mostra spiegazione"));
+        explanationToggle.getStyleClass().addAll("ghost-button", "help-toggle");
+        HBox tableTools = new HBox(8, hiddenColumns, UiFactory.spacer(), explanationToggle);
+        tableTools.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(hiddenColumns, Priority.ALWAYS);
+        VBox tableArea = new VBox(7, tableTools, table);
+        VBox.setVgrow(table, Priority.ALWAYS);
+        BorderPane content = new BorderPane(tableArea);
+        content.setMinWidth(0);
+        explanationToggle.selectedProperty().addListener((obs, oldValue, selected) -> {
+            explanationToggle.setText(I18n.t(selected ? "Nascondi spiegazione" : "Mostra spiegazione"));
+            if (selected) {
+                content.setRight(sideScroll);
+                BorderPane.setMargin(sideScroll, new Insets(0, 0, 0, 10));
+            } else content.setRight(null);
+        });
+        I18n.languageProperty().addListener((obs, oldValue, newValue) ->
+                explanationToggle.setText(I18n.t(explanationToggle.isSelected()
+                        ? "Nascondi spiegazione" : "Mostra spiegazione")));
+
+        pane.setCenter(content);
         return pane;
     }
 

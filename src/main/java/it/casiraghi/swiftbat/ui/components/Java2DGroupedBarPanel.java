@@ -1,5 +1,7 @@
 package it.casiraghi.swiftbat.ui.components;
 
+import it.casiraghi.swiftbat.ui.I18n;
+
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import java.awt.BasicStroke;
@@ -263,11 +265,11 @@ public final class Java2DGroupedBarPanel extends JPanel {
 
         g.setFont(new Font("SansSerif", Font.BOLD, 12));
         g.setColor(TEXT);
-        String xLabel = dataset.xAxisLabel();
+        String xLabel = I18n.t(dataset.xAxisLabel());
         g.drawString(xLabel,
                 (float) ((origin.getX() + xEnd.getX()) / 2.0 - g.getFontMetrics().stringWidth(xLabel) / 2.0),
                 (float) Math.max(origin.getY(), xEnd.getY()) + 43);
-        String yLabel = dataset.valueLabel();
+        String yLabel = I18n.t(dataset.valueLabel());
         Graphics2D verticalAxis = (Graphics2D) g.create();
         verticalAxis.rotate(-Math.PI / 2);
         double yCenter = (origin.getY() + yEnd.getY()) / 2.0;
@@ -277,7 +279,7 @@ public final class Java2DGroupedBarPanel extends JPanel {
                 (float) labelX);
         verticalAxis.dispose();
         g.setColor(new Color(198, 174, 250));
-        g.drawString(dataset.depthAxisLabel(), (float) zEnd.getX() - 20, (float) zEnd.getY() - 10);
+        g.drawString(I18n.t(dataset.depthAxisLabel()), (float) zEnd.getX() - 20, (float) zEnd.getY() - 10);
 
         g.setFont(new Font("SansSerif", Font.BOLD, 11));
         for (int group = 0; group < dataset.groups().length; group++) {
@@ -285,14 +287,14 @@ public final class Java2DGroupedBarPanel extends JPanel {
             Point2D point = geometry.project(1, 0, z);
             g.setColor(dataset.colors()[group]);
             g.fillOval((int) point.getX() + 8, (int) point.getY() - 4, 8, 8);
-            g.drawString(dataset.groups()[group], (float) point.getX() + 21, (float) point.getY() + 4);
+            g.drawString(I18n.t(dataset.groups()[group]), (float) point.getX() + 21, (float) point.getY() + 4);
         }
     }
 
     private void paintHint(Graphics2D g) {
         g.setFont(new Font("SansSerif", Font.PLAIN, 10));
         g.setColor(new Color(MUTED.getRed(), MUTED.getGreen(), MUTED.getBlue(), 185));
-        g.drawString("Trascina: ruota prospettiva   ·   Rotella: zoom   ·   Doppio clic: centra",
+        g.drawString(I18n.t("Trascina: ruota prospettiva   ·   Rotella: zoom   ·   Doppio clic: centra"),
                 18, getHeight() - 17);
     }
 
@@ -312,9 +314,9 @@ public final class Java2DGroupedBarPanel extends JPanel {
 
     private void paintTooltip(Graphics2D g, BarHit selected) {
         String[] lines = {
-                dataset.groups()[selected.group()],
-                dataset.xAxisLabel() + ": " + dataset.categories()[selected.category()],
-                dataset.valueLabel() + ": " + selected.count()
+                I18n.t(dataset.groups()[selected.group()]),
+                I18n.t(dataset.xAxisLabel()) + ": " + I18n.t(dataset.categories()[selected.category()]),
+                I18n.t(dataset.valueLabel()) + ": " + selected.count()
         };
         g.setFont(new Font("SansSerif", Font.PLAIN, 12));
         FontMetrics metrics = g.getFontMetrics();

@@ -1,5 +1,6 @@
 package it.casiraghi.swiftbat.ui;
 
+import javafx.application.Platform;
 import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.MenuButton;
 
@@ -26,9 +27,13 @@ public final class MultiSelectMenuButton extends MenuButton {
             CheckMenuItem item = new CheckMenuItem(I18n.t(value));
             item.setSelected(true);
             item.setOnAction(event -> {
-                if (!internal) {
-                    refreshText();
-                    changeListener.run();
+                if (internal) return;
+                refreshText();
+                changeListener.run();
+                if (!isAllSelected()) {
+                    Platform.runLater(() -> {
+                        if (getScene() != null && !isShowing()) show();
+                    });
                 }
             });
             items.add(item);
@@ -44,9 +49,7 @@ public final class MultiSelectMenuButton extends MenuButton {
 
     public Set<String> selectedValues() {
         Set<String> selected = new LinkedHashSet<>();
-        for (int i = 0; i < items.size(); i++) {
-            if (items.get(i).isSelected()) selected.add(values.get(i));
-        }
+        for (int i = 0; i < items.size(); i++) if (items.get(i).isSelected()) selected.add(values.get(i));
         return Collections.unmodifiableSet(selected);
     }
 
@@ -60,6 +63,7 @@ public final class MultiSelectMenuButton extends MenuButton {
         internal = false;
         refreshText();
         changeListener.run();
+        hide();
     }
 
     private void refreshLanguage() {

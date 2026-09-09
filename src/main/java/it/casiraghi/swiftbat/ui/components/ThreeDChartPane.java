@@ -115,6 +115,7 @@ public final class ThreeDChartPane extends BorderPane {
 
         widthProperty().addListener((observable, oldValue, newValue) -> repaintRenderer());
         heightProperty().addListener((observable, oldValue, newValue) -> repaintRenderer());
+        it.casiraghi.swiftbat.ui.I18n.languageProperty().addListener((obs, oldValue, newValue) -> repaintRenderer());
         Platform.runLater(() -> syncRendererSize(viewer));
     }
 

@@ -33,6 +33,8 @@ import javafx.stage.Stage;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -57,6 +59,7 @@ public final class MainView {
     private final SpectralCatalogService spectralCatalogService = new SpectralCatalogService();
     private final OnlineGrbService grbService = new OnlineGrbService();
     private final ObservableMap<String, GrbData> sessionData = FXCollections.observableHashMap();
+    private final Set<String> compareLoadsInFlight = ConcurrentHashMap.newKeySet();
 
     private final BorderPane root = new BorderPane();
     private final StackPane pageHost = new StackPane();
@@ -80,7 +83,7 @@ public final class MainView {
         explorerPage = new ExplorerPage(hostServices, this::loadGrb,
                 entry -> grbService.cachedLocally(entry.grbName()));
         glossaryPage = new GlossaryPage();
-        comparePage = new ComparePage(sessionData);
+        comparePage = new ComparePage(sessionData, this::loadCompareGrb);
         populationPage = new PopulationPage(
                 (entry, progress) -> grbService.load(entry, false, progress),
                 BACKGROUND_EXECUTOR, DOWNLOAD_EXECUTOR, sessionData);
@@ -270,6 +273,7 @@ public final class MainView {
             explorerPage.setCatalog(entries, false);
             skyMapPage.setBaseCatalog(entries);
             populationPage.setCatalog(entries);
+            comparePage.setCatalog(entries);
             I18n.setText(catalogStatus, entries.size() + " GRB", entries.size() + " GRBs");
             setConnection("Online", "status-online");
             loadSkyCatalog();
@@ -279,6 +283,7 @@ public final class MainView {
             explorerPage.setCatalog(fallback, true);
             skyMapPage.setBaseCatalog(fallback);
             populationPage.setCatalog(fallback);
+            comparePage.setCatalog(fallback);
             I18n.setText(catalogStatus, fallback.size() + " GRB ridotti", fallback.size() + " GRBs · fallback");
             setConnection("Offline parziale", "status-warning");
             loadSkyCatalog();
@@ -338,6 +343,28 @@ public final class MainView {
         // segnala esplicitamente l'assenza dei fit ufficiali.
         task.setOnFailed(event -> explorerPage.setSpectralCatalog(Map.of()));
         BACKGROUND_EXECUTOR.execute(task);
+    }
+
+    private void loadCompareGrb(CatalogEntry entry) {
+        if (entry == null || sessionData.containsKey(entry.grbName())
+                || !compareLoadsInFlight.add(entry.grbName())) return;
+        setConnection(I18n.dynamic("Caricamento confronto…", "Loading comparison…"), "status-neutral");
+        Task<GrbData> task = new Task<>() {
+            @Override protected GrbData call() throws Exception {
+                return grbService.load(entry, false, update -> { });
+            }
+        };
+        task.setOnSucceeded(event -> {
+            compareLoadsInFlight.remove(entry.grbName());
+            GrbData data = task.getValue();
+            if (data != null) sessionData.put(data.grbName(), data);
+            setConnection("Online", "status-online");
+        });
+        task.setOnFailed(event -> {
+            compareLoadsInFlight.remove(entry.grbName());
+            setConnection(I18n.dynamic("Errore caricamento confronto", "Comparison load failed"), "status-warning");
+        });
+        DOWNLOAD_EXECUTOR.execute(task);
     }
 
     private void loadGrb(CatalogEntry entry, boolean forceRefresh) {

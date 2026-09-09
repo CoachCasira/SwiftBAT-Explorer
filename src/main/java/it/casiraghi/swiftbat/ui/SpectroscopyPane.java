@@ -103,11 +103,15 @@ public final class SpectroscopyPane extends BorderPane {
         source.setOnAction(event -> hostServices.showDocument(sourceUrl()));
         Node intervalRadios = radioChoice(List.of(Interval.values()), intervalChoice);
         Node modelRadios = radioChoice(List.of(AUTOMATIC_MODEL, POWER_LAW_MODEL, CUTOFF_MODEL), modelChoice);
-        GridPane controls = responsiveGrid(1120, 3,
-                controlBox("Intervallo del fit", intervalRadios, ""),
-                controlBox("Modello del fit", modelRadios, ""),
-                sourceControlBox(source));
+        VBox intervalBox = controlBox("Intervallo del fit", intervalRadios, "", 300);
+        VBox modelBox = controlBox("Modello del fit", modelRadios, "", 410);
+        VBox sourceBox = sourceControlBox(source);
+        HBox controls = new HBox(10, intervalBox, modelBox, sourceBox);
         controls.getStyleClass().add("spectroscopy-controls");
+        controls.setAlignment(Pos.TOP_LEFT);
+        HBox.setHgrow(intervalBox, Priority.ALWAYS);
+        HBox.setHgrow(modelBox, Priority.ALWAYS);
+        HBox.setHgrow(sourceBox, Priority.ALWAYS);
 
         intervalChoice.valueProperty().addListener((obs, oldValue, newValue) -> refreshOfficialResult());
         modelChoice.valueProperty().addListener((obs, oldValue, newValue) -> refreshOfficialResult());
@@ -330,13 +334,6 @@ public final class SpectroscopyPane extends BorderPane {
         card.setMinWidth(0);
         card.setMaxWidth(Double.MAX_VALUE);
 
-        Label explanation = UiFactory.wrappedLabel(
-                "Asse X = energia dei fotoni. Asse Y = log₁₀ del flusso fotonico differenziale previsto dal fit. "
-                        + "La linea è il modello ricostruito, non una serie di misure grezze.",
-                "card-subtitle");
-        explanation.setMinHeight(Region.USE_PREF_SIZE);
-        explanation.setMaxWidth(Double.MAX_VALUE);
-
         NumberAxis xAxis = new NumberAxis(15, 150, 15);
         double[] yBounds = spectralYAxisBounds(fit);
         NumberAxis yAxis = new NumberAxis(yBounds[0], yBounds[1], yBounds[2]);
@@ -367,7 +364,6 @@ public final class SpectroscopyPane extends BorderPane {
         }
 
         card.getChildren().add(UiFactory.label("Modello spettrale ricostruito", "card-title"));
-        card.getChildren().add(UiFactory.collapsibleHelp("", explanation));
         if (showActions) {
             Button threeD = UiFactory.button("Vista 3D", "secondary-button");
             threeD.setDisable(fit == null || fit.normalization() == null || fit.alpha() == null);
@@ -392,13 +388,6 @@ public final class SpectroscopyPane extends BorderPane {
         card.setMinWidth(0);
         card.setMinHeight(Region.USE_PREF_SIZE);
         card.setMaxWidth(Double.MAX_VALUE);
-
-        Label explanation = UiFactory.wrappedLabel(
-                "Asse X = banda energetica; asse Y = energia ricevuta per unità di area e di tempo. "
-                        + "Una barra più alta indica un flusso maggiore; i limiti al 90% sono nella tabella e nel tooltip.",
-                "card-subtitle");
-        explanation.setMinHeight(Region.USE_PREF_SIZE);
-        explanation.setMaxWidth(Double.MAX_VALUE);
 
         CategoryAxis xAxis = new CategoryAxis();
         xAxis.setLabel("Banda energetica (keV)");
@@ -438,7 +427,6 @@ public final class SpectroscopyPane extends BorderPane {
         VBox.setVgrow(chart, Priority.ALWAYS);
 
         card.getChildren().add(UiFactory.label("Flusso energetico", "card-title"));
-        card.getChildren().add(UiFactory.collapsibleHelp("", explanation));
         if (showActions) {
             Button threeD = UiFactory.button("Vista 3D", "secondary-button");
             threeD.setDisable(fluxes.stream().noneMatch(EnergyFluxBand::available));
@@ -619,11 +607,6 @@ public final class SpectroscopyPane extends BorderPane {
     private Node buildTimeEnergyTab() {
         VBox box = new VBox(12);
         box.setPadding(new Insets(14));
-        Label description = UiFactory.wrappedLabel(
-                "Questa vista usa i dati ASCII: X = tempo rispetto al trigger, Y = banda energetica e colore = rate nel bin di 1 secondo. "
-                        + "Arancio significa rate netto positivo, blu fluttuazione negativa dopo la sottrazione del fondo. "
-                        + "Non è un fit XSPEC e non converte i conteggi in flusso fisico.",
-                "section-caption");
         TimeEnergyHeatmapPane heatmap = new TimeEnergyHeatmapPane();
         heatmap.setData(grbData.asciiData());
 
@@ -642,8 +625,7 @@ public final class SpectroscopyPane extends BorderPane {
         threeD.setOnAction(event -> openTimeEnergy3D());
 
         FlowPane controls = new FlowPane(10, 10);
-        controls.getChildren().add(
-                controlBox("Finestra temporale", window, "", 620));
+        controls.getChildren().add(controlBox("Finestra temporale", window, "", 620));
         controls.setAlignment(Pos.BOTTOM_LEFT);
 
         FlowPane chartActions = new FlowPane(8, 8);
@@ -656,11 +638,7 @@ public final class SpectroscopyPane extends BorderPane {
         chartCard.getStyleClass().addAll("card", "time-energy-card");
         chartCard.setPadding(new Insets(14));
         VBox.setVgrow(heatmap, Priority.ALWAYS);
-        Label note = UiFactory.wrappedLabel(
-                "Nota: i rate BAT sono già corretti per il fondo; piccole celle negative rappresentano fluttuazioni statistiche dopo la sottrazione del fondo.",
-                "spectroscopy-note");
-        VBox explanationBox = new VBox(7, description, note);
-        box.getChildren().addAll(controls, chartCard, UiFactory.collapsibleHelp("", explanationBox));
+        box.getChildren().addAll(controls, chartCard);
         return box;
     }
 

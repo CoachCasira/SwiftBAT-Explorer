@@ -1,6 +1,7 @@
 package it.casiraghi.swiftbat.ui.components;
 
 import it.casiraghi.swiftbat.ui.UiFactory;
+import it.casiraghi.swiftbat.ui.I18n;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingNode;
 import javafx.geometry.Pos;
@@ -62,6 +63,7 @@ public final class SpectralModel3DPane extends BorderPane {
 
         setCenter(viewer);
         setBottom(buildFooter());
+        I18n.languageProperty().addListener((obs, oldValue, newValue) -> SwingUtilities.invokeLater(renderer::repaint));
         Platform.runLater(() -> syncRendererSize(viewer));
     }
 
@@ -208,7 +210,7 @@ public final class SpectralModel3DPane extends BorderPane {
         private void paintEmpty(Graphics2D g) {
             g.setFont(new Font("SansSerif", Font.PLAIN, 15));
             g.setColor(MUTED);
-            String text = "Modello spettrale non disponibile.";
+            String text = I18n.t("Modello spettrale non disponibile.");
             FontMetrics metrics = g.getFontMetrics();
             g.drawString(text, (getWidth() - metrics.stringWidth(text)) / 2, getHeight() / 2);
         }
@@ -256,7 +258,7 @@ public final class SpectralModel3DPane extends BorderPane {
 
             g.setFont(new Font("SansSerif", Font.BOLD, 12));
             g.setColor(TEXT);
-            String xLabel = "Energia (keV)";
+            String xLabel = I18n.t("Energia (keV)");
             g.drawString(xLabel,
                     (float) ((left + right) / 2 - g.getFontMetrics().stringWidth(xLabel) / 2.0),
                     (float) bottom + 54);

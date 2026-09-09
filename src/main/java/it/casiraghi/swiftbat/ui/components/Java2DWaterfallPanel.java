@@ -1,5 +1,7 @@
 package it.casiraghi.swiftbat.ui.components;
 
+import it.casiraghi.swiftbat.ui.I18n;
+
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import java.awt.BasicStroke;
@@ -438,17 +440,18 @@ public final class Java2DWaterfallPanel extends JPanel {
 
         g.setFont(new Font("SansSerif", Font.BOLD, 12));
         g.setColor(TEXT);
-        String xLabel = presentation.xAxisLabel();
+        String xLabel = I18n.t(presentation.xAxisLabel());
         g.drawString(xLabel, (float) ((xStart.getX() + xEnd.getX()) / 2 - g.getFontMetrics().stringWidth(xLabel) / 2.0),
                 (float) Math.max(xStart.getY(), xEnd.getY()) + 43);
-        g.drawString(presentation.yAxisLabel(), (float) yTop.getX() - 42, (float) yTop.getY() - 12);
+        g.drawString(I18n.t(presentation.yAxisLabel()), (float) yTop.getX() - 42, (float) yTop.getY() - 12);
 
         if (!presentation.depthAxisLabel().isBlank()) {
             g.setColor(new Color(190, 166, 250));
-            int labelWidth = g.getFontMetrics().stringWidth(presentation.depthAxisLabel());
+            String depthLabel = I18n.t(presentation.depthAxisLabel());
+            int labelWidth = g.getFontMetrics().stringWidth(depthLabel);
             float labelX = (float) clamp(depthEnd.getX() + 8, 12, getWidth() - labelWidth - 12);
             float labelY = (float) clamp(depthEnd.getY() - 9, 20, getHeight() - 45);
-            g.drawString(presentation.depthAxisLabel(), labelX, labelY);
+            g.drawString(depthLabel, labelX, labelY);
         }
 
         // Etichette delle serie all'estremità destra, diradate nei campioni numerosi.
@@ -468,7 +471,7 @@ public final class Java2DWaterfallPanel extends JPanel {
     private void paintOrientationHint(Graphics2D g) {
         g.setFont(new Font("SansSerif", Font.PLAIN, 10));
         g.setColor(new Color(MUTED.getRed(), MUTED.getGreen(), MUTED.getBlue(), 185));
-        String hint = "Trascina: ruota prospettiva   ·   Rotella: zoom   ·   Doppio clic: centra";
+        String hint = I18n.t("Trascina: ruota prospettiva   ·   Rotella: zoom   ·   Doppio clic: centra");
         g.drawString(hint, 18, getHeight() - 17);
     }
 
@@ -508,8 +511,8 @@ public final class Java2DWaterfallPanel extends JPanel {
 
         String[] lines = {
                 dataset.labels()[band],
-                "Tempo: " + VALUE_FORMAT.format(dataset.times()[index]) + " s",
-                presentation.valueLabel() + ": " + VALUE_FORMAT.format(dataset.rates()[band][index])
+                I18n.t("Tempo") + ": " + VALUE_FORMAT.format(dataset.times()[index]) + " s",
+                I18n.t(presentation.valueLabel()) + ": " + VALUE_FORMAT.format(dataset.rates()[band][index])
                         + presentation.valueUnit()
         };
         g.setFont(new Font("SansSerif", Font.PLAIN, 12));

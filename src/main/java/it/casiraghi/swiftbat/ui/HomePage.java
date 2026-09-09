@@ -7,6 +7,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -67,9 +68,7 @@ public final class HomePage extends ScrollPane {
                 actionCard("✦", "Esplora", "Cerca un evento e apri curve, dati e metadati.", "Apri catalogo", openExplorer),
                 actionCard("◎", "Mappa celeste", "Guarda i GRB sulla Mollweide o sulla sfera 3D.", "Esplora il cielo", openSky),
                 actionCard("⇄", "Confronta", "Sovrapponi due eventi già aperti nella sessione.", "Confronta eventi", openCompare));
-        for (Node node : quickActions.getChildren()) {
-            HBox.setHgrow(node, Priority.ALWAYS);
-        }
+        for (Node node : quickActions.getChildren()) HBox.setHgrow(node, Priority.ALWAYS);
 
         HBox lower = new HBox(14);
         VBox workflow = new VBox(14);
@@ -104,14 +103,20 @@ public final class HomePage extends ScrollPane {
         card.getStyleClass().add("home-action-card");
         card.setPadding(new Insets(20));
         card.setMaxWidth(Double.MAX_VALUE);
+        card.setCursor(javafx.scene.Cursor.HAND);
+        card.setOnMouseClicked(event -> {
+            if (event.getButton() == MouseButton.PRIMARY) runnable.run();
+        });
         Label icon = UiFactory.label(glyph, "home-action-icon");
         Label titleLabel = UiFactory.label(title, "home-action-title");
         Label textLabel = UiFactory.wrappedLabel(text, "home-action-text");
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
-        Button button = UiFactory.button(action + "  →", "home-link-button");
-        button.setOnAction(event -> runnable.run());
-        card.getChildren().addAll(icon, titleLabel, textLabel, spacer, button);
+        HBox actionHint = new HBox(5,
+                UiFactory.label(action, "home-link-button"),
+                UiFactory.label("→", "home-link-button"));
+        actionHint.setMouseTransparent(true);
+        card.getChildren().addAll(icon, titleLabel, textLabel, spacer, actionHint);
         return card;
     }
 

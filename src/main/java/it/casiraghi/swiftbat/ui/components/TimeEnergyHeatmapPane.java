@@ -1,6 +1,7 @@
 package it.casiraghi.swiftbat.ui.components;
 
 import it.casiraghi.swiftbat.model.TabularData;
+import it.casiraghi.swiftbat.ui.I18n;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Label;
@@ -56,6 +57,7 @@ public final class TimeEnergyHeatmapPane extends Region {
         setPrefHeight(390);
         widthProperty().addListener(ignored -> draw());
         heightProperty().addListener(ignored -> draw());
+        I18n.languageProperty().addListener((obs, oldValue, newValue) -> draw());
         setOnMouseMoved(event -> updateHover(event.getX(), event.getY()));
         setOnMouseExited(event -> clearHover());
     }
@@ -101,7 +103,7 @@ public final class TimeEnergyHeatmapPane extends Region {
         if (visibleRows.isEmpty()) {
             graphics.setFill(Color.web("#94a3bd"));
             graphics.setFont(Font.font("System", FontWeight.BOLD, 14));
-            graphics.fillText("Mappa non disponibile: servono i quattro canali ASCII.", 24, 64);
+            graphics.fillText(I18n.t("Mappa non disponibile: servono i quattro canali ASCII."), 24, 64);
             hoverCard.setVisible(false);
             hoveredRowIndex = -1;
             hoveredBandIndex = -1;
@@ -171,13 +173,13 @@ public final class TimeEnergyHeatmapPane extends Region {
 
         graphics.setFill(Color.web("#b9c7df"));
         graphics.setFont(Font.font("System", FontWeight.BOLD, 11));
-        graphics.fillText("Tempo dal trigger (s)", plotLeft + plotWidth / 2 - 54, height - 38);
+        graphics.fillText(I18n.t("Tempo dal trigger (s)"), plotLeft + plotWidth / 2 - 54, height - 38);
 
         double legendY = height - 13;
         double legendColumnWidth = plotWidth / 3.0;
-        drawLegendItem(graphics, plotLeft, legendY, Color.web("#3b82f6"), "Fluttuazione negativa");
-        drawLegendItem(graphics, plotLeft + legendColumnWidth, legendY, Color.web("#101a2b"), "Rate circa zero");
-        drawLegendItem(graphics, plotLeft + 2 * legendColumnWidth, legendY, Color.web("#ff9f43"), "Rate positivo");
+        drawLegendItem(graphics, plotLeft, legendY, Color.web("#3b82f6"), I18n.t("Fluttuazione negativa"));
+        drawLegendItem(graphics, plotLeft + legendColumnWidth, legendY, Color.web("#101a2b"), I18n.t("Rate circa zero"));
+        drawLegendItem(graphics, plotLeft + 2 * legendColumnWidth, legendY, Color.web("#ff9f43"), I18n.t("Rate positivo"));
     }
 
     private void drawHoverHighlight(GraphicsContext graphics, double bandHeight) {
@@ -284,9 +286,10 @@ public final class TimeEnergyHeatmapPane extends Region {
 
         Row nearest = visibleRows.get(rowIndex);
         Band band = BANDS.get(bandIndex);
-        hoverCard.setText(String.format(Locale.ITALIAN,
-                "Banda: %s%nCentro bin: %.3f s%nRate: %.5g count/s%nLarghezza banda: %.0f keV",
-                band.label(), nearest.time(), nearest.rates()[bandIndex], band.widthKeV()));
+        hoverCard.setText(I18n.t("Banda") + ": " + band.label()
+                + "\n" + I18n.t("Centro bin") + ": " + String.format(Locale.ROOT, "%.3f s", nearest.time())
+                + "\nRate: " + String.format(Locale.ROOT, "%.5g count/s", nearest.rates()[bandIndex])
+                + "\n" + I18n.t("Larghezza banda") + ": " + String.format(Locale.ROOT, "%.0f keV", band.widthKeV()));
         hoverCard.applyCss();
         hoverCard.autosize();
 
