@@ -2,6 +2,7 @@ package it.casiraghi.swiftbat;
 
 import it.casiraghi.swiftbat.ui.MainView;
 import it.casiraghi.swiftbat.ui.UiBugFixes;
+import it.casiraghi.swiftbat.ui.UiLocalizationWatcher;
 import it.casiraghi.swiftbat.ui.UiRefinements;
 import javafx.application.Application;
 import javafx.scene.Scene;
@@ -26,14 +27,13 @@ public final class SwiftBatExplorerApp extends Application {
 
         stage.setTitle("SwiftBAT Explorer 1.3.0 — Reference UI Preview");
         var iconStream = SwiftBatExplorerApp.class.getResourceAsStream("/app-icon.png");
-        if (iconStream != null) {
-            stage.getIcons().add(new Image(iconStream));
-        }
+        if (iconStream != null) stage.getIcons().add(new Image(iconStream));
         stage.setMinWidth(1240);
         stage.setMinHeight(790);
         stage.setScene(scene);
         stage.show();
 
+        UiLocalizationWatcher.install(mainView.getRoot());
         UiRefinements.install(mainView.getRoot());
         UiBugFixes.install(mainView.getRoot());
         mainView.initialize();
