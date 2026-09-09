@@ -8,17 +8,28 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * Guardrail for the bilingual UI. Every Italian string literal in the UI layer
- * that looks user-visible must have an English mapping in I18n.
- *
- * <p>The scan is recursive and includes custom Java2D/3D renderers, so a new
- * label cannot silently remain in Italian just because it is not a JavaFX Label.</p>
+ * Guardrail for the bilingual UI. The complete UI package is scanned, including
+ * custom Java2D/3D renderers, so a new visible Italian literal cannot silently
+ * remain untranslated.
  */
 class TranslationCoverageTest {
+    private static final Pattern ITALIAN_WORD = Pattern.compile(
+            "(?iu)(?:^|[^\\p{L}])(?:il|lo|la|gli|le|un|una|di|del|della|dei|delle|e|è|per|con|senza|non|dal|nel|nella|nelle|"
+                    + "mostra|nascondi|apri|scegli|cerca|curva|curve|luce|dati|mappa|analisi|durata|tempo|valore|qualità|"
+                    + "spiegazione|intervallo|flusso|modello|energia|banda|tabella|righe|esposizione|guida|informazioni|"
+                    + "evento|eventi|confronto|schermo|descrizione|caricamento|campione|coordinate|celeste|sessione|lettura|"
+                    + "risultati|errore|picco|durezza|fonte|ufficiale|filtro|filtri|nessun|nessuna|tutte|tutti|ripristina|"
+                    + "profilo|profondità|altezza|disponibilità|redshift|gradi|scelta|vincolato|incerto|visualizzati|"
+                    + "caricati|ammesso|massimo|minimo|corrispondono|leggibili|sconosciuto|spettro|barre|asse|assi|"
+                    + "trascina|rotella|centra|numero|secondo|secondi|binning|estremo|scienza|strumenti|scorciatoie|"
+                    + "catalogo|metadati|probabilità|frequenza|conteggi|limiti|unità|seleziona|punto|distribuzione)(?:$|[^\\p{L}])");
+
     @Test
     void everyUiItalianLiteralMustHaveEnglishTranslation() throws Exception {
         Path root = Path.of("src/main/java/it/casiraghi/swiftbat/ui");
@@ -27,6 +38,7 @@ class TranslationCoverageTest {
         try (var files = Files.walk(root)) {
             files.filter(path -> path.toString().endsWith(".java"))
                     .filter(path -> !path.getFileName().toString().equals("I18n.java"))
+                    .filter(path -> !path.getFileName().toString().equals("UiTranslations.java"))
                     .sorted(Comparator.comparing(Path::toString))
                     .forEach(path -> scan(path, missing));
         }
@@ -41,13 +53,20 @@ class TranslationCoverageTest {
             String source = Files.readString(path, StandardCharsets.UTF_8);
             for (Literal literal : stringLiterals(source)) {
                 String value = unescape(literal.value());
-                if (I18n.requiresTranslation(value) && !I18n.hasEnglish(value)) {
+                if (looksItalian(value) && !UiTranslations.hasEnglish(value)) {
                     missing.add(path.getFileName() + ":" + lineOf(source, literal.offset()) + " -> " + value);
                 }
             }
         } catch (Exception error) {
             throw new RuntimeException(error);
         }
+    }
+
+    private boolean looksItalian(String value) {
+        if (value == null || value.isBlank()) return false;
+        String lower = value.toLowerCase(Locale.ROOT);
+        if (lower.matches(".*[àèéìòù].*")) return true;
+        return ITALIAN_WORD.matcher(value).find();
     }
 
     /** Minimal Java lexer: extracts string literals while ignoring comments and char literals. */
