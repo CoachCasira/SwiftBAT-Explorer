@@ -136,15 +136,16 @@ public final class HomePage extends ScrollPane {
                             ObservableValue<? extends String> value,
                             String detail, String accent) {
         VBox card = metricShell(glyph, title, detail, accent);
-        Label valueLabel = UiFactory.label("", "mockup-metric-value");
+        Label valueLabel = new Label();
+        valueLabel.getStyleClass().add("mockup-metric-value");
         valueLabel.textProperty().bind(value);
-        card.getChildren().add(2, valueLabel);
+        card.getChildren().add(1, valueLabel);
         return card;
     }
 
     private VBox staticMetricCard(String glyph, String title, String value, String detail, String accent) {
         VBox card = metricShell(glyph, title, detail, accent);
-        card.getChildren().add(2, UiFactory.label(value, "mockup-metric-value"));
+        card.getChildren().add(1, UiFactory.label(value, "mockup-metric-value"));
         return card;
     }
 
@@ -158,11 +159,8 @@ public final class HomePage extends ScrollPane {
                 UiFactory.label(glyph, "mockup-metric-icon"),
                 UiFactory.label(title, "mockup-metric-title"));
         head.setAlignment(Pos.CENTER_LEFT);
-        Label spacer = UiFactory.label("", "mockup-metric-value");
-        spacer.setVisible(false);
-        spacer.setManaged(false);
         Label detailLabel = UiFactory.label(detail, "mockup-metric-detail");
-        card.getChildren().addAll(head, spacer, detailLabel);
+        card.getChildren().addAll(head, detailLabel);
         return card;
     }
 
