@@ -24,13 +24,10 @@ public final class UiFactory {
     }
 
     public static Label label(String text, String... styleClasses) {
-        Label label = new Label(I18n.t(text));
+        Label label = new Label(UiTranslations.t(text));
         label.getProperties().put("swiftbat.originalText", text);
         label.getStyleClass().addAll(styleClasses);
-        I18n.languageProperty().addListener((obs, oldValue, newValue) -> {
-            Object original = label.getProperties().get("swiftbat.originalText");
-            if (original instanceof String source) label.setText(I18n.t(source));
-        });
+        I18n.languageProperty().addListener((obs, oldValue, newValue) -> refreshLocalizedText(label));
         autoTooltip(label);
         return label;
     }
@@ -43,16 +40,25 @@ public final class UiFactory {
     }
 
     public static Button button(String text, String styleClass) {
-        Button button = new Button(I18n.t(text == null ? "" : text.replace("  ⛶", "").replace(" ⛶", "")));
-        button.getProperties().put("swiftbat.originalText", text == null ? "" : text.replace("  ⛶", "").replace(" ⛶", ""));
+        String source = text == null ? "" : text.replace("  ⛶", "").replace(" ⛶", "");
+        Button button = new Button(UiTranslations.t(source));
+        button.getProperties().put("swiftbat.originalText", source);
         button.getStyleClass().add(styleClass);
         button.setCursor(javafx.scene.Cursor.HAND);
-        I18n.languageProperty().addListener((obs, oldValue, newValue) -> {
-            Object original = button.getProperties().get("swiftbat.originalText");
-            if (original instanceof String source) button.setText(I18n.t(source));
-        });
+        I18n.languageProperty().addListener((obs, oldValue, newValue) -> refreshLocalizedText(button));
         autoTooltip(button);
         return button;
+    }
+
+    /**
+     * Refreshes a label/button without ever writing into a bound property.
+     * Explicit bilingual controls created through I18n.setText retain their IT/EN pair instead of
+     * being overwritten by the empty source text used by helper factories.
+     */
+    private static void refreshLocalizedText(Labeled control) {
+        if (control == null || control.textProperty().isBound()) return;
+        UiTranslations.localizeLabeled(control);
+        Platform.runLater(() -> refreshAutoTooltip(control));
     }
 
     /** Mostra il testo completo al passaggio del mouse solo se il controllo lo tronca. */
@@ -68,12 +74,13 @@ public final class UiFactory {
     /** Per i menu a scelta il tooltip mostra sempre il valore selezionato per intero. */
     public static <T> ChoiceBox<T> autoTooltip(ChoiceBox<T> choice) {
         if (choice == null) return null;
-        I18n.installChoiceBox(choice);
+        UiTranslations.installChoiceBox(choice);
         Runnable refresh = () -> {
             T value = choice.getValue();
             choice.setTooltip(value == null || value.toString().isBlank() ? null : quickTooltip(value.toString()));
         };
         choice.valueProperty().addListener((obs, oldValue, newValue) -> refresh.run());
+        I18n.languageProperty().addListener((obs, oldValue, newValue) -> refresh.run());
         refresh.run();
         return choice;
     }
@@ -110,10 +117,14 @@ public final class UiFactory {
     }
 
     public static Tooltip quickTooltip(String text) {
-        Tooltip tooltip = new Tooltip(text);
+        String source = text == null ? "" : text;
+        Tooltip tooltip = new Tooltip(UiTranslations.t(source));
         tooltip.setShowDelay(Duration.millis(500));
         tooltip.setHideDelay(Duration.millis(80));
         tooltip.setShowDuration(Duration.seconds(30));
+        I18n.languageProperty().addListener((obs, oldValue, newValue) -> {
+            if (!tooltip.textProperty().isBound()) tooltip.setText(UiTranslations.t(source));
+        });
         return tooltip;
     }
 
@@ -169,21 +180,21 @@ public final class UiFactory {
         row.getChildren().addAll(label, value);
         return row;
     }
+
     public static VBox collapsibleHelp(String title, Node content) {
-        ToggleButton toggle = new ToggleButton(I18n.t("Mostra spiegazione"));
+        ToggleButton toggle = new ToggleButton(UiTranslations.t("Mostra spiegazione"));
         toggle.getStyleClass().addAll("ghost-button", "help-toggle");
         content.setVisible(false);
         content.setManaged(false);
         toggle.selectedProperty().addListener((obs, oldValue, selected) -> {
             content.setVisible(selected);
             content.setManaged(selected);
-            toggle.setText(I18n.t(selected ? "Nascondi spiegazione" : "Mostra spiegazione"));
+            toggle.setText(UiTranslations.t(selected ? "Nascondi spiegazione" : "Mostra spiegazione"));
         });
         I18n.languageProperty().addListener((obs, oldValue, newValue) ->
-                toggle.setText(I18n.t(toggle.isSelected() ? "Nascondi spiegazione" : "Mostra spiegazione")));
+                toggle.setText(UiTranslations.t(toggle.isSelected() ? "Nascondi spiegazione" : "Mostra spiegazione")));
         VBox box = new VBox(8, toggle, content);
         box.getStyleClass().add("collapsible-help");
         return box;
     }
-
 }
