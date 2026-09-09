@@ -21,16 +21,15 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re, codecs
+          import re
 
           ROOT = Path('src/main/java')
           i18n = Path('src/main/java/it/casiraghi/swiftbat/ui/I18n.java').read_text(encoding='utf-8')
 
           def unescape(s):
-              try:
-                  return codecs.decode(s, 'unicode_escape')
-              except Exception:
-                  return s.replace('\\n','\n').replace('\\"','"').replace('\\\\','\\')
+              return (s.replace('\\n','\n').replace('\\t','\t')
+                       .replace('\\"','"').replace("\\'", "'")
+                       .replace('\\\\','\\'))
 
           mapped = set()
           for m in re.finditer(r'put\("((?:\\.|[^"\\])*)",\s*"((?:\\.|[^"\\])*)"\);', i18n):
@@ -66,18 +65,15 @@ jobs:
               if path.name == 'I18n.java': continue
               src = path.read_text(encoding='utf-8')
               for m in literal_re.finditer(src):
-                  raw = m.group(1)
-                  s = unescape(raw)
+                  s = unescape(m.group(1))
                   if not italian(s): continue
-                  # Explicit bilingual calls are already safe.
-                  prefix = src[max(0, m.start()-180):m.start()]
-                  if re.search(r'I18n\.(?:dynamic|setText)\s*\([^;]{0,160}$', prefix, re.S):
+                  prefix = src[max(0, m.start()-220):m.start()]
+                  if re.search(r'I18n\.(?:dynamic|setText)\s*\([^;]{0,200}$', prefix, re.S):
                       continue
                   if s in mapped: continue
                   line = src.count('\n', 0, m.start()) + 1
                   missing.append((str(path), line, s))
 
-          # De-duplicate exact file/text repetitions but keep first location.
           seen=set(); out=[]
           for item in missing:
               key=(item[0],item[2])
@@ -85,7 +81,7 @@ jobs:
               seen.add(key); out.append(item)
           print(f'UNTRANSLATED_COUNT={len(out)}')
           for p,l,s in out:
-              print(f'{p}:{l}: {s}')
+              print(f'{p}:{l}: {s!r}')
           if out:
               raise SystemExit(1)
           PY
