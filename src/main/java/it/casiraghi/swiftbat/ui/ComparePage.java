@@ -4,6 +4,7 @@ import it.casiraghi.swiftbat.model.CatalogEntry;
 import it.casiraghi.swiftbat.model.GrbData;
 import it.casiraghi.swiftbat.model.SummaryItem;
 import it.casiraghi.swiftbat.model.TabularData;
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableMap;
@@ -25,6 +26,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -294,7 +296,8 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
             return;
         }
         showComparisonLoading(aName, bName, false);
-        Platform.runLater(() -> {
+        PauseTransition pause = new PauseTransition(Duration.millis(140));
+        pause.setOnFinished(event -> {
             if (version != comparisonVersion) return;
             if (!aName.equals(selected(first)) || !bName.equals(selected(second))) return;
             GrbData currentA = sessionData.get(aName);
@@ -303,6 +306,7 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
             content.getChildren().setAll(buildComparison(currentA, currentB));
             I18n.localizeTree(content);
         });
+        pause.play();
     }
 
     private void showComparisonLoading(String aName, String bName, boolean downloading) {

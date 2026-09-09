@@ -2398,3 +2398,13 @@
     -fx-background-color: rgba(255,174,91,0.12);
     -fx-text-fill: #fff3e4;
 }
+
+
+/* Runtime polish 1.3.0 */
+.bar-chart .chart-bar { -fx-bar-fill: #4fd5ef; }
+.population-fracexp-inline { -fx-padding: 8px 9px; }
+.population-fracexp-inline .percentage-control { -fx-padding: 5px 6px; }
+.population-fracexp-inline .percentage-field { -fx-font-size: 12px; -fx-padding: 4px 5px; }
+.population-fracexp-inline .percentage-step-button { -fx-min-width: 28px; -fx-min-height: 28px; -fx-pref-width: 28px; -fx-pref-height: 28px; }
+.compare-combo, .compare-combo .text-field { -fx-background-color: rgba(255,255,255,0.045); -fx-text-fill: #e7eaf0; -fx-prompt-text-fill: #646d7d; }
+.compare-combo:focused, .compare-combo .text-field:focused { -fx-border-color: rgba(86,216,250,0.70); }

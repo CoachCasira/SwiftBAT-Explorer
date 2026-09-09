@@ -258,14 +258,14 @@ public final class PopulationPage extends BorderPane {
         VBox exposureBox = new VBox(6, exposureIntro, exposureControls);
         exposureBox.setAlignment(Pos.TOP_LEFT);
         exposureBox.getStyleClass().addAll("population-filter-section", "population-filter-side", "population-fracexp-inline");
-        exposureBox.setMinWidth(270);
-        exposureBox.setPrefWidth(285);
-        exposureBox.setMaxWidth(300);
+        exposureBox.setMinWidth(225);
+        exposureBox.setPrefWidth(240);
+        exposureBox.setMaxWidth(255);
 
-        VBox durationGroup = filterGroup("Durata T90", "", duration, 155);
-        VBox redshiftGroup = filterGroup("Redshift", "", redshiftControl, 205);
-        VBox windowGroup = filterGroup("Finestra temporale", "", windowControl, 195);
-        VBox limitGroup = filterGroup("Campione massimo", "", limit, 125);
+        VBox durationGroup = filterGroup("Durata T90", "", duration, 150);
+        VBox redshiftGroup = filterGroup("Redshift", "", redshiftControl, 190);
+        VBox windowGroup = filterGroup("Finestra temporale", "", windowControl, 185);
+        VBox limitGroup = filterGroup("Campione massimo", "", limit, 120);
         HBox topFilters = new HBox(7, durationGroup, redshiftGroup, windowGroup, exposureBox, limitGroup);
         topFilters.setAlignment(Pos.TOP_LEFT);
         HBox.setHgrow(exposureBox, Priority.NEVER);

@@ -470,6 +470,24 @@ public final class I18n {
         put("del campione: la distribuzione z non è completa.", "of the sample: the z distribution is incomplete.");
         put("Le curve sono divise per il proprio picco: il confronto riguarda la forma relativa, non la luminosità assoluta.",
                 "Curves are divided by their own peak: the comparison concerns relative shape, not absolute luminosity.");
+        // Runtime strings verified from EN screenshots (2026-09-09)
+        put("T90 duration", "T90 duration");
+        put("FRACEXP quality", "FRACEXP quality");
+        put("Maximum sample", "Maximum sample");
+        put("Population analysis", "Population analysis");
+        put("Temporal profile", "Temporal profile");
+        put("Sample distributions", "Sample distributions");
+        put("Included GRBs", "Included GRBs");
+        put("Peak time", "Peak time");
+        put("Peak / error", "Peak / error");
+        put("Hardness proxy", "Hardness proxy");
+        put("Full exposure", "Full exposure");
+        put("No z", "No z");
+        put("Numero di GRB", "Number of GRBs");
+        put("Tempo normalizzato (t / T90)", "Normalized time (t / T90)");
+        put("Finestra", "Window");
+        put("Zoom", "Zoom");
+        put("Bande energetiche", "Energy bands");
     }
 
     private I18n() {}

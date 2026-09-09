@@ -205,8 +205,7 @@ public final class InPlaceFullscreen {
             readingScroll.setPannable(true);
             readingScroll.setMinSize(0, 0);
             readingScroll.setStyle("-fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0;");
-            readingScroll.viewportBoundsProperty().addListener((obs, oldBounds, bounds) ->
-                    reading.setMinHeight(Math.max(0, bounds.getHeight())));
+            reading.setMinHeight(Region.USE_PREF_SIZE);
 
             ToggleButton help = new ToggleButton(I18n.t("Mostra spiegazione"));
             help.getStyleClass().addAll("ghost-button", "help-toggle");
@@ -230,6 +229,11 @@ public final class InPlaceFullscreen {
             help.selectedProperty().addListener((obs, oldValue, selected) -> {
                 help.setText(I18n.t(selected ? "Nascondi spiegazione" : "Mostra spiegazione"));
                 relayout.run();
+                Platform.runLater(() -> {
+                    relayout.run();
+                    split.applyCss();
+                    split.requestLayout();
+                });
             });
             I18n.languageProperty().addListener((obs, oldValue, newValue) ->
                     help.setText(I18n.t(help.isSelected() ? "Nascondi spiegazione" : "Mostra spiegazione")));
