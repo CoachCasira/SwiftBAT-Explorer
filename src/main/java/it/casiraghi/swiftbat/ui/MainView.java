@@ -106,6 +106,7 @@ public final class MainView {
                 sessionStatus.textProperty(),
                 connectionStatus.textProperty());
         buildLayout();
+        PopulationCardEnhancer.install(populationPage);
         sessionData.addListener((javafx.collections.MapChangeListener<String, GrbData>) change -> {
             updateCacheStatus();
             explorerPage.refreshCacheIndicators();
