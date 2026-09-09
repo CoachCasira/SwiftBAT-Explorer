@@ -1,6 +1,7 @@
 package it.casiraghi.swiftbat.ui.components;
 
 import it.casiraghi.swiftbat.service.CumulativeAnalysisService;
+import it.casiraghi.swiftbat.ui.I18n;
 import it.casiraghi.swiftbat.ui.UiFactory;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingNode;
@@ -23,9 +24,10 @@ import java.util.List;
 
 /** Vista interattiva 3D degli stessi elementi statistici mostrati nel profilo 2D. */
 public final class Population3DChartPane extends BorderPane {
-    private static final Color SINGLE_COLOR = new Color(82, 216, 255);
-    private static final Color MEDIAN_COLOR = new Color(255, 174, 74);
-    private static final Color QUARTILE_COLOR = new Color(170, 120, 219);
+    // Exact colors used by the 2D population profile and its legend.
+    private static final Color SINGLE_COLOR = new Color(84, 215, 255);   // #54d7ff
+    private static final Color MEDIAN_COLOR = new Color(242, 71, 211);   // #f247d3
+    private static final Color QUARTILE_COLOR = new Color(139, 107, 255); // #8b6bff
 
     private final SwingNode swingNode = new SwingNode();
     private final Java2DWaterfallPanel renderer = new Java2DWaterfallPanel();
@@ -53,6 +55,7 @@ public final class Population3DChartPane extends BorderPane {
         setTop(buildHeader());
         setCenter(viewer);
         setBottom(buildFooter());
+        I18n.languageProperty().addListener((obs, oldValue, newValue) -> SwingUtilities.invokeLater(renderer::repaint));
         Platform.runLater(() -> syncRendererSize(viewer));
     }
 
@@ -61,8 +64,13 @@ public final class Population3DChartPane extends BorderPane {
                         double halfWindowSeconds) {
         Java2DWaterfallPanel.Dataset dataset = toDataset(curves, profile, halfWindowSeconds);
         int curveCount = curves == null ? 0 : curves.size();
-        sampleLabel.setText(dataset.isEmpty() ? "Nessun campione"
-                : curveCount + " GRB · mediana + fascia centrale");
+        if (dataset.isEmpty()) {
+            I18n.setText(sampleLabel, "Nessun campione", "No sample");
+        } else {
+            I18n.setText(sampleLabel,
+                    curveCount + " GRB · mediana + fascia centrale",
+                    curveCount + " GRBs · median + central band");
+        }
         SwingUtilities.invokeLater(() -> renderer.setDataset(dataset));
     }
 
@@ -127,7 +135,7 @@ public final class Population3DChartPane extends BorderPane {
         HBox titleRow = new HBox(10, title, spacer, sampleLabel);
         titleRow.setAlignment(Pos.CENTER_LEFT);
         Label explanation = UiFactory.wrappedLabel(
-                "La vista 3D riproduce gli stessi elementi del grafico 2D: singoli GRB in azzurro, mediana in arancio e limiti 25°/75° in viola. "
+                "La vista 3D riproduce gli stessi elementi del grafico 2D: singoli GRB in azzurro, mediana in magenta e limiti 25°/75° in viola. "
                         + "La profondità serve solo a separare visivamente le curve e non rappresenta T90, distanza o posizione nello spazio.",
                 "overlay-caption");
         FlowPane legend = new FlowPane(14, 6,
