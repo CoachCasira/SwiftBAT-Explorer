@@ -275,7 +275,7 @@ public final class MainView {
         languageBox.setAlignment(Pos.CENTER);
         languageBox.getStyleClass().add("language-switch");
         I18n.languageProperty().addListener((obs, oldValue, newValue) -> Platform.runLater(() -> {
-            I18n.localizeTree(root);
+            UiTranslations.localizeTree(root);
             updateGlobalSearchPrompt(globalSearch);
             updateCacheStatus();
         }));
@@ -362,7 +362,7 @@ public final class MainView {
             default -> homePage;
         };
         pageHost.getChildren().setAll(node);
-        Platform.runLater(() -> I18n.localizeTree(node));
+        Platform.runLater(() -> UiTranslations.localizeTree(node));
         boolean foundVisibleButton = false;
         for (Node navNode : navigation.getChildren()) {
             if (navNode instanceof Button button && page.equals(button.getUserData())) {
