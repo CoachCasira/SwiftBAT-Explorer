@@ -1,5 +1,7 @@
 package it.casiraghi.swiftbat.ui.components;
 
+import it.casiraghi.swiftbat.ui.ExportSupport;
+import it.casiraghi.swiftbat.ui.I18n;
 import it.casiraghi.swiftbat.ui.UiFactory;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingNode;
@@ -18,6 +20,7 @@ import javafx.scene.layout.VBox;
 import javax.swing.SwingUtilities;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.util.Locale;
 
 /** Contenitore JavaFX per una distribuzione 3D raggruppata. */
 public final class PopulationHistogram3DPane extends BorderPane {
@@ -73,9 +76,13 @@ public final class PopulationHistogram3DPane extends BorderPane {
                 "subtle-text");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
+        Button export = UiFactory.button("", "secondary-button");
+        I18n.setText(export, "Esporta PNG", "Export PNG");
+        export.setOnAction(event -> ExportSupport.exportSwingPng(
+                this, renderer, "population_" + slug(title) + "_3d.png"));
         Button reset = UiFactory.button("Centra vista", "secondary-button");
         reset.setOnAction(event -> SwingUtilities.invokeLater(renderer::resetView));
-        HBox footer = new HBox(12, note, spacer, reset);
+        HBox footer = new HBox(12, note, spacer, export, reset);
         footer.setAlignment(Pos.CENTER_LEFT);
         footer.getStyleClass().add("three-d-footer");
         return footer;
@@ -95,5 +102,12 @@ public final class PopulationHistogram3DPane extends BorderPane {
 
     private String toHex(Color color) {
         return String.format("#%02X%02X%02X", color.getRed(), color.getGreen(), color.getBlue());
+    }
+
+    private String slug(String text) {
+        String value = text == null ? "histogram" : text.toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "");
+        return value.isBlank() ? "histogram" : value;
     }
 }
