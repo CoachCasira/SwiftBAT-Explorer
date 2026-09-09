@@ -1,11 +1,13 @@
 package it.casiraghi.swiftbat.ui;
 
 import it.casiraghi.swiftbat.ui.components.BrandLogoAsset;
+import it.casiraghi.swiftbat.ui.components.UniBgMarkPane;
 import javafx.application.HostServices;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.ColumnConstraints;
 import javafx.scene.layout.GridPane;
@@ -52,24 +54,24 @@ public final class AboutPage extends ScrollPane {
         secondColumn.setPercentWidth(50);
         secondColumn.setHgrow(Priority.ALWAYS);
         cards.getColumnConstraints().addAll(firstColumn, secondColumn);
-        cards.add(infoCard("Dati", "Catalogo ufficiale NASA/GSFC Swift/BAT e prodotti DAT/FITS a binning di 1 secondo. I valori restano riconducibili alle sorgenti pubbliche usate dall'app."), 0, 0);
-        cards.add(infoCard("Curve", "Visualizzazione delle curve di luce totali e nelle quattro bande energetiche, con finestre temporali, zoom e viste dedicate per leggere meglio la struttura del burst."), 1, 0);
-        cards.add(infoCard("Volta celeste", "Mollweide 2D e sfera 3D costruite con le coordinate RA/DEC pubblicate da Swift/BAT. Le due viste mostrano lo stesso campione con rappresentazioni differenti."), 0, 1);
-        cards.add(infoCard("Sessione", "Gli eventi aperti restano in memoria finché l'app è in esecuzione. La cache locale evita download ripetuti senza modificare i prodotti scientifici sorgente."), 1, 1);
 
-        VBox scope = UiFactory.card("Scopo scientifico", null,
-                UiFactory.wrappedLabel(
-                        "L'app facilita consultazione, controllo e confronto descrittivo dei dati. Gli indicatori e la soglia T90 = 2 s mostrati nell'interfaccia non sostituiscono una classificazione astrofisica validata.",
-                        "explanation-text"));
-        VBox reading = UiFactory.card("Lettura dei risultati", null,
-                UiFactory.wrappedLabel(
-                        "Grafici, mappe, filtri e assistenti di lettura servono a mettere in evidenza pattern e differenze nel campione. Le viste 2D e 3D sono strumenti esplorativi e mantengono sempre separata la rappresentazione grafica dall'interpretazione fisica.",
-                        "explanation-text"));
-        scope.setMaxWidth(Double.MAX_VALUE);
-        reading.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(scope, Priority.ALWAYS);
-        HBox.setHgrow(reading, Priority.ALWAYS);
-        HBox scienceRow = new HBox(14, scope, reading);
+        VBox data = infoCard("Dati", "Catalogo ufficiale NASA/GSFC Swift/BAT e prodotti DAT/FITS a binning di 1 secondo. I valori restano riconducibili alle sorgenti pubbliche usate dall'app.");
+        VBox curves = infoCard("Curve", "Visualizzazione delle curve di luce totali e nelle quattro bande energetiche, con finestre temporali, zoom e viste dedicate per leggere meglio la struttura del burst.");
+        VBox sky = infoCard("Volta celeste", "Mollweide 2D e sfera 3D costruite con le coordinate RA/DEC pubblicate da Swift/BAT. Le due viste mostrano lo stesso campione con rappresentazioni differenti.");
+        VBox session = infoCard("Sessione", "Gli eventi aperti restano in memoria finché l'app è in esecuzione. La cache locale evita download ripetuti senza modificare i prodotti scientifici sorgente.");
+        VBox scope = infoCard("Scopo scientifico",
+                "L'app facilita consultazione, controllo e confronto descrittivo dei dati. Gli indicatori e la soglia T90 = 2 s mostrati nell'interfaccia non sostituiscono una classificazione astrofisica validata.");
+        VBox reading = infoCard("Lettura dei risultati",
+                "Grafici, mappe, filtri e assistenti di lettura servono a mettere in evidenza pattern e differenze nel campione. Le viste 2D e 3D sono strumenti esplorativi e mantengono sempre separata la rappresentazione grafica dall'interpretazione fisica.");
+
+        // Tutte le sei card condividono la stessa griglia: le tre righe sono quindi
+        // perfettamente allineate, anche ridimensionando la finestra.
+        cards.add(data, 0, 0);
+        cards.add(curves, 1, 0);
+        cards.add(sky, 0, 1);
+        cards.add(session, 1, 1);
+        cards.add(scope, 0, 2);
+        cards.add(reading, 1, 2);
 
         HBox actions = new HBox(10);
         actions.setAlignment(Pos.CENTER_LEFT);
@@ -82,7 +84,23 @@ public final class AboutPage extends ScrollPane {
                 "https://swift.gsfc.nasa.gov/results/batgrbcat/summary_cflux/summary_general_info/GRBlist_redshift_BAT.txt"));
         actions.getChildren().addAll(catalog, redshift, fits);
 
-        page.getChildren().addAll(hero, cards, scienceRow, actions);
+        Label creditText = UiFactory.label("", "info-credit-text");
+        I18n.setText(creditText,
+                "Realizzato da Matteo Casiraghi · UniBG",
+                "Realized by Matteo Casiraghi · UniBG");
+        VBox creditCopy = new VBox(2,
+                creditText,
+                UiFactory.label("SwiftBAT Explorer · thesis project", "info-credit-subtitle"));
+        HBox credit = new HBox(10, new UniBgMarkPane(38), creditCopy);
+        credit.getStyleClass().add("info-credit-card");
+        credit.setAlignment(Pos.CENTER_LEFT);
+        credit.setPadding(new Insets(10, 14, 10, 14));
+
+        HBox footer = new HBox(18, actions, UiFactory.spacer(), credit);
+        footer.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(actions, Priority.NEVER);
+
+        page.getChildren().addAll(hero, cards, footer);
         return page;
     }
 
@@ -91,7 +109,12 @@ public final class AboutPage extends ScrollPane {
         card.getStyleClass().add("info-static-card");
         card.setPadding(new Insets(21));
         card.setMinWidth(0);
+        card.setMinHeight(124);
+        card.setPrefHeight(124);
         card.setMaxWidth(Double.MAX_VALUE);
+        card.setMaxHeight(Double.MAX_VALUE);
+        GridPane.setHgrow(card, Priority.ALWAYS);
+        GridPane.setVgrow(card, Priority.ALWAYS);
         card.getChildren().addAll(
                 UiFactory.label(title, "home-action-title"),
                 UiFactory.wrappedLabel(text, "home-action-text"));
