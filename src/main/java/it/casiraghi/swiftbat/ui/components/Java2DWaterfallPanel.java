@@ -14,7 +14,6 @@ import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Point;
-import java.awt.Polygon;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -61,6 +60,8 @@ public final class Java2DWaterfallPanel extends JPanel {
     private double yaw = 0.32;
     private double pitch = 0.72;
     private double zoom = 1.0;
+    private double panX;
+    private double panY;
     private int dragStartX;
     private int dragStartY;
     private double dragStartYaw;
@@ -120,10 +121,11 @@ public final class Java2DWaterfallPanel extends JPanel {
 
             @Override
             public void mouseWheelMoved(MouseWheelEvent event) {
-                zoom = clamp(zoom * Math.pow(1.08, -event.getPreciseWheelRotation()), 0.68, 1.55);
+                zoomAt(event.getX(), event.getY(), event.getPreciseWheelRotation());
                 hover = null;
                 zoomListener.accept(zoom);
                 repaint();
+                event.consume();
             }
         };
         addMouseListener(mouse);
@@ -161,9 +163,28 @@ public final class Java2DWaterfallPanel extends JPanel {
         yaw = 0.32;
         pitch = 0.72;
         zoom = 1.0;
+        panX = 0;
+        panY = 0;
         hover = null;
         zoomListener.accept(zoom);
         repaint();
+    }
+
+    private void zoomAt(double mouseX, double mouseY, double wheelRotation) {
+        double oldZoom = zoom;
+        double newZoom = clamp(oldZoom * Math.pow(1.08, -wheelRotation), 0.68, 1.85);
+        if (Math.abs(newZoom - oldZoom) < 1e-9) return;
+
+        // Geometry is affine around the base origin. Moving that origin after
+        // scaling keeps the data point under the mouse in the same screen spot.
+        double baseX = getWidth() * 0.45;
+        double baseY = getHeight() * 0.74;
+        double ratio = newZoom / oldZoom;
+        panX = mouseX - baseX - ratio * (mouseX - baseX - panX);
+        panY = mouseY - baseY - ratio * (mouseY - baseY - panY);
+        panX = clamp(panX, -getWidth() * 1.5, getWidth() * 1.5);
+        panY = clamp(panY, -getHeight() * 1.5, getHeight() * 1.5);
+        zoom = newZoom;
     }
 
     @Override
@@ -193,13 +214,12 @@ public final class Java2DWaterfallPanel extends JPanel {
     private void paintBackground(Graphics2D g) {
         g.setPaint(new GradientPaint(0, 0, BACKGROUND_TOP, 0, getHeight(), BACKGROUND_BOTTOM));
         g.fillRect(0, 0, getWidth(), getHeight());
-
     }
 
     private void paintEmpty(Graphics2D g) {
         g.setColor(MUTED);
         g.setFont(new Font("SansSerif", Font.PLAIN, 15));
-        String text = presentation.emptyMessage();
+        String text = I18n.t(presentation.emptyMessage());
         FontMetrics metrics = g.getFontMetrics();
         g.drawString(text, (getWidth() - metrics.stringWidth(text)) / 2, getHeight() / 2);
     }
@@ -208,7 +228,7 @@ public final class Java2DWaterfallPanel extends JPanel {
         projectedPoints.clear();
 
         Bounds bounds = calculateBounds();
-        Geometry geometry = new Geometry(getWidth(), getHeight(), dataset.bandCount(), yaw, pitch, zoom);
+        Geometry geometry = new Geometry(getWidth(), getHeight(), dataset.bandCount(), yaw, pitch, zoom, panX, panY);
 
         paintGrid(g, bounds, geometry);
         paintTrigger(g, bounds, geometry);
@@ -464,7 +484,7 @@ public final class Java2DWaterfallPanel extends JPanel {
             Point2D point = geometry.project(1, zeroNorm, band);
             g.setColor(dataset.colors()[band]);
             g.fillOval((int) point.getX() + 8, (int) point.getY() - 4, 8, 8);
-            g.drawString(dataset.labels()[band], (float) point.getX() + 21, (float) point.getY() + 4);
+            g.drawString(I18n.t(dataset.labels()[band]), (float) point.getX() + 21, (float) point.getY() + 4);
         }
     }
 
@@ -510,7 +530,7 @@ public final class Java2DWaterfallPanel extends JPanel {
         g.drawOval((int) point.getX() - 7, (int) point.getY() - 7, 14, 14);
 
         String[] lines = {
-                dataset.labels()[band],
+                I18n.t(dataset.labels()[band]),
                 I18n.t("Tempo") + ": " + VALUE_FORMAT.format(dataset.times()[index]) + " s",
                 I18n.t(presentation.valueLabel()) + ": " + VALUE_FORMAT.format(dataset.rates()[band][index])
                         + presentation.valueUnit()
@@ -665,22 +685,12 @@ public final class Java2DWaterfallPanel extends JPanel {
         }
     }
 
-    private record Bounds(double minTime, double maxTime, double minRate, double maxRate) {
-    }
-
-    private record ProjectedPoint(Point2D point, int band, int index) {
-    }
-
-    private record HoverPoint(Point2D point, int band, int index) {
-    }
+    private record Bounds(double minTime, double maxTime, double minRate, double maxRate) { }
+    private record ProjectedPoint(Point2D point, int band, int index) { }
+    private record HoverPoint(Point2D point, int band, int index) { }
 
     private static final class Geometry {
-        private final int width;
-        private final int height;
         private final int bandCount;
-        private final double yaw;
-        private final double pitch;
-        private final double zoom;
         private final double plotWidth;
         private final double plotHeight;
         private final double centerX;
@@ -688,17 +698,13 @@ public final class Java2DWaterfallPanel extends JPanel {
         private final double depthX;
         private final double depthY;
 
-        private Geometry(int width, int height, int bandCount, double yaw, double pitch, double zoom) {
-            this.width = width;
-            this.height = height;
+        private Geometry(int width, int height, int bandCount, double yaw, double pitch, double zoom,
+                         double panX, double panY) {
             this.bandCount = Math.max(1, bandCount);
-            this.yaw = yaw;
-            this.pitch = pitch;
-            this.zoom = zoom;
             this.plotWidth = Math.max(350, width * 0.68) * zoom;
             this.plotHeight = Math.max(190, height * 0.60) * zoom;
-            this.centerX = width * 0.45;
-            this.baselineY = height * 0.74;
+            this.centerX = width * 0.45 + panX;
+            this.baselineY = height * 0.74 + panY;
             this.depthX = (38 + 70 * yaw) * zoom;
             this.depthY = (20 + 46 * pitch) * zoom;
         }
