@@ -1,0 +1,91 @@
+name: Audit completo localizzazione temporaneo
+
+on:
+  push:
+    branches:
+      - feature/analysis-population-1.3.0
+    paths:
+      - .github/workflows/audit-i18n-temporary.yml
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/analysis-population-1.3.0
+      - name: Cerca stringhe italiane non coperte
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, codecs
+
+          ROOT = Path('src/main/java')
+          i18n = Path('src/main/java/it/casiraghi/swiftbat/ui/I18n.java').read_text(encoding='utf-8')
+
+          def unescape(s):
+              try:
+                  return codecs.decode(s, 'unicode_escape')
+              except Exception:
+                  return s.replace('\\n','\n').replace('\\"','"').replace('\\\\','\\')
+
+          mapped = set()
+          for m in re.finditer(r'put\("((?:\\.|[^"\\])*)",\s*"((?:\\.|[^"\\])*)"\);', i18n):
+              mapped.add(unescape(m.group(1)))
+
+          markers = [
+              ' il ', ' lo ', ' la ', ' gli ', ' le ', ' un ', ' una ', ' di ', ' del ', ' della ', ' dei ', ' delle ',
+              ' e ', ' è ', ' per ', ' con ', ' senza ', ' non ', ' dal ', ' nel ', ' nella ', ' nelle ', ' alla ', ' alle ',
+              ' mostra', 'nascond', 'apri', 'apro ', 'scegli', 'cerca', 'curva', 'dati', 'mappa', 'analisi', 'durata',
+              'tempo', 'valore', 'qualità', 'spiegazione', 'disponibile', 'intervallo', 'flusso', 'modello', 'energia',
+              'banda', 'tabella', 'righe', 'esposizione', 'guida', 'informazioni', 'evento', 'confront', 'schermo',
+              'descrizione', 'caric', 'campione', 'coordinate', 'celeste', 'sessione', 'lettura', 'risultati', 'errore',
+              'picco', 'durezza', 'fonte', 'ufficiale', 'filtro', 'filtri', 'visualizz', 'nessun', 'nessuna', 'tutte',
+              'tutti', 'solo ', 'seleziona', 'ripristina', 'centra', 'trascina', 'rotella', 'zoom', 'secondo', 'prima ',
+              'dopo ', 'indica', 'rappresenta', 'contiene', 'serve ', 'perché', 'attenzione', 'totale', 'media ',
+              'deviazione', 'soglia', 'classificazione', 'catalogo', 'scaric', 'cache ', 'locale', 'prodotto', 'file ',
+              'finestra', 'bin ', 'conteggi', 'incertezza', 'rapporto', 'ascensione', 'declinazione', 'piano galattico',
+              'osservazione', 'spettro', 'spettrale', 'frequenza', 'parametri', 'fit ', 'limiti', 'misura', 'gradi ',
+              'probabilità', 'modello migliore', 'riga ', 'colonna', 'colonne', 'metadati', 'keyword', 'commento',
+              'voce ', 'voci ', 'unità', 'indice ', 'distribuzione', 'mediana', 'singoli ', 'fascia ', 'copertura',
+              'elaborazione', 'annull', 'inclusi', 'esclusi', 'valido', 'valida', 'non valido', 'non valida'
+          ]
+          def italian(s):
+              if not s or len(s.strip()) < 2: return False
+              lower = ' ' + s.lower().replace('\n',' ') + ' '
+              if re.fullmatch(r'[A-Z0-9_./:+#%<>=%×·±−–—→↗↻⌁◎✦⇄! ?()\[\],;*\\-]+', s): return False
+              if re.search(r'[àèéìòù]', lower): return True
+              return any(x in lower for x in markers)
+
+          literal_re = re.compile(r'"((?:\\.|[^"\\])*)"')
+          missing = []
+          for path in sorted(ROOT.rglob('*.java')):
+              if path.name == 'I18n.java': continue
+              src = path.read_text(encoding='utf-8')
+              for m in literal_re.finditer(src):
+                  raw = m.group(1)
+                  s = unescape(raw)
+                  if not italian(s): continue
+                  # Explicit bilingual calls are already safe.
+                  prefix = src[max(0, m.start()-180):m.start()]
+                  if re.search(r'I18n\.(?:dynamic|setText)\s*\([^;]{0,160}$', prefix, re.S):
+                      continue
+                  if s in mapped: continue
+                  line = src.count('\n', 0, m.start()) + 1
+                  missing.append((str(path), line, s))
+
+          # De-duplicate exact file/text repetitions but keep first location.
+          seen=set(); out=[]
+          for item in missing:
+              key=(item[0],item[2])
+              if key in seen: continue
+              seen.add(key); out.append(item)
+          print(f'UNTRANSLATED_COUNT={len(out)}')
+          for p,l,s in out:
+              print(f'{p}:{l}: {s}')
+          if out:
+              raise SystemExit(1)
+          PY
