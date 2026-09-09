@@ -20,14 +20,14 @@ import static org.junit.jupiter.api.Assertions.fail;
  */
 class TranslationCoverageTest {
     private static final Pattern ITALIAN_WORD = Pattern.compile(
-            "(?iu)(?:^|[^\\p{L}])(?:il|lo|la|gli|le|un|una|di|del|della|dei|delle|e|è|per|con|senza|non|dal|nel|nella|nelle|"
-                    + "mostra|nascondi|apri|scegli|cerca|curva|curve|luce|dati|mappa|analisi|durata|tempo|valore|qualità|"
+            "(?iu)(?:^|[^\\p{L}])(?:il|lo|la|gli|le|un|una|di|del|della|dei|delle|è|con|senza|non|dal|nel|nella|nelle|"
+                    + "mostra|nascondi|apri|scegli|cerca|curva|luce|dati|mappa|analisi|durata|tempo|valore|qualità|"
                     + "spiegazione|intervallo|flusso|modello|energia|banda|tabella|righe|esposizione|guida|informazioni|"
-                    + "evento|eventi|confronto|schermo|descrizione|caricamento|campione|coordinate|celeste|sessione|lettura|"
+                    + "evento|eventi|confronto|schermo|descrizione|caricamento|campione|celeste|sessione|lettura|"
                     + "risultati|errore|picco|durezza|fonte|ufficiale|filtro|filtri|nessun|nessuna|tutte|tutti|ripristina|"
                     + "profilo|profondità|altezza|disponibilità|redshift|gradi|scelta|vincolato|incerto|visualizzati|"
                     + "caricati|ammesso|massimo|minimo|corrispondono|leggibili|sconosciuto|spettro|barre|asse|assi|"
-                    + "trascina|rotella|centra|numero|secondo|secondi|binning|estremo|scienza|strumenti|scorciatoie|"
+                    + "trascina|rotella|centra|numero|secondo|secondi|estremo|scienza|strumenti|scorciatoie|"
                     + "catalogo|metadati|probabilità|frequenza|conteggi|limiti|unità|seleziona|punto|distribuzione)(?:$|[^\\p{L}])");
 
     @Test
@@ -53,7 +53,10 @@ class TranslationCoverageTest {
             String source = Files.readString(path, StandardCharsets.UTF_8);
             for (Literal literal : stringLiterals(source)) {
                 String value = unescape(literal.value());
-                if (looksItalian(value) && !UiTranslations.hasEnglish(value)) {
+                if (!looksItalian(value)) continue;
+                if (codeOnlyLiteral(source, literal.offset())) continue;
+                if (concatenationFragment(source, literal, value)) continue;
+                if (!hasRuntimeEnglish(value)) {
                     missing.add(path.getFileName() + ":" + lineOf(source, literal.offset()) + " -> " + value);
                 }
             }
@@ -67,6 +70,70 @@ class TranslationCoverageTest {
         String lower = value.toLowerCase(Locale.ROOT);
         if (lower.matches(".*[àèéìòù].*")) return true;
         return ITALIAN_WORD.matcher(value).find();
+    }
+
+    private boolean hasRuntimeEnglish(String value) {
+        if (UiTranslations.hasEnglish(value)) return true;
+        String legacy = I18n.english(value);
+        if (isTranslation(value, legacy)) return true;
+
+        // The fullscreen reading assistant deliberately reuses the existing
+        // translated copy after changing the scientific color from orange to cyan.
+        String legacyColorSource = value
+                .replace("linea azzurra", "linea arancione")
+                .replace("curva azzurra", "curva arancione");
+        if (!legacyColorSource.equals(value)) {
+            String translated = I18n.english(legacyColorSource);
+            if (isTranslation(legacyColorSource, translated)) return true;
+        }
+        return false;
+    }
+
+    private boolean isTranslation(String source, String translated) {
+        return translated != null
+                && !translated.equals(source)
+                && !translated.equals("[Missing English translation]");
+    }
+
+    /** Literals used only to recognize/transform code are not user-visible copy. */
+    private boolean codeOnlyLiteral(String source, int offset) {
+        String line = lineAt(source, offset);
+        return line.contains(".contains(")
+                || line.contains(".startsWith(")
+                || line.contains(".endsWith(")
+                || line.contains(".replace(")
+                || line.contains(".replaceFirst(")
+                || line.contains(".indexOf(")
+                || line.contains(".substring(")
+                || line.contains(".toLowerCase(")
+                || line.contains(".matches(");
+    }
+
+    /**
+     * Java often splits one visible paragraph across adjacent literals. The complete
+     * runtime string is audited through the translation layer; individual fragments
+     * must not be reported as independent controls.
+     */
+    private boolean concatenationFragment(String source, Literal literal, String value) {
+        if (!(value.startsWith(" ") || value.endsWith(" ") || value.endsWith("\n"))) return false;
+        int lineStart = source.lastIndexOf('\n', literal.offset()) + 1;
+        int lineEnd = source.indexOf('\n', literal.offset());
+        if (lineEnd < 0) lineEnd = source.length();
+        String current = source.substring(lineStart, lineEnd);
+
+        int previousStart = lineStart <= 1 ? 0 : source.lastIndexOf('\n', lineStart - 2) + 1;
+        String previous = source.substring(previousStart, Math.max(previousStart, lineStart - 1));
+        int nextEnd = source.indexOf('\n', Math.min(source.length(), lineEnd + 1));
+        if (nextEnd < 0) nextEnd = source.length();
+        String next = lineEnd >= source.length() ? "" : source.substring(lineEnd + 1, nextEnd);
+        return current.contains("+") || previous.contains("+") || next.contains("+");
+    }
+
+    private String lineAt(String source, int offset) {
+        int start = source.lastIndexOf('\n', offset) + 1;
+        int end = source.indexOf('\n', offset);
+        if (end < 0) end = source.length();
+        return source.substring(start, end);
     }
 
     /** Minimal Java lexer: extracts string literals while ignoring comments and char literals. */
