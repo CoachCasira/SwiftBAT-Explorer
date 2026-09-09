@@ -25,18 +25,13 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.function.DoubleConsumer;
 
-/**
- * Renderer scientifico 2.5D basato su Java2D.
- *
- * <p>Le quattro bande energetiche sono mostrate come curve "a cascata":
- * tempo sull'asse orizzontale, rate sull'asse verticale e profondità puramente
- * grafica per separare le bande. Non usa la scena 3D di JavaFX e quindi evita
- * artefatti di illuminazione, clipping e piani metà chiari/metà scuri.</p>
- */
+/** Renderer scientifico 2.5D basato su Java2D. */
 public final class Java2DWaterfallPanel extends JPanel {
     private static final Color BACKGROUND_TOP = new Color(6, 13, 29);
     private static final Color BACKGROUND_BOTTOM = new Color(9, 23, 48);
@@ -56,6 +51,7 @@ public final class Java2DWaterfallPanel extends JPanel {
     private Dataset dataset = Dataset.empty();
     private Presentation presentation = Presentation.explorerDefaults();
     private final List<ProjectedPoint> projectedPoints = new ArrayList<>();
+    private final Set<Integer> focusedBands = new LinkedHashSet<>();
 
     private double yaw = 0.32;
     private double pitch = 0.72;
@@ -66,6 +62,7 @@ public final class Java2DWaterfallPanel extends JPanel {
     private int dragStartY;
     private double dragStartYaw;
     private double dragStartPitch;
+    private boolean draggedSincePress;
     private HoverPoint hover;
     private DoubleConsumer zoomListener = value -> { };
 
@@ -78,49 +75,61 @@ public final class Java2DWaterfallPanel extends JPanel {
         setFocusable(true);
 
         MouseAdapter mouse = new MouseAdapter() {
-            @Override
-            public void mousePressed(MouseEvent event) {
+            @Override public void mousePressed(MouseEvent event) {
                 requestFocusInWindow();
                 dragStartX = event.getX();
                 dragStartY = event.getY();
                 dragStartYaw = yaw;
                 dragStartPitch = pitch;
+                draggedSincePress = false;
                 setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
             }
 
-            @Override
-            public void mouseReleased(MouseEvent event) {
+            @Override public void mouseReleased(MouseEvent event) {
                 setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             }
 
-            @Override
-            public void mouseDragged(MouseEvent event) {
+            @Override public void mouseDragged(MouseEvent event) {
+                if (Math.abs(event.getX() - dragStartX) > 3 || Math.abs(event.getY() - dragStartY) > 3) {
+                    draggedSincePress = true;
+                }
                 yaw = clamp(dragStartYaw + (event.getX() - dragStartX) * 0.0028, -0.72, 0.72);
                 pitch = clamp(dragStartPitch - (event.getY() - dragStartY) * 0.0032, 0.30, 1.12);
                 hover = null;
                 repaint();
             }
 
-            @Override
-            public void mouseMoved(MouseEvent event) {
+            @Override public void mouseMoved(MouseEvent event) {
                 updateHover(event.getPoint());
             }
 
-            @Override
-            public void mouseExited(MouseEvent event) {
+            @Override public void mouseExited(MouseEvent event) {
                 hover = null;
                 repaint();
             }
 
-            @Override
-            public void mouseClicked(MouseEvent event) {
-                if (event.getClickCount() == 2) {
-                    resetView();
+            @Override public void mouseClicked(MouseEvent event) {
+                if (draggedSincePress) return;
+                int band = nearestBand(event.getPoint());
+                if (event.getClickCount() >= 2) {
+                    if (band < 0 && !focusedBands.isEmpty()) {
+                        focusedBands.clear();
+                        hover = null;
+                        repaint();
+                    } else {
+                        focusedBands.clear();
+                        resetView();
+                    }
+                    return;
+                }
+                if (event.getClickCount() == 1 && band >= 0) {
+                    if (!focusedBands.add(band)) focusedBands.remove(band);
+                    hover = null;
+                    repaint();
                 }
             }
 
-            @Override
-            public void mouseWheelMoved(MouseWheelEvent event) {
+            @Override public void mouseWheelMoved(MouseWheelEvent event) {
                 zoomAt(event.getX(), event.getY(), event.getPreciseWheelRotation());
                 hover = null;
                 zoomListener.accept(zoom);
@@ -139,11 +148,11 @@ public final class Java2DWaterfallPanel extends JPanel {
             return;
         }
         dataset = newDataset == null ? Dataset.empty() : newDataset.copy();
+        focusedBands.clear();
         hover = null;
         repaint();
     }
 
-    /** Personalizza testi e densità del renderer senza cambiare la geometria dei dati. */
     public void setPresentation(Presentation newPresentation) {
         if (!SwingUtilities.isEventDispatchThread()) {
             SwingUtilities.invokeLater(() -> setPresentation(newPresentation));
@@ -174,9 +183,6 @@ public final class Java2DWaterfallPanel extends JPanel {
         double oldZoom = zoom;
         double newZoom = clamp(oldZoom * Math.pow(1.08, -wheelRotation), 0.68, 1.85);
         if (Math.abs(newZoom - oldZoom) < 1e-9) return;
-
-        // Geometry is affine around the base origin. Moving that origin after
-        // scaling keeps the data point under the mouse in the same screen spot.
         double baseX = getWidth() * 0.45;
         double baseY = getHeight() * 0.74;
         double ratio = newZoom / oldZoom;
@@ -187,8 +193,7 @@ public final class Java2DWaterfallPanel extends JPanel {
         zoom = newZoom;
     }
 
-    @Override
-    protected void paintComponent(Graphics graphics) {
+    @Override protected void paintComponent(Graphics graphics) {
         super.paintComponent(graphics);
         Graphics2D g = (Graphics2D) graphics.create();
         try {
@@ -226,23 +231,14 @@ public final class Java2DWaterfallPanel extends JPanel {
 
     private void paintChart(Graphics2D g) {
         projectedPoints.clear();
-
         Bounds bounds = calculateBounds();
         Geometry geometry = new Geometry(getWidth(), getHeight(), dataset.bandCount(), yaw, pitch, zoom, panX, panY);
-
         paintGrid(g, bounds, geometry);
         paintTrigger(g, bounds, geometry);
-
-        // Disegno dal fondo verso il fronte, così la profondità resta leggibile.
-        for (int band = dataset.bandCount() - 1; band >= 0; band--) {
-            paintBand(g, band, bounds, geometry);
-        }
-
+        for (int band = dataset.bandCount() - 1; band >= 0; band--) paintBand(g, band, bounds, geometry);
         paintAxesAndLabels(g, bounds, geometry);
         paintOrientationHint(g);
-        if (hover != null) {
-            paintHover(g, hover);
-        }
+        if (hover != null) paintHover(g, hover);
     }
 
     private Bounds calculateBounds() {
@@ -258,20 +254,13 @@ public final class Java2DWaterfallPanel extends JPanel {
                 }
             }
         }
-        if (maxTime <= minTime) {
-            maxTime = minTime + 1;
-        }
-        if (maxRate <= 0) {
-            maxRate = 1;
-        }
-        double paddedMax = maxRate * 1.12;
-        double paddedMin = minRate < 0 ? minRate * 1.30 : -maxRate * 0.08;
-        return new Bounds(minTime, maxTime, paddedMin, paddedMax);
+        if (maxTime <= minTime) maxTime = minTime + 1;
+        if (maxRate <= 0) maxRate = 1;
+        return new Bounds(minTime, maxTime, minRate < 0 ? minRate * 1.30 : -maxRate * 0.08, maxRate * 1.12);
     }
 
     private void paintGrid(Graphics2D g, Bounds bounds, Geometry geometry) {
         g.setStroke(new BasicStroke(1f));
-
         int xTicks = 8;
         for (int tick = 0; tick <= xTicks; tick++) {
             double fraction = tick / (double) xTicks;
@@ -281,7 +270,6 @@ public final class Java2DWaterfallPanel extends JPanel {
             g.setColor(Math.abs(time) < (bounds.maxTime() - bounds.minTime()) / 1000 ? GRID_STRONG : GRID);
             g.draw(new Line2D.Double(front, back));
         }
-
         int yTicks = 5;
         for (int tick = 0; tick <= yTicks; tick++) {
             double rate = lerp(bounds.minRate(), bounds.maxRate(), tick / (double) yTicks);
@@ -295,35 +283,28 @@ public final class Java2DWaterfallPanel extends JPanel {
             g.draw(new Line2D.Double(leftBack, rightBack));
             g.draw(new Line2D.Double(leftFront, leftBack));
         }
-
-        // Linee di base delle serie disposte in profondità.
         double zeroNorm = normalize(0, bounds.minRate(), bounds.maxRate());
         for (int band = 0; band < dataset.bandCount(); band++) {
             Point2D left = geometry.project(0, zeroNorm, band);
             Point2D right = geometry.project(1, zeroNorm, band);
             int baselineAlpha = presentation.denseSeries() ? 24 : band == 0 ? 90 : 55;
-            g.setColor(withAlpha(dataset.colors()[band], baselineAlpha));
+            g.setColor(withAlpha(dataset.colors()[band], focusAlpha(band, baselineAlpha)));
             g.setStroke(new BasicStroke(presentation.denseSeries() ? 0.8f : band == 0 ? 1.5f : 1f,
-                    BasicStroke.CAP_ROUND,
-                    BasicStroke.JOIN_ROUND, 10f, new float[]{5f, 7f}, 0f));
+                    BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[]{5f, 7f}, 0f));
             g.draw(new Line2D.Double(left, right));
         }
         g.setStroke(new BasicStroke(1f));
     }
 
     private void paintTrigger(Graphics2D g, Bounds bounds, Geometry geometry) {
-        if (0 < bounds.minTime() || 0 > bounds.maxTime()) {
-            return;
-        }
+        if (0 < bounds.minTime() || 0 > bounds.maxTime()) return;
         double xNorm = normalize(0, bounds.minTime(), bounds.maxTime());
         Point2D bottomFront = geometry.project(xNorm, normalize(0, bounds.minRate(), bounds.maxRate()), 0);
         Point2D topBack = geometry.project(xNorm, 1, dataset.bandCount() - 1);
-        g.setColor(new Color(TRIGGER.getRed(), TRIGGER.getGreen(), TRIGGER.getBlue(), 175));
-        g.setStroke(new BasicStroke(1.7f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND,
-                10f, new float[]{7f, 7f}, 0f));
+        g.setColor(new Color(TRIGGER.getRed(), TRIGGER.getGreen(), TRIGGER.getBlue(), focusedBands.isEmpty() ? 175 : 90));
+        g.setStroke(new BasicStroke(1.7f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[]{7f, 7f}, 0f));
         g.draw(new Line2D.Double(bottomFront, topBack));
         g.setStroke(new BasicStroke(1f));
-
         g.setFont(new Font("SansSerif", Font.BOLD, 12));
         g.drawString("trigger  t = 0", (float) topBack.getX() + 7, (float) topBack.getY() - 5);
     }
@@ -333,7 +314,6 @@ public final class Java2DWaterfallPanel extends JPanel {
         double[] values = dataset.rates()[band];
         Color color = dataset.colors()[band];
         double zeroNorm = normalize(0, bounds.minRate(), bounds.maxRate());
-
         Path2D line = new Path2D.Double();
         Point2D[] points = new Point2D[times.length];
         boolean drawingSegment = false;
@@ -344,60 +324,46 @@ public final class Java2DWaterfallPanel extends JPanel {
                 allFinite = false;
                 continue;
             }
-            double xNorm = normalize(times[index], bounds.minTime(), bounds.maxTime());
-            double yNorm = normalize(values[index], bounds.minRate(), bounds.maxRate());
-            Point2D point = geometry.project(xNorm, yNorm, band);
+            Point2D point = geometry.project(normalize(times[index], bounds.minTime(), bounds.maxTime()),
+                    normalize(values[index], bounds.minRate(), bounds.maxRate()), band);
             points[index] = point;
             if (!drawingSegment) {
                 line.moveTo(point.getX(), point.getY());
                 drawingSegment = true;
-            } else {
-                line.lineTo(point.getX(), point.getY());
-            }
+            } else line.lineTo(point.getX(), point.getY());
             projectedPoints.add(new ProjectedPoint(point, band, index));
         }
 
-        // Riempimento trasparente: dà profondità senza creare un pannello opaco.
         if (presentation.showAreaFill() && allFinite && points.length >= 2) {
             Path2D area = new Path2D.Double();
             Point2D firstBase = geometry.project(0, zeroNorm, band);
             area.moveTo(firstBase.getX(), firstBase.getY());
-            for (Point2D point : points) {
-                area.lineTo(point.getX(), point.getY());
-            }
+            for (Point2D point : points) area.lineTo(point.getX(), point.getY());
             Point2D lastBase = geometry.project(1, zeroNorm, band);
             area.lineTo(lastBase.getX(), lastBase.getY());
             area.closePath();
-            g.setColor(withAlpha(color, band == 0 ? 34 : 25));
+            g.setColor(withAlpha(color, focusAlpha(band, band == 0 ? 34 : 25)));
             g.fill(area);
         }
 
-        // Glow sottile seguito dalla linea nitida. Nel profilo di popolazione
-        // mediana e quartili mantengono la stessa gerarchia visiva della vista 2D.
         boolean medianBand = isMedianBand(band);
         boolean quartileBand = isQuartileBand(band);
         int glowAlpha = medianBand ? 70 : quartileBand ? 40 : presentation.denseSeries() ? 18 : 55;
-        float glowWidth = medianBand ? 8.0f : quartileBand ? 5.0f
-                : presentation.denseSeries() ? 3.0f : 7.5f;
-        g.setColor(withAlpha(color, glowAlpha));
+        float glowWidth = medianBand ? 8.0f : quartileBand ? 5.0f : presentation.denseSeries() ? 3.0f : 7.5f;
+        g.setColor(withAlpha(color, focusAlpha(band, glowAlpha)));
         g.setStroke(new BasicStroke(glowWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g.draw(line);
 
-        int lineAlpha = medianBand ? 255 : quartileBand ? 235
-                : presentation.denseSeries() ? 105 : band == 0 ? 245 : 220;
-        float lineWidth = medianBand ? 4.2f : quartileBand ? 2.4f
-                : presentation.denseSeries() ? 1.05f : band == 0 ? 2.8f : 2.35f;
-        g.setColor(withAlpha(color, lineAlpha));
+        int lineAlpha = medianBand ? 255 : quartileBand ? 235 : presentation.denseSeries() ? 105 : band == 0 ? 245 : 220;
+        float lineWidth = medianBand ? 4.2f : quartileBand ? 2.4f : presentation.denseSeries() ? 1.05f : band == 0 ? 2.8f : 2.35f;
+        if (!isBandActive(band)) lineWidth = Math.min(1.0f, lineWidth);
+        g.setColor(withAlpha(color, focusAlpha(band, lineAlpha)));
         if (quartileBand) {
-            g.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND,
-                    10f, new float[]{8f, 6f}, 0f));
-        } else {
-            g.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        }
+            g.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 10f, new float[]{8f, 6f}, 0f));
+        } else g.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         g.draw(line);
 
-        // Evidenzia il massimo quando è utile per il tipo di grafico visualizzato.
-        int peakIndex = presentation.showPeakMarkers() ? peakIndex(values) : -1;
+        int peakIndex = presentation.showPeakMarkers() && isBandActive(band) ? peakIndex(values) : -1;
         if (peakIndex >= 0 && points[peakIndex] != null) {
             Point2D peak = points[peakIndex];
             g.setColor(new Color(255, 255, 255, 220));
@@ -408,17 +374,17 @@ public final class Java2DWaterfallPanel extends JPanel {
         }
     }
 
-    private boolean isMedianBand(int band) {
-        return "Mediana".equals(labelForBand(band));
-    }
-
+    private boolean isMedianBand(int band) { return "Mediana".equals(labelForBand(band)); }
     private boolean isQuartileBand(int band) {
         String label = labelForBand(band);
         return label != null && label.contains("percentile");
     }
-
     private String labelForBand(int band) {
         return band >= 0 && band < dataset.labels().length ? dataset.labels()[band] : null;
+    }
+    private boolean isBandActive(int band) { return focusedBands.isEmpty() || focusedBands.contains(band); }
+    private int focusAlpha(int band, int normalAlpha) {
+        return isBandActive(band) ? normalAlpha : Math.max(7, (int) Math.round(normalAlpha * 0.11));
     }
 
     private void paintAxesAndLabels(Graphics2D g, Bounds bounds, Geometry geometry) {
@@ -427,35 +393,26 @@ public final class Java2DWaterfallPanel extends JPanel {
         Point2D xEnd = geometry.project(1, zeroNorm, 0);
         Point2D yTop = geometry.project(0, 1, 0);
         Point2D depthEnd = geometry.project(0, zeroNorm, dataset.bandCount() - 1);
-
         g.setStroke(new BasicStroke(1.8f));
-        g.setColor(new Color(90, 216, 255, 205));
-        g.draw(new Line2D.Double(xStart, xEnd));
-        g.setColor(new Color(228, 238, 255, 210));
-        g.draw(new Line2D.Double(xStart, yTop));
-        g.setColor(new Color(167, 139, 250, 190));
-        g.draw(new Line2D.Double(xStart, depthEnd));
+        g.setColor(new Color(90, 216, 255, 205)); g.draw(new Line2D.Double(xStart, xEnd));
+        g.setColor(new Color(228, 238, 255, 210)); g.draw(new Line2D.Double(xStart, yTop));
+        g.setColor(new Color(167, 139, 250, 190)); g.draw(new Line2D.Double(xStart, depthEnd));
 
         g.setFont(new Font("SansSerif", Font.PLAIN, 11));
         g.setColor(MUTED);
-        int xTicks = 8;
-        for (int tick = 0; tick <= xTicks; tick++) {
-            double fraction = tick / (double) xTicks;
+        for (int tick = 0; tick <= 8; tick++) {
+            double fraction = tick / 8.0;
             double time = lerp(bounds.minTime(), bounds.maxTime(), fraction);
             Point2D point = geometry.project(fraction, zeroNorm, 0);
             String label = formatAxis(time);
-            int width = g.getFontMetrics().stringWidth(label);
-            g.drawString(label, (float) point.getX() - width / 2f, (float) point.getY() + 20);
+            g.drawString(label, (float) point.getX() - g.getFontMetrics().stringWidth(label) / 2f, (float) point.getY() + 20);
         }
-
-        int yTicks = 5;
-        for (int tick = 0; tick <= yTicks; tick++) {
-            double fraction = tick / (double) yTicks;
+        for (int tick = 0; tick <= 5; tick++) {
+            double fraction = tick / 5.0;
             double rate = lerp(bounds.minRate(), bounds.maxRate(), fraction);
             Point2D point = geometry.project(0, fraction, 0);
             String label = formatAxis(rate);
-            int width = g.getFontMetrics().stringWidth(label);
-            g.drawString(label, (float) point.getX() - width - 10, (float) point.getY() + 4);
+            g.drawString(label, (float) point.getX() - g.getFontMetrics().stringWidth(label) - 10, (float) point.getY() + 4);
         }
 
         g.setFont(new Font("SansSerif", Font.BOLD, 12));
@@ -469,20 +426,17 @@ public final class Java2DWaterfallPanel extends JPanel {
             g.setColor(new Color(190, 166, 250));
             String depthLabel = I18n.t(presentation.depthAxisLabel());
             int labelWidth = g.getFontMetrics().stringWidth(depthLabel);
-            float labelX = (float) clamp(depthEnd.getX() + 8, 12, getWidth() - labelWidth - 12);
-            float labelY = (float) clamp(depthEnd.getY() - 9, 20, getHeight() - 45);
-            g.drawString(depthLabel, labelX, labelY);
+            g.drawString(depthLabel, (float) clamp(depthEnd.getX() + 8, 12, getWidth() - labelWidth - 12),
+                    (float) clamp(depthEnd.getY() - 9, 20, getHeight() - 45));
         }
 
-        // Etichette delle serie all'estremità destra, diradate nei campioni numerosi.
         g.setFont(new Font("SansSerif", Font.BOLD, 11));
         int labelStep = labelStep(dataset.bandCount(), presentation.maxDepthLabels());
         for (int band = dataset.bandCount() - 1; band >= 0; band--) {
-            if (band != 0 && band != dataset.bandCount() - 1 && band % labelStep != 0) {
-                continue;
-            }
+            if (band != 0 && band != dataset.bandCount() - 1 && band % labelStep != 0) continue;
             Point2D point = geometry.project(1, zeroNorm, band);
-            g.setColor(dataset.colors()[band]);
+            Color labelColor = withAlpha(dataset.colors()[band], isBandActive(band) ? 255 : 48);
+            g.setColor(labelColor);
             g.fillOval((int) point.getX() + 8, (int) point.getY() - 4, 8, 8);
             g.drawString(I18n.t(dataset.labels()[band]), (float) point.getX() + 21, (float) point.getY() + 4);
         }
@@ -495,10 +449,16 @@ public final class Java2DWaterfallPanel extends JPanel {
         g.drawString(hint, 18, getHeight() - 17);
     }
 
-    private void updateHover(Point mouse) {
+    private int nearestBand(Point mouse) {
+        ProjectedPoint nearest = nearestPoint(mouse, false);
+        return nearest == null ? -1 : nearest.band();
+    }
+
+    private ProjectedPoint nearestPoint(Point mouse, boolean respectFocus) {
         ProjectedPoint nearest = null;
-        double best = 12 * 12;
+        double best = 15 * 15;
         for (ProjectedPoint projected : projectedPoints) {
+            if (respectFocus && !isBandActive(projected.band())) continue;
             double dx = projected.point().getX() - mouse.x;
             double dy = projected.point().getY() - mouse.y;
             double distance = dx * dx + dy * dy;
@@ -507,11 +467,13 @@ public final class Java2DWaterfallPanel extends JPanel {
                 nearest = projected;
             }
         }
+        return nearest;
+    }
+
+    private void updateHover(Point mouse) {
+        ProjectedPoint nearest = nearestPoint(mouse, !focusedBands.isEmpty());
         if (nearest == null) {
-            if (hover != null) {
-                hover = null;
-                repaint();
-            }
+            if (hover != null) { hover = null; repaint(); }
             return;
         }
         hover = new HoverPoint(nearest.point(), nearest.band(), nearest.index());
@@ -522,138 +484,78 @@ public final class Java2DWaterfallPanel extends JPanel {
         int band = hovered.band();
         int index = hovered.index();
         Point2D point = hovered.point();
-
-        g.setColor(Color.WHITE);
-        g.fillOval((int) point.getX() - 4, (int) point.getY() - 4, 8, 8);
-        g.setColor(dataset.colors()[band]);
-        g.setStroke(new BasicStroke(2f));
+        g.setColor(Color.WHITE); g.fillOval((int) point.getX() - 4, (int) point.getY() - 4, 8, 8);
+        g.setColor(dataset.colors()[band]); g.setStroke(new BasicStroke(2f));
         g.drawOval((int) point.getX() - 7, (int) point.getY() - 7, 14, 14);
 
         String[] lines = {
                 I18n.t(dataset.labels()[band]),
                 I18n.t("Tempo") + ": " + VALUE_FORMAT.format(dataset.times()[index]) + " s",
-                I18n.t(presentation.valueLabel()) + ": " + VALUE_FORMAT.format(dataset.rates()[band][index])
-                        + presentation.valueUnit()
+                I18n.t(presentation.valueLabel()) + ": " + VALUE_FORMAT.format(dataset.rates()[band][index]) + presentation.valueUnit()
         };
         g.setFont(new Font("SansSerif", Font.PLAIN, 12));
         FontMetrics metrics = g.getFontMetrics();
         int width = 0;
-        for (String line : lines) {
-            width = Math.max(width, metrics.stringWidth(line));
-        }
+        for (String line : lines) width = Math.max(width, metrics.stringWidth(line));
         width += 24;
         int height = 66;
         int x = (int) point.getX() + 16;
         int y = (int) point.getY() - height - 12;
-        if (x + width > getWidth() - 10) {
-            x = (int) point.getX() - width - 16;
-        }
-        if (y < 10) {
-            y = (int) point.getY() + 16;
-        }
-
-        g.setColor(TOOLTIP_BG);
-        g.fillRoundRect(x, y, width, height, 14, 14);
-        g.setColor(withAlpha(dataset.colors()[band], 180));
-        g.setStroke(new BasicStroke(1.2f));
+        if (x + width > getWidth() - 10) x = (int) point.getX() - width - 16;
+        if (y < 10) y = (int) point.getY() + 16;
+        g.setColor(TOOLTIP_BG); g.fillRoundRect(x, y, width, height, 14, 14);
+        g.setColor(withAlpha(dataset.colors()[band], 180)); g.setStroke(new BasicStroke(1.2f));
         g.drawRoundRect(x, y, width, height, 14, 14);
-
-        g.setColor(dataset.colors()[band]);
-        g.setFont(new Font("SansSerif", Font.BOLD, 12));
+        g.setColor(dataset.colors()[band]); g.setFont(new Font("SansSerif", Font.BOLD, 12));
         g.drawString(lines[0], x + 12, y + 19);
-        g.setColor(TEXT);
-        g.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        g.drawString(lines[1], x + 12, y + 38);
-        g.drawString(lines[2], x + 12, y + 56);
+        g.setColor(TEXT); g.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        g.drawString(lines[1], x + 12, y + 38); g.drawString(lines[2], x + 12, y + 56);
     }
 
     private static int peakIndex(double[] values) {
-        int result = -1;
-        double max = Double.NEGATIVE_INFINITY;
+        int result = -1; double max = Double.NEGATIVE_INFINITY;
         for (int index = 0; index < values.length; index++) {
-            if (Double.isFinite(values[index]) && values[index] > max) {
-                max = values[index];
-                result = index;
-            }
+            if (Double.isFinite(values[index]) && values[index] > max) { max = values[index]; result = index; }
         }
         return result;
     }
-
     private static int labelStep(int count, int maximumLabels) {
-        if (count <= 1 || maximumLabels <= 1 || count <= maximumLabels) {
-            return 1;
-        }
+        if (count <= 1 || maximumLabels <= 1 || count <= maximumLabels) return 1;
         return Math.max(1, (int) Math.ceil((count - 1.0) / (maximumLabels - 1.0)));
     }
-
     private static Color withAlpha(Color color, int alpha) {
         return new Color(color.getRed(), color.getGreen(), color.getBlue(), clampInt(alpha, 0, 255));
     }
-
-    private static int clampInt(int value, int min, int max) {
-        return Math.max(min, Math.min(max, value));
-    }
-
+    private static int clampInt(int value, int min, int max) { return Math.max(min, Math.min(max, value)); }
     private static double normalize(double value, double min, double max) {
-        if (max <= min) {
-            return 0.5;
-        }
-        return clamp((value - min) / (max - min), 0, 1);
+        return max <= min ? 0.5 : clamp((value - min) / (max - min), 0, 1);
     }
-
-    private static double lerp(double start, double end, double fraction) {
-        return start + (end - start) * fraction;
-    }
-
-    private static double clamp(double value, double min, double max) {
-        return Math.max(min, Math.min(max, value));
-    }
-
+    private static double lerp(double start, double end, double fraction) { return start + (end - start) * fraction; }
+    private static double clamp(double value, double min, double max) { return Math.max(min, Math.min(max, value)); }
     private static String formatAxis(double value) {
         double absolute = Math.abs(value);
-        if (absolute >= 100) {
-            return String.format(Locale.US, "%.0f", value);
-        }
-        if (absolute >= 10) {
-            return String.format(Locale.US, "%.1f", value);
-        }
+        if (absolute >= 100) return String.format(Locale.US, "%.0f", value);
+        if (absolute >= 10) return String.format(Locale.US, "%.1f", value);
         return String.format(Locale.US, "%.2f", value);
     }
 
     public record Dataset(double[] times, double[][] rates, String[] labels, Color[] colors) {
-        public static Dataset empty() {
-            return new Dataset(new double[0], new double[0][], new String[0], new Color[0]);
-        }
-
+        public static Dataset empty() { return new Dataset(new double[0], new double[0][], new String[0], new Color[0]); }
         public Dataset {
             times = times == null ? new double[0] : times;
             rates = rates == null ? new double[0][] : rates;
             labels = labels == null ? new String[0] : labels;
             colors = colors == null ? new Color[0] : colors;
         }
-
         public boolean isEmpty() {
-            if (times.length == 0 || rates.length == 0 || labels.length != rates.length
-                    || colors.length != rates.length) {
-                return true;
-            }
-            for (double[] series : rates) {
-                if (series == null || series.length != times.length) {
-                    return true;
-                }
-            }
+            if (times.length == 0 || rates.length == 0 || labels.length != rates.length || colors.length != rates.length) return true;
+            for (double[] series : rates) if (series == null || series.length != times.length) return true;
             return false;
         }
-
-        public int bandCount() {
-            return rates.length;
-        }
-
+        public int bandCount() { return rates.length; }
         public Dataset copy() {
             double[][] copiedRates = new double[rates.length][];
-            for (int index = 0; index < rates.length; index++) {
-                copiedRates[index] = Arrays.copyOf(rates[index], rates[index].length);
-            }
+            for (int index = 0; index < rates.length; index++) copiedRates[index] = Arrays.copyOf(rates[index], rates[index].length);
             return new Dataset(Arrays.copyOf(times, times.length), copiedRates,
                     Arrays.copyOf(labels, labels.length), Arrays.copyOf(colors, colors.length));
         }
@@ -672,17 +574,12 @@ public final class Java2DWaterfallPanel extends JPanel {
             valueUnit = valueUnit == null ? "" : valueUnit;
             maxDepthLabels = Math.max(2, maxDepthLabels);
         }
-
         public static Presentation explorerDefaults() {
-            return new Presentation(
-                    "Nessun dato a quattro bande disponibile per la vista 3D.",
+            return new Presentation("Nessun dato a quattro bande disponibile per la vista 3D.",
                     "Tempo dal trigger (s)", "Rate (count/s)", "Bande energetiche",
                     "Rate", " count/s", true, true, false, 8);
         }
-
-        private static String textOr(String value, String fallback) {
-            return value == null || value.isBlank() ? fallback : value;
-        }
+        private static String textOr(String value, String fallback) { return value == null || value.isBlank() ? fallback : value; }
     }
 
     private record Bounds(double minTime, double maxTime, double minRate, double maxRate) { }
@@ -697,7 +594,6 @@ public final class Java2DWaterfallPanel extends JPanel {
         private final double baselineY;
         private final double depthX;
         private final double depthY;
-
         private Geometry(int width, int height, int bandCount, double yaw, double pitch, double zoom,
                          double panX, double panY) {
             this.bandCount = Math.max(1, bandCount);
@@ -708,12 +604,10 @@ public final class Java2DWaterfallPanel extends JPanel {
             this.depthX = (38 + 70 * yaw) * zoom;
             this.depthY = (20 + 46 * pitch) * zoom;
         }
-
         private Point2D project(double xNorm, double yNorm, int band) {
             double zNorm = bandCount <= 1 ? 0 : band / (double) (bandCount - 1);
-            double x = centerX + (xNorm - 0.5) * plotWidth + zNorm * depthX;
-            double y = baselineY - yNorm * plotHeight - zNorm * depthY;
-            return new Point2D.Double(x, y);
+            return new Point2D.Double(centerX + (xNorm - 0.5) * plotWidth + zNorm * depthX,
+                    baselineY - yNorm * plotHeight - zNorm * depthY);
         }
     }
 }
