@@ -50,8 +50,9 @@ public final class BlackHoleHeroPane extends Region {
         gc.save();
         gc.setFill(new RadialGradient(0, 0, cx, cy, core * 3.35, false, CycleMethod.NO_CYCLE,
                 new Stop(0.00, Color.rgb(91, 40, 154, 0.00)),
-                new Stop(0.42, Color.rgb(109, 58, 193, 0.07)),
-                new Stop(0.72, Color.rgb(35, 122, 186, 0.10)),
+                new Stop(0.38, Color.rgb(223, 48, 210, 0.13)),
+                new Stop(0.68, Color.rgb(70, 75, 235, 0.16)),
+                new Stop(0.84, Color.rgb(0, 205, 245, 0.09)),
                 new Stop(1.00, Color.TRANSPARENT)));
         gc.fillOval(cx - core * 3.35, cy - core * 3.35, core * 6.70, core * 6.70);
         gc.restore();
@@ -67,12 +68,14 @@ public final class BlackHoleHeroPane extends Region {
             double h = diskH * (0.42 + 0.58 * t);
             double alpha = 0.10 + 0.38 * (1.0 - Math.abs(t - 0.44) * 1.75);
             Color c;
-            if (t < 0.34) {
+            if (t < 0.25) {
                 c = Color.rgb(255, 235, 185, Math.max(0.04, alpha));
-            } else if (t < 0.68) {
-                c = Color.rgb(255, 151, 62, Math.max(0.04, alpha));
+            } else if (t < 0.48) {
+                c = Color.rgb(255, 119, 84, Math.max(0.04, alpha));
+            } else if (t < 0.76) {
+                c = Color.rgb(226, 54, 215, Math.max(0.04, alpha * 0.84));
             } else {
-                c = Color.rgb(146, 78, 224, Math.max(0.04, alpha * 0.72));
+                c = Color.rgb(53, 113, 255, Math.max(0.04, alpha * 0.74));
             }
             gc.setStroke(c);
             gc.setLineWidth(Math.max(0.9, core * (0.025 + (1.0 - t) * 0.022)));
@@ -90,17 +93,17 @@ public final class BlackHoleHeroPane extends Region {
         gc.save();
         gc.translate(cx, cy);
         gc.rotate(-8);
-        gc.setStroke(Color.rgb(149, 96, 255, 0.32));
+        gc.setStroke(Color.rgb(227, 78, 237, 0.40));
         gc.setLineWidth(Math.max(1.3, core * 0.035));
         gc.strokeArc(-core * 1.85, -core * 1.28, core * 3.70, core * 2.56, 20, 140, javafx.scene.shape.ArcType.OPEN);
-        gc.setStroke(Color.rgb(75, 207, 255, 0.22));
+        gc.setStroke(Color.rgb(45, 207, 255, 0.34));
         gc.strokeArc(-core * 1.98, -core * 1.37, core * 3.96, core * 2.74, 199, 142, javafx.scene.shape.ArcType.OPEN);
         gc.restore();
 
         // Ombra centrale + photon ring.
         gc.setFill(Color.rgb(0, 0, 0, 0.98));
         gc.fillOval(cx - core, cy - core, core * 2, core * 2);
-        gc.setStroke(Color.rgb(255, 190, 94, 0.52));
+        gc.setStroke(Color.rgb(194, 103, 255, 0.62));
         gc.setLineWidth(Math.max(1.5, core * 0.045));
         gc.strokeOval(cx - core * 1.08, cy - core * 1.08, core * 2.16, core * 2.16);
 

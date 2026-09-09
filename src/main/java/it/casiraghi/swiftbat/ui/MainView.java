@@ -10,6 +10,7 @@ import it.casiraghi.swiftbat.service.RedshiftCatalogService;
 import it.casiraghi.swiftbat.service.SkyCatalogService;
 import it.casiraghi.swiftbat.service.SpectralCatalogService;
 import it.casiraghi.swiftbat.service.SwiftCatalogService;
+import it.casiraghi.swiftbat.ui.components.BlackHoleBackdropPane;
 import javafx.application.HostServices;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -118,11 +119,13 @@ public final class MainView {
     }
 
     private void buildLayout() {
-        root.getStyleClass().add("app-root");
+        root.getStyleClass().addAll("app-root", "black-hole-redesign");
         root.setLeft(buildNavigation());
         root.setTop(buildTopBar());
         pageHost.getStyleClass().add("page-host");
-        root.setCenter(pageHost);
+        StackPane workspace = new StackPane(new BlackHoleBackdropPane(), pageHost);
+        workspace.getStyleClass().add("workspace-shell");
+        root.setCenter(workspace);
     }
 
     private Node buildNavigation() {

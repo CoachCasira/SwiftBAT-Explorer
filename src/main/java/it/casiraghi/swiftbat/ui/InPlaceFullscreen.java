@@ -95,7 +95,7 @@ public final class InPlaceFullscreen {
             BorderPane.setMargin(preparedContent, new Insets(14, 18, 18, 18));
             layout.getStyleClass().add("fullscreen-layout");
             fullscreenRoot = new StackPane(layout);
-            fullscreenRoot.getStyleClass().addAll("app-root", "in-place-fullscreen");
+            fullscreenRoot.getStyleClass().addAll("app-root", "black-hole-redesign", "in-place-fullscreen");
 
             back.setOnAction(event -> close(false));
             keyHandler = this::handleKeyPressed;
