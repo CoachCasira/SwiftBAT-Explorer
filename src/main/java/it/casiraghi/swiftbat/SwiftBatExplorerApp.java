@@ -1,6 +1,7 @@
 package it.casiraghi.swiftbat;
 
 import it.casiraghi.swiftbat.ui.MainView;
+import it.casiraghi.swiftbat.ui.UiBugFixes;
 import it.casiraghi.swiftbat.ui.UiRefinements;
 import javafx.application.Application;
 import javafx.scene.Scene;
@@ -28,6 +29,7 @@ public final class SwiftBatExplorerApp extends Application {
         stage.show();
 
         UiRefinements.install(mainView.getRoot());
+        UiBugFixes.install(mainView.getRoot());
         mainView.initialize();
     }
 
