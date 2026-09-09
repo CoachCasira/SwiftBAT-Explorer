@@ -258,15 +258,15 @@ public final class PopulationPage extends BorderPane {
         VBox exposureBox = new VBox(6, exposureIntro, exposureControls);
         exposureBox.setAlignment(Pos.TOP_LEFT);
         exposureBox.getStyleClass().addAll("population-filter-section", "population-filter-side", "population-fracexp-inline");
-        exposureBox.setMinWidth(225);
-        exposureBox.setPrefWidth(240);
-        exposureBox.setMaxWidth(255);
+        exposureBox.setMinWidth(270);
+        exposureBox.setPrefWidth(280);
+        exposureBox.setMaxWidth(295);
 
         VBox durationGroup = filterGroup("Durata T90", "", duration, 150);
-        VBox redshiftGroup = filterGroup("Redshift", "", redshiftControl, 190);
-        VBox windowGroup = filterGroup("Finestra temporale", "", windowControl, 185);
-        VBox limitGroup = filterGroup("Campione massimo", "", limit, 120);
-        HBox topFilters = new HBox(7, durationGroup, redshiftGroup, windowGroup, exposureBox, limitGroup);
+        VBox redshiftGroup = filterGroup("Redshift", "", redshiftControl, 185);
+        VBox windowGroup = filterGroup("Finestra temporale", "", windowControl, 180);
+        VBox limitGroup = filterGroup("Campione massimo", "", limit, 125);
+        HBox topFilters = new HBox(14, durationGroup, redshiftGroup, windowGroup, exposureBox, limitGroup);
         topFilters.setAlignment(Pos.TOP_LEFT);
         HBox.setHgrow(exposureBox, Priority.NEVER);
 
@@ -863,26 +863,35 @@ public final class PopulationPage extends BorderPane {
         populateHistograms(result);
         populateInsight(result);
         profile3D.setDisable(result.curves().isEmpty());
-        StringBuilder message = new StringBuilder()
+        StringBuilder messageIt = new StringBuilder()
                 .append(result.accepted().size()).append(" GRB inclusi su ")
                 .append(result.examined()).append(" esaminati");
+        StringBuilder messageEn = new StringBuilder()
+                .append(result.accepted().size()).append(" GRBs included out of ")
+                .append(result.examined()).append(" examined");
         if (!result.measured().isEmpty()) {
             double observedMinimum = result.measured().stream()
                     .mapToDouble(PopulationEvent::exposurePercent).min().orElse(Double.NaN);
             double observedMaximum = result.measured().stream()
                     .mapToDouble(PopulationEvent::exposurePercent).max().orElse(Double.NaN);
-            message.append(String.format(Locale.ITALY, " · copertura rilevata %.1f%%–%.1f%%",
+            messageIt.append(String.format(Locale.ITALY, " · copertura rilevata %.1f%%–%.1f%%",
+                    observedMinimum, observedMaximum));
+            messageEn.append(String.format(Locale.US, " · observed coverage %.1f%%–%.1f%%",
                     observedMinimum, observedMaximum));
             if (result.accepted().isEmpty()) {
-                message.append(String.format(Locale.ITALY, " fuori dal filtro %.0f%%–%.0f%%",
+                messageIt.append(String.format(Locale.ITALY, " fuori dal filtro %.0f%%–%.0f%%",
+                        result.exposureMinimum(), result.exposureMaximum()));
+                messageEn.append(String.format(Locale.US, " outside filter %.0f%%–%.0f%%",
                         result.exposureMinimum(), result.exposureMaximum()));
             }
         }
         if (result.failures() > 0) {
-            message.append(" · ").append(result.failures()).append(" non leggibili");
+            messageIt.append(" · ").append(result.failures()).append(" non leggibili");
+            messageEn.append(" · ").append(result.failures()).append(" unreadable");
         }
-        setStatus(message.toString(),
-                result.accepted().isEmpty() ? "status-warning" : "status-online");
+        status.setText(I18n.dynamic(messageIt.toString(), messageEn.toString()));
+        status.getStyleClass().removeAll("status-neutral", "status-online", "status-warning");
+        status.getStyleClass().add(result.accepted().isEmpty() ? "status-warning" : "status-online");
         updateCandidatePreview();
         setRunning(false);
         runningTask = null;

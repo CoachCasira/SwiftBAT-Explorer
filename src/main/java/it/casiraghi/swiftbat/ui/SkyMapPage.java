@@ -86,7 +86,6 @@ public final class SkyMapPage extends BorderPane {
     private final Label selectedT90 = UiFactory.label("—", "info-value");
     private final Label selectedClass = UiFactory.wrappedLabel("—", "info-value");
     private final Label selectedRedshift = UiFactory.wrappedLabel("—", "info-value");
-    private final Label selectedCatalog = UiFactory.wrappedLabel("Seleziona un punto sulla mappa.", "sky-detail-note");
     private final Button openButton = UiFactory.button("Apri curve di luce →", "primary-button");
 
     public SkyMapPage(Consumer<CatalogEntry> openGrb) {
@@ -447,8 +446,8 @@ public final class SkyMapPage extends BorderPane {
             dec.setText(String.format(Locale.ITALY, "%+.5f°", burst.decDeg())
                     + "  ·  " + SkyCoordinates.decToDms(burst.decDeg()));
             t90.setText(burst.formattedT90());
-            clazz.setText(burst.durationClass());
-            redshift.setText(burst.redshift().detail());
+            clazz.setText(I18n.t(burst.durationClass()));
+            redshift.setText(localizedRedshift(burst));
             CatalogEntry entry = baseCatalog.get(burst.grbName().toUpperCase(Locale.ROOT));
             if (entry != null) {
                 catalogInfo.setText("Evento presente nel catalogo Swift/BAT: puoi aprire direttamente curve, FITS e metadati.");
@@ -510,21 +509,27 @@ public final class SkyMapPage extends BorderPane {
                 detailRow("Classe descrittiva", selectedClass),
                 detailRow("Redshift", selectedRedshift));
 
-        Label scientificNote = UiFactory.wrappedLabel(
-                "La soglia a 2 s è mostrata soltanto come riferimento descrittivo tradizionale. La mappa non assegna da sola una classificazione scientifica definitiva. "
-                        + "Seleziona un punto per leggere coordinate, T90, classe descrittiva e redshift. Le viste Mollweide 2D e Sfera 3D rappresentano lo stesso campione: cambia soltanto il modo in cui la distribuzione celeste viene esplorata.",
-                "sky-science-note");
-        scientificNote.setMaxWidth(Double.MAX_VALUE);
-        scientificNote.setMaxHeight(Double.MAX_VALUE);
-        scientificNote.setPrefHeight(155);
         openButton.setDisable(true);
         openButton.setMaxWidth(Double.MAX_VALUE);
 
         details.getChildren().addAll(
                 UiFactory.label("GRB selezionato", "card-subtitle"),
-                selectedName, rows, selectedCatalog, openButton,
-                UiFactory.collapsibleHelp("", scientificNote));
+                selectedName, rows, openButton);
         return details;
+    }
+
+    private String localizedRedshift(SkyBurst burst) {
+        if (burst == null || !burst.redshift().available()) {
+            return I18n.dynamic("Redshift non disponibile nella tabella BAT.", "Redshift unavailable in the BAT table.");
+        }
+        StringBuilder value = new StringBuilder("z = ").append(burst.redshift().rawValue());
+        if (!burst.redshift().method().isBlank() && !burst.redshift().method().equalsIgnoreCase("N/A")) {
+            value.append(I18n.dynamic(" · metodo ", " · method ")).append(burst.redshift().method());
+        }
+        if (burst.redshift().uncertain()) {
+            value.append(I18n.dynamic(" · valore indicato come incerto", " · value marked as uncertain"));
+        }
+        return value.toString();
     }
 
     private HBox detailRow(String key, Label value) {
@@ -702,7 +707,6 @@ public final class SkyMapPage extends BorderPane {
             selectedT90.setText("—");
             selectedClass.setText("—");
             selectedRedshift.setText("—");
-            selectedCatalog.setText("Seleziona un punto sulla mappa.");
             openButton.setDisable(true);
             return;
         }
@@ -713,14 +717,12 @@ public final class SkyMapPage extends BorderPane {
         selectedDec.setText(String.format(Locale.ITALY, "%+.5f°", selectedBurst.decDeg())
                 + "  ·  " + SkyCoordinates.decToDms(selectedBurst.decDeg()));
         selectedT90.setText(selectedBurst.formattedT90());
-        selectedClass.setText(selectedBurst.durationClass());
-        selectedRedshift.setText(selectedBurst.redshift().detail());
+        selectedClass.setText(I18n.t(selectedBurst.durationClass()));
+        selectedRedshift.setText(localizedRedshift(selectedBurst));
         CatalogEntry entry = baseCatalog.get(selectedBurst.grbName().toUpperCase(Locale.ROOT));
         if (entry != null) {
-            selectedCatalog.setText("Questo evento è presente nel catalogo Swift/BAT usato dall'app: puoi aprire direttamente curve, FITS e metadati.");
             openButton.setDisable(false);
         } else {
-            selectedCatalog.setText("Coordinate disponibili nella tabella generale, ma questo evento non è presente nel catalogo BAT caricato dall'Explorer.");
             openButton.setDisable(true);
         }
     }
