@@ -180,7 +180,7 @@ public final class SkyMapPage extends BorderPane {
         exportPng.setOnAction(event -> exportMapNode(
                 sphereView ? sphere : mollweide,
                 sphereView ? "mappa_celeste_sfera_3D.png" : "mappa_celeste_mollweide_2D.png"));
-        Button fullscreen = UiFactory.button("Schermo intero  ⛶", "primary-button");
+        Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
         fullscreen.setOnAction(event -> openMapFullscreen());
         HBox mapHead = new HBox(10,
                 UiFactory.label("Cielo", "card-title"),

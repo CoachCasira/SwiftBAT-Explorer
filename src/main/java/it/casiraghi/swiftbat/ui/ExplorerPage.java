@@ -11,6 +11,7 @@ import it.casiraghi.swiftbat.model.TabularData;
 import it.casiraghi.swiftbat.service.ExcelExportService;
 import it.casiraghi.swiftbat.ui.components.ThreeDChartPane;
 import javafx.animation.PauseTransition;
+import javafx.application.Platform;
 import javafx.application.HostServices;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
@@ -81,8 +82,10 @@ public final class ExplorerPage extends BorderPane {
     private final FilteredList<CatalogEntry> filteredCatalog = new FilteredList<>(catalog, ignored -> true);
     private final ListView<CatalogEntry> catalogList = new ListView<>(filteredCatalog);
     private final TextField catalogSearch = new TextField();
-    private final ComboBox<String> durationFilter = new ComboBox<>();
-    private final ComboBox<String> redshiftFilter = new ComboBox<>();
+    private final MultiSelectMenuButton durationFilter = new MultiSelectMenuButton(
+            "Tutte", List.of("Short ≤ 2 s", "Long > 2 s", "T90 n.d."));
+    private final MultiSelectMenuButton redshiftFilter = new MultiSelectMenuButton(
+            "Tutti", List.of("Con z", "Senza z"));
     private final ComboBox<String> cacheFilter = new ComboBox<>();
     private final TextField t90MinFilter = compactFilterField("min");
     private final TextField t90MaxFilter = compactFilterField("max");
@@ -205,9 +208,7 @@ public final class ExplorerPage extends BorderPane {
         header.setAlignment(Pos.CENTER_LEFT);
         VBox copy = new VBox(5,
                 UiFactory.label("Esplora", "page-title"),
-                UiFactory.wrappedLabel(
-                        "Cerca un GRB e apri curve di luce, dati e metadati senza gestire file manualmente.",
-                        "page-subtitle"));
+                UiFactory.label("", "page-subtitle"));
         HBox.setHgrow(copy, Priority.ALWAYS);
         header.getChildren().add(copy);
         return header;
@@ -224,14 +225,6 @@ public final class ExplorerPage extends BorderPane {
         Label title = UiFactory.label("GRB", "panel-title");
         catalogSearch.setPromptText("Cerca GRB o Trigger ID…");
         catalogSearch.getStyleClass().add("search-field");
-        durationFilter.setItems(FXCollections.observableArrayList(
-                "Tutte", "Short ≤ 2 s", "Long > 2 s", "T90 n.d."));
-        durationFilter.setValue("Tutte");
-        durationFilter.getStyleClass().add("choice-box-modern");
-        redshiftFilter.setItems(FXCollections.observableArrayList(
-                "Tutti", "Con z", "Senza z"));
-        redshiftFilter.setValue("Tutti");
-        redshiftFilter.getStyleClass().add("choice-box-modern");
         durationFilter.setMaxWidth(Double.MAX_VALUE);
         redshiftFilter.setMaxWidth(Double.MAX_VALUE);
 
@@ -304,11 +297,8 @@ public final class ExplorerPage extends BorderPane {
 
         Separator separator = new Separator(Orientation.HORIZONTAL);
         separator.getStyleClass().add("soft-separator");
-        Label hint = UiFactory.wrappedLabel(
-                "Dopo il primo download, ASCII e FITS restano nella cache locale anche ai successivi avvii.",
-                "sidebar-hint");
         sidebar.getChildren().addAll(title, catalogSearch, filterGrid, extraToggle, extraBox,
-                catalogCount, catalogList, separator, hint);
+                catalogCount, catalogList, separator);
 
         workspace.getStyleClass().add("workspace-host");
         workspace.setMinWidth(0);
@@ -323,8 +313,8 @@ public final class ExplorerPage extends BorderPane {
     private void wireCatalog() {
         catalogFilterDebounce.setOnFinished(event -> applyCatalogFilters());
         catalogSearch.textProperty().addListener((observable, oldValue, newValue) -> scheduleCatalogFilters());
-        durationFilter.valueProperty().addListener((obs, oldValue, newValue) -> scheduleCatalogFilters());
-        redshiftFilter.valueProperty().addListener((obs, oldValue, newValue) -> scheduleCatalogFilters());
+        durationFilter.setOnSelectionChanged(this::scheduleCatalogFilters);
+        redshiftFilter.setOnSelectionChanged(this::scheduleCatalogFilters);
         cacheFilter.valueProperty().addListener((obs, oldValue, newValue) -> scheduleCatalogFilters());
         for (TextField field : List.of(t90MinFilter, t90MaxFilter, redshiftMinFilter, redshiftMaxFilter)) {
             field.textProperty().addListener((obs, oldValue, newValue) -> scheduleCatalogFilters());
@@ -344,8 +334,10 @@ public final class ExplorerPage extends BorderPane {
 
     private void applyCatalogFilters() {
         String query = catalogSearch.getText() == null ? "" : catalogSearch.getText().trim().toLowerCase(Locale.ROOT);
-        String duration = durationFilter.getValue() == null ? "Tutte" : durationFilter.getValue();
-        String redshift = redshiftFilter.getValue() == null ? "Tutti" : redshiftFilter.getValue();
+        java.util.Set<String> durations = durationFilter.selectedValues();
+        java.util.Set<String> redshifts = redshiftFilter.selectedValues();
+        boolean durationAll = durationFilter.isAllSelected();
+        boolean redshiftAll = redshiftFilter.isAllSelected();
         String cache = cacheFilter.getValue() == null ? "Tutti" : cacheFilter.getValue();
         Double t90Min = optionalNumber(t90MinFilter);
         Double t90Max = optionalNumber(t90MaxFilter);
@@ -365,13 +357,19 @@ public final class ExplorerPage extends BorderPane {
             SkyBurst burst = scientificMetadata.get(entry.grbName().toUpperCase(Locale.ROOT));
             boolean hasNumericFilters = t90Min != null || t90Max != null || zMin != null || zMax != null;
             if (burst == null) {
-                return duration.equals("Tutte") && !redshift.equals("Con z") && !hasNumericFilters;
+                return durationAll && redshiftAll && !hasNumericFilters;
             }
-            if (duration.startsWith("Short") && !burst.isShort()) return false;
-            if (duration.startsWith("Long") && !burst.isLong()) return false;
-            if (duration.equals("T90 n.d.") && burst.hasT90()) return false;
-            if (redshift.equals("Con z") && !burst.redshift().available()) return false;
-            if (redshift.equals("Senza z") && burst.redshift().available()) return false;
+            if (!durationAll) {
+                boolean durationMatches = (durations.contains("Short ≤ 2 s") && burst.isShort())
+                        || (durations.contains("Long > 2 s") && burst.isLong())
+                        || (durations.contains("T90 n.d.") && !burst.hasT90());
+                if (!durationMatches) return false;
+            }
+            if (!redshiftAll) {
+                boolean redshiftMatches = (redshifts.contains("Con z") && burst.redshift().available())
+                        || (redshifts.contains("Senza z") && !burst.redshift().available());
+                if (!redshiftMatches) return false;
+            }
 
             Double t90 = burst.t90Sec();
             if (t90Min != null && (t90 == null || t90 < t90Min)) return false;
@@ -559,7 +557,7 @@ public final class ExplorerPage extends BorderPane {
 
         Button export = UiFactory.button("Esporta PNG", "ghost-button");
         export.setOnAction(event -> exportNode(chart, data.grbName() + "_curva_1s.png"));
-        Button fullscreen = UiFactory.button("Schermo intero  ⛶", "primary-button");
+        Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
         fullscreen.setOnAction(event -> openOverviewFullscreen(
                 data, channelChoice.getValue(), windowChoice.getValue(), smooth.isSelected()));
         chartCard.getChildren().addAll(controls, chart);
@@ -688,6 +686,7 @@ public final class ExplorerPage extends BorderPane {
         TableView<ObservableList<String>> table = new TableView<>();
         table.getStyleClass().add("data-table");
         table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        TablePreferences.install(table, "explorer.data");
 
         VBox explanation = new VBox(12);
         explanation.getStyleClass().add("field-explanation-panel");
@@ -729,6 +728,7 @@ public final class ExplorerPage extends BorderPane {
         TableView<MetadataItem> table = new TableView<>();
         table.getStyleClass().add("data-table");
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        TablePreferences.install(table, "explorer.metadata");
         TableColumn<MetadataItem, String> hdu = metadataColumn("HDU", item -> item.hduName(), 95);
         hdu.setMinWidth(75);
         TableColumn<MetadataItem, String> keyword = metadataColumn("Keyword", item -> item.keyword(), 145);
@@ -949,6 +949,7 @@ public final class ExplorerPage extends BorderPane {
                         return;
                     }
                     setText(value);
+                    TablePreferences.alignCell(this, value);
                     double numeric = parse(value);
                     if (header.contains("RATE") && Double.isFinite(numeric) && numeric < 0) {
                         getStyleClass().add("negative-cell");
@@ -1049,6 +1050,7 @@ public final class ExplorerPage extends BorderPane {
                     setTooltip(null);
                 } else {
                     setText(value);
+                    TablePreferences.alignCell(this, value);
                     setTooltip(value.length() > 20 ? new Tooltip(value) : null);
                 }
             }
@@ -1113,6 +1115,7 @@ public final class ExplorerPage extends BorderPane {
     private void setWorkspace(Node node) {
         workspace.getChildren().setAll(node);
         StackPane.setAlignment(node, Pos.CENTER);
+        Platform.runLater(() -> I18n.localizeTree(node));
     }
 
     private String readableError(Throwable error) {

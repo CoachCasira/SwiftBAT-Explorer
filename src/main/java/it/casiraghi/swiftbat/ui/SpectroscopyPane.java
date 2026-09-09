@@ -26,6 +26,8 @@ import javafx.scene.chart.XYChart;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.RadioButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -75,12 +77,7 @@ public final class SpectroscopyPane extends BorderPane {
 
         HBox heading = new HBox(12);
         heading.setAlignment(Pos.CENTER_LEFT);
-        VBox copy = new VBox(4,
-                UiFactory.label("Analisi spettroscopica", "section-title"),
-                UiFactory.wrappedLabel(
-                        "Confronta i fit PL/CPL e i flussi già pubblicati da Swift/BAT. "
-                                + "La mappa tempo–energia, tenuta separata, descrive invece i quattro rate ASCII a bin di 1 secondo.",
-                        "section-caption"));
+        VBox copy = new VBox(4, UiFactory.label("Analisi spettroscopica", "section-title"));
         HBox.setHgrow(copy, Priority.ALWAYS);
         Label provenance = UiFactory.label("DATI UFFICIALI BAT · FIT XSPEC", "status-pill", "status-online");
         heading.getChildren().addAll(copy, provenance);
@@ -103,11 +100,11 @@ public final class SpectroscopyPane extends BorderPane {
         Button source = UiFactory.button("Apri tabella ufficiale ↗", "ghost-button");
         source.setMaxWidth(Double.MAX_VALUE);
         source.setOnAction(event -> hostServices.showDocument(sourceUrl()));
+        Node intervalRadios = radioChoice(List.of(Interval.values()), intervalChoice);
+        Node modelRadios = radioChoice(List.of(AUTOMATIC_MODEL, POWER_LAW_MODEL, CUTOFF_MODEL), modelChoice);
         GridPane controls = responsiveGrid(1120, 3,
-                controlBox("Intervallo del fit", intervalChoice,
-                        "T100 usa l'intervallo complessivo del burst; Picco 1 s usa il secondo più intenso."),
-                controlBox("Modello del fit", modelChoice,
-                        "Automatico segue la scelta BAT; PL e CPL permettono di confrontare i due fit pubblicati."),
+                controlBox("Intervallo del fit", intervalRadios, ""),
+                controlBox("Modello del fit", modelRadios, ""),
                 sourceControlBox(source));
         controls.getStyleClass().add("spectroscopy-controls");
 
@@ -144,11 +141,7 @@ public final class SpectroscopyPane extends BorderPane {
     }
 
     private VBox controlBox(String label, Node control, String help, double preferredWidth) {
-        Label explanation = UiFactory.wrappedLabel(help, "spectroscopy-control-help");
-        explanation.setPrefWidth(preferredWidth);
-        explanation.setMinHeight(Region.USE_PREF_SIZE);
-        explanation.setMaxWidth(Double.MAX_VALUE);
-        VBox box = new VBox(5, UiFactory.label(label, "filter-label"), control, explanation);
+        VBox box = new VBox(5, UiFactory.label(label, "filter-label"), control);
         box.getStyleClass().add("spectroscopy-control-box");
         box.setPrefWidth(preferredWidth);
         box.setFillWidth(true);
@@ -157,20 +150,40 @@ public final class SpectroscopyPane extends BorderPane {
     }
 
     private VBox sourceControlBox(Button source) {
-        Label help = UiFactory.wrappedLabel(
-                "Apre direttamente la tabella BAT da cui provengono i parametri mostrati in questa scheda.",
-                "spectroscopy-control-help");
-        help.setMinHeight(Region.USE_PREF_SIZE);
-        help.setMaxWidth(Double.MAX_VALUE);
         VBox box = new VBox(5,
                 UiFactory.label("Fonte ufficiale BAT", "filter-label"),
-                source,
-                help);
+                source);
         box.getStyleClass().add("spectroscopy-control-box");
         box.setPrefWidth(270);
         box.setFillWidth(true);
         box.setMaxWidth(Double.MAX_VALUE);
         return box;
+    }
+
+    private <T> Node radioChoice(List<T> values, ChoiceBox<T> backing) {
+        HBox row = new HBox(8);
+        row.getStyleClass().add("compact-radio-group");
+        ToggleGroup group = new ToggleGroup();
+        for (T value : values) {
+            RadioButton radio = new RadioButton(value == null ? "" : I18n.t(value.toString()));
+            radio.getStyleClass().add("compact-radio");
+            radio.setToggleGroup(group);
+            radio.setUserData(value);
+            if (value != null && value.equals(backing.getValue())) radio.setSelected(true);
+            radio.setOnAction(event -> backing.setValue(value));
+            I18n.languageProperty().addListener((obs, oldLanguage, newLanguage) ->
+                    radio.setText(value == null ? "" : I18n.t(value.toString())));
+            row.getChildren().add(radio);
+        }
+        backing.valueProperty().addListener((obs, oldValue, newValue) -> {
+            for (javafx.scene.control.Toggle toggle : group.getToggles()) {
+                if (java.util.Objects.equals(toggle.getUserData(), newValue)) {
+                    group.selectToggle(toggle);
+                    break;
+                }
+            }
+        });
+        return row;
     }
 
     private Interval preferredInterval() {
@@ -239,24 +252,12 @@ public final class SpectroscopyPane extends BorderPane {
                 metric("Esposizione", fit == null ? "n.d." : format(fit.exposureSeconds()) + " s",
                         fit == null ? "intervallo non disponibile" : intervalText(fit)));
 
-        Label readingIntro = UiFactory.wrappedLabel(
-                "Come leggere i grafici: la curva arancione è la forma prevista dal modello selezionato in funzione "
-                        + "dell'energia; le barre confrontano invece il flusso energetico integrato nelle diverse bande. "
-                        + "Sono due rappresentazioni dello stesso fit ufficiale, non quattro curve di luce sommate.",
-                "spectroscopy-reading-intro");
-
-        readingIntro.setMinHeight(Region.USE_PREF_SIZE);
-        readingIntro.setMaxWidth(Double.MAX_VALUE);
 
         GridPane charts = responsiveGrid(1320, 2,
                 buildModelChart(fit, true),
                 buildFluxChart(fluxes, model, true));
 
-Label scientificNote = UiFactory.wrappedLabel(
-                "I flussi sono quelli pubblicati dal catalogo Swift/BAT in erg cm⁻² s⁻¹, con limiti al 90%. "
-                        + "La curva a sinistra ricostruisce il modello fotonico del fit; non è ricavata sommando i quattro rate della curva di luce.",
-                "spectroscopy-note");
-        content.getChildren().addAll(metrics, readingIntro, charts, scientificNote);
+        content.getChildren().addAll(metrics, charts);
         return content;
     }
 
@@ -371,7 +372,7 @@ Label scientificNote = UiFactory.wrappedLabel(
             Button threeD = UiFactory.button("Vista 3D", "secondary-button");
             threeD.setDisable(fit == null || fit.normalization() == null || fit.alpha() == null);
             threeD.setOnAction(event -> openModel3D(fit));
-            Button fullscreen = UiFactory.button("Schermo intero ⛶", "primary-button");
+            Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
             fullscreen.setOnAction(event -> openModelFullscreen(fit));
             FlowPane actions = new FlowPane(8, 8);
             actions.getStyleClass().add("spectroscopy-chart-actions");
@@ -441,7 +442,7 @@ Label scientificNote = UiFactory.wrappedLabel(
             Button threeD = UiFactory.button("Vista 3D", "secondary-button");
             threeD.setDisable(fluxes.stream().noneMatch(EnergyFluxBand::available));
             threeD.setOnAction(event -> openFlux3D(fluxes, model));
-            Button fullscreen = UiFactory.button("Schermo intero ⛶", "primary-button");
+            Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
             fullscreen.setOnAction(event -> openFluxFullscreen(fluxes, model));
             FlowPane actions = new FlowPane(8, 8);
             actions.getStyleClass().add("spectroscopy-chart-actions");
@@ -632,7 +633,7 @@ Label scientificNote = UiFactory.wrappedLabel(
         window.valueProperty().addListener((obs, oldValue, value) ->
                 heatmap.setHalfWindowSeconds(timeWindowSeconds(value)));
 
-        Button fullscreen = UiFactory.button("Schermo intero ⛶", "primary-button");
+        Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
         fullscreen.setDisable(grbData.asciiData().isEmpty());
         fullscreen.setOnAction(event -> openTimeEnergyFullscreen(timeWindowSeconds(window.getValue())));
         Button threeD = UiFactory.button("Apri vista 3D dei rate", "primary-button");

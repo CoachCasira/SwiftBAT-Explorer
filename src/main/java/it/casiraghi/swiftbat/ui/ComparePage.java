@@ -12,9 +12,8 @@ import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
-import javafx.scene.control.ScrollPane;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -25,13 +24,17 @@ import javafx.scene.layout.VBox;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 public final class ComparePage extends BorderPane {
     private final ObservableMap<String, GrbData> sessionData;
-    private final ChoiceBox<String> first = new ChoiceBox<>();
-    private final ChoiceBox<String> second = new ChoiceBox<>();
+    private final ComboBox<String> first = new ComboBox<>();
+    private final ComboBox<String> second = new ComboBox<>();
+    private final Label firstMatches = UiFactory.label("", "compare-match-count");
+    private final Label secondMatches = UiFactory.label("", "compare-match-count");
     private final CheckBox normalize = new CheckBox("Normalizza ogni curva sul proprio picco");
     private final StackPane content = new StackPane();
+    private List<String> availableNames = List.of();
 
     public ComparePage(ObservableMap<String, GrbData> sessionData) {
         this.sessionData = sessionData;
@@ -40,73 +43,104 @@ public final class ComparePage extends BorderPane {
         setTop(buildHeader());
         setCenter(content);
         BorderPane.setMargin(content, new Insets(20, 0, 0, 0));
+        configureSearch(first, firstMatches);
+        configureSearch(second, secondMatches);
         sessionData.addListener((javafx.collections.MapChangeListener<String, GrbData>) change -> refreshChoices());
-        first.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refreshComparison());
-        second.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refreshComparison());
+        first.valueProperty().addListener((obs, oldValue, newValue) -> refreshComparison());
+        second.valueProperty().addListener((obs, oldValue, newValue) -> refreshComparison());
         normalize.selectedProperty().addListener((obs, oldValue, newValue) -> refreshComparison());
         refreshChoices();
     }
 
     private Node buildHeader() {
         VBox header = new VBox(14);
-        VBox copy = new VBox(5,
-                UiFactory.label("Confronta", "page-title"),
-                UiFactory.wrappedLabel(
-                        "Scegli due GRB già aperti e sovrapponi le loro curve di luce.",
-                        "page-subtitle"));
+        VBox copy = new VBox(5, UiFactory.label("Confronta", "page-title"));
 
         first.getStyleClass().add("choice-box-modern");
         second.getStyleClass().add("choice-box-modern");
-        first.setPrefWidth(205);
-        second.setPrefWidth(205);
+        first.setPrefWidth(235);
+        second.setPrefWidth(235);
         normalize.getStyleClass().add("modern-check");
 
+        VBox firstBox = new VBox(3, first, firstMatches);
+        VBox secondBox = new VBox(3, second, secondMatches);
         HBox controls = new HBox(10);
         controls.getStyleClass().add("compare-control-bar");
         controls.setPadding(new Insets(13, 15, 13, 15));
         controls.setAlignment(Pos.CENTER_LEFT);
         controls.getChildren().addAll(
-                UiFactory.label("Evento A", "toolbar-label"), first,
+                UiFactory.label("Evento A", "toolbar-label"), firstBox,
                 UiFactory.label("vs", "compare-vs"),
-                UiFactory.label("Evento B", "toolbar-label"), second,
+                UiFactory.label("Evento B", "toolbar-label"), secondBox,
                 UiFactory.spacer(), normalize);
         header.getChildren().addAll(copy, controls);
         return header;
     }
 
+    private void configureSearch(ComboBox<String> combo, Label counter) {
+        combo.setEditable(true);
+        combo.getEditor().setText("GRB");
+        combo.getEditor().setPromptText("GRB…");
+        combo.getEditor().textProperty().addListener((obs, oldValue, raw) -> updateSuggestions(combo, counter, raw));
+        combo.setOnAction(event -> {
+            String value = combo.getValue();
+            if (value != null && availableNames.contains(value)) {
+                combo.getEditor().setText(value);
+                refreshComparison();
+            }
+        });
+    }
+
+    private void updateSuggestions(ComboBox<String> combo, Label counter, String raw) {
+        String query = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
+        if (query.isBlank()) query = "GRB";
+        if (!query.startsWith("GRB")) query = "GRB" + query;
+        final String normalized = query;
+        List<String> matches = availableNames.stream().filter(name -> name.startsWith(normalized)).toList();
+        counter.setText(matches.size() + (I18n.language() == I18n.Language.IT ? " corrispondenze" : " matches"));
+        if (matches.size() <= 10 && !matches.isEmpty() && normalized.length() > 3) {
+            combo.setItems(FXCollections.observableArrayList(matches));
+            if (!combo.isShowing()) combo.show();
+        } else {
+            combo.hide();
+            combo.setItems(FXCollections.observableArrayList());
+        }
+        if (matches.size() == 1 && matches.get(0).equals(normalized)) combo.setValue(matches.get(0));
+    }
+
     private void refreshChoices() {
         List<String> names = new ArrayList<>(sessionData.keySet());
         names.sort(Comparator.reverseOrder());
-        String previousFirst = first.getValue();
-        String previousSecond = second.getValue();
-        first.setItems(FXCollections.observableArrayList(names));
-        second.setItems(FXCollections.observableArrayList(names));
-        if (previousFirst != null && names.contains(previousFirst)) {
-            first.setValue(previousFirst);
-        } else if (!names.isEmpty()) {
-            first.setValue(names.get(0));
-        }
-        if (previousSecond != null && names.contains(previousSecond)) {
-            second.setValue(previousSecond);
-        } else if (names.size() > 1) {
-            second.setValue(names.get(1));
-        }
+        availableNames = List.copyOf(names);
+        updateSuggestions(first, firstMatches, first.getEditor().getText());
+        updateSuggestions(second, secondMatches, second.getEditor().getText());
         refreshComparison();
     }
 
+    private String selected(ComboBox<String> combo) {
+        String value = combo.getValue();
+        if (value != null && sessionData.containsKey(value)) return value;
+        String editor = combo.getEditor().getText();
+        if (editor != null) {
+            String normalized = editor.trim().toUpperCase(Locale.ROOT);
+            if (!normalized.startsWith("GRB")) normalized = "GRB" + normalized;
+            if (sessionData.containsKey(normalized)) return normalized;
+        }
+        return null;
+    }
+
     private void refreshComparison() {
-        if (sessionData.size() < 2 || first.getValue() == null || second.getValue() == null
-                || first.getValue().equals(second.getValue())) {
+        String aName = selected(first);
+        String bName = selected(second);
+        if (sessionData.size() < 2 || aName == null || bName == null || aName.equals(bName)) {
             showEmpty();
             return;
         }
-        GrbData a = sessionData.get(first.getValue());
-        GrbData b = sessionData.get(second.getValue());
-        if (a == null || b == null) {
-            showEmpty();
-            return;
-        }
+        GrbData a = sessionData.get(aName);
+        GrbData b = sessionData.get(bName);
+        if (a == null || b == null) { showEmpty(); return; }
         content.getChildren().setAll(buildComparison(a, b));
+        I18n.localizeTree(content);
     }
 
     private void showEmpty() {
@@ -115,16 +149,12 @@ public final class ComparePage extends BorderPane {
         empty.setAlignment(Pos.CENTER);
         empty.getChildren().addAll(
                 UiFactory.label("⇄", "empty-icon"),
-                UiFactory.label("Apri almeno due GRB", "empty-title"),
-                UiFactory.wrappedLabel(
-                        "Gli eventi vengono mantenuti nella memoria della sessione. Aprine due dalla pagina Esplora, poi torna qui per sovrapporre le curve e confrontare gli indicatori.",
-                        "empty-message"));
+                UiFactory.label("Apri almeno due GRB", "empty-title"));
         content.getChildren().setAll(empty);
     }
 
     private Node buildComparison(GrbData a, GrbData b) {
         VBox page = new VBox(16);
-
         FlowPane cards = new FlowPane(12, 12);
         cards.getChildren().addAll(
                 compareMetric("Picco", value(a, "PEAK_RATE"), value(b, "PEAK_RATE"), a.grbName(), b.grbName()),
@@ -135,24 +165,19 @@ public final class ComparePage extends BorderPane {
 
         NumberAxis xAxis = new NumberAxis(-60, 60, 10);
         NumberAxis yAxis = new NumberAxis();
-        xAxis.setLabel("Tempo dal trigger (s)");
-        yAxis.setLabel(normalize.isSelected() ? "Rate normalizzato" : "Rate totale (count/s)");
+        xAxis.setLabel(I18n.t("Tempo dal trigger (s)"));
+        yAxis.setLabel(I18n.t(normalize.isSelected() ? "Rate normalizzato" : "Rate totale (count/s)"));
         LineChart<Number, Number> chart = new LineChart<>(xAxis, yAxis);
         chart.setAnimated(false);
         chart.setCreateSymbols(false);
-        chart.setTitle("Sovrapposizione delle curve totali, finestra ±60 s");
+        chart.setTitle("±60 s");
         chart.getStyleClass().add("lightcurve-chart");
         chart.getData().add(seriesFor(a, normalize.isSelected()));
         chart.getData().add(seriesFor(b, normalize.isSelected()));
         VBox.setVgrow(chart, Priority.ALWAYS);
 
-        VBox chartCard = UiFactory.card("Confronto temporale",
-                "Normalizzare aiuta a confrontare la forma; lasciare i valori originali permette di confrontare anche l'intensità.", chart);
-        VBox note = UiFactory.card("Come leggere il confronto", "",
-                UiFactory.wrappedLabel(
-                        "Due curve simili non implicano automaticamente la stessa origine fisica. Questo strumento serve a formulare domande e individuare differenze, non ad assegnare da solo una classe short o long.",
-                        "explanation-text"));
-        page.getChildren().addAll(cards, chartCard, note);
+        VBox chartCard = UiFactory.card("Confronto temporale", "", chart);
+        page.getChildren().add(chartCard);
         return page;
     }
 
@@ -184,28 +209,18 @@ public final class ComparePage extends BorderPane {
         double scale = normalized && peak > 0 ? peak : 1;
         XYChart.Series<Number, Number> series = new XYChart.Series<>();
         series.setName(data.grbName());
-        for (double[] point : points) {
-            series.getData().add(new XYChart.Data<>(point[0], point[1] / scale));
-        }
+        for (double[] point : points) series.getData().add(new XYChart.Data<>(point[0], point[1] / scale));
         return series;
     }
 
     private String value(GrbData data, String key) {
         SummaryItem item = data.summaryByKey().get(key);
-        if (item == null) {
-            return "n.d.";
-        }
-        return DisplayFormat.summary(key, item);
+        return item == null ? "n.d." : DisplayFormat.summary(key, item);
     }
 
     private double parse(List<String> row, int index) {
-        if (index < 0 || index >= row.size()) {
-            return Double.NaN;
-        }
-        try {
-            return Double.parseDouble(row.get(index));
-        } catch (Exception ignored) {
-            return Double.NaN;
-        }
+        if (index < 0 || index >= row.size()) return Double.NaN;
+        try { return Double.parseDouble(row.get(index)); }
+        catch (Exception ignored) { return Double.NaN; }
     }
 }

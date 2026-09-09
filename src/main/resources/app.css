@@ -2177,3 +2177,73 @@
     -fx-border-radius: 11px;
     -fx-padding: 10 12;
 }
+
+
+/* ---------- Feedback relatori: dense expert UI ---------- */
+.table-view .column-header .label,
+.tree-table-view .column-header .label {
+    -fx-alignment: CENTER-LEFT;
+    -fx-text-alignment: left;
+}
+
+.language-switch {
+    -fx-background-color: rgba(20, 30, 54, 0.78);
+    -fx-background-radius: 10px;
+    -fx-border-color: rgba(110, 145, 210, 0.22);
+    -fx-border-radius: 10px;
+    -fx-padding: 2px;
+}
+
+.language-toggle {
+    -fx-background-color: transparent;
+    -fx-text-fill: #8494b4;
+    -fx-font-weight: bold;
+    -fx-font-size: 10px;
+    -fx-padding: 6 9;
+    -fx-background-radius: 8px;
+}
+
+.language-toggle:selected {
+    -fx-background-color: linear-gradient(to right, rgba(45, 190, 225, 0.32), rgba(121, 91, 225, 0.34));
+    -fx-text-fill: #f4f8ff;
+}
+
+.compact-radio-group {
+    -fx-alignment: center-left;
+    -fx-spacing: 8px;
+}
+
+.compact-radio {
+    -fx-text-fill: #c8d5ef;
+    -fx-font-size: 11px;
+    -fx-padding: 7 9;
+    -fx-background-color: rgba(23, 34, 59, 0.72);
+    -fx-background-radius: 9px;
+    -fx-border-color: rgba(105, 139, 201, 0.20);
+    -fx-border-radius: 9px;
+}
+
+.compact-radio:selected {
+    -fx-text-fill: #ffffff;
+    -fx-background-color: rgba(101, 84, 205, 0.35);
+    -fx-border-color: rgba(130, 114, 244, 0.50);
+}
+
+.help-toggle {
+    -fx-font-size: 10px;
+    -fx-padding: 8 11;
+}
+
+.population-analysis-overlay {
+    -fx-background-color: rgba(5, 9, 20, 0.94);
+    -fx-background-radius: 18px;
+    -fx-border-color: rgba(88, 210, 243, 0.22);
+    -fx-border-radius: 18px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 28, 0.25, 0, 8);
+}
+
+.compare-match-count {
+    -fx-text-fill: #6f7f9f;
+    -fx-font-size: 9px;
+    -fx-padding: 0 2;
+}

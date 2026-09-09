@@ -43,6 +43,7 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.shape.Line;
 import javafx.util.Duration;
@@ -103,6 +104,11 @@ public final class PopulationPage extends BorderPane {
     private final Label candidatePreview = UiFactory.label("Filtri in preparazione…", "population-preview");
     private final Label status = UiFactory.label("Attendo catalogo e metadati", "status-pill", "status-neutral");
     private final ProgressBar progress = new ProgressBar(0);
+    private final StackPane resultHost = new StackPane();
+    private final VBox analysisOverlay = new VBox(14);
+    private final Label analysisOverlayTitle = UiFactory.label("Elaborazione del campione…", "loading-title");
+    private final Label analysisOverlayDetail = UiFactory.label("", "loading-detail");
+    private final ProgressBar analysisOverlayProgress = new ProgressBar(0);
 
     private final NumberAxis curveXAxis = new NumberAxis();
     private final NumberAxis curveYAxis = new NumberAxis();
@@ -189,7 +195,10 @@ public final class PopulationPage extends BorderPane {
         resultTabs.setPrefHeight(500);
         resultTabs.setMaxHeight(560);
 
-        page.getChildren().addAll(title, filterCard, resultTabs);
+        configureAnalysisOverlay();
+        resultHost.getChildren().setAll(resultTabs, analysisOverlay);
+        VBox.setVgrow(resultHost, Priority.ALWAYS);
+        page.getChildren().addAll(title, filterCard, resultHost);
         ScrollPane scroll = new ScrollPane(page);
         scroll.getStyleClass().add("page-scroll");
         scroll.setFitToWidth(true);
@@ -247,10 +256,7 @@ public final class PopulationPage extends BorderPane {
         HBox.setHgrow(maximum, Priority.ALWAYS);
 
         VBox exposureIntro = new VBox(2,
-                UiFactory.label("Qualità della copertura FRACEXP", "population-section-title"),
-                UiFactory.wrappedLabel(
-                        "Percentuale di bin con FRACEXP ≥ 0,999. Trascina oppure scrivi il valore.",
-                        "sky-filter-help"));
+                UiFactory.label("Qualità della copertura FRACEXP", "population-section-title"));
         VBox exposureBox = new VBox(7, exposureIntro, exposureControls);
         exposureBox.setAlignment(Pos.TOP_LEFT);
         exposureBox.getStyleClass().addAll("population-filter-section", "population-filter-side");
@@ -275,11 +281,7 @@ public final class PopulationPage extends BorderPane {
         reset.setOnAction(event -> resetFilters());
         actions.getChildren().addAll(analyze, cancel, reset, progress);
 
-        VBox preview = new VBox(2,
-                candidatePreview,
-                UiFactory.wrappedLabel(
-                        "T90, redshift e coordinate vengono applicati prima; FRACEXP richiede il FITS e usa la cache locale.",
-                        "sky-filter-help"));
+        VBox preview = new VBox(2, candidatePreview);
         preview.setMinWidth(0);
         preview.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(preview, Priority.ALWAYS);
@@ -297,24 +299,29 @@ public final class PopulationPage extends BorderPane {
         box.setPadding(new Insets(14, 16, 16, 16));
         box.getStyleClass().add("population-chart-card");
 
-        Label note = UiFactory.wrappedLabel(
-                "Asse X: secondi dal trigger. Asse Y: rate relativo, con il picco di ogni GRB posto uguale a 1. "
-                        + "Il grafico confronta la forma temporale e non somma i segnali.",
-                "explanation-text");
-        HBox.setHgrow(note, Priority.ALWAYS);
         profile3D.setDisable(true);
         profile3D.setOnAction(event -> openProfile3D());
-        Button fullscreen = UiFactory.button("Schermo intero  ⛶", "primary-button");
+        Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
         fullscreen.setOnAction(event -> openProfileFullscreen());
-        HBox actions = new HBox(8, profile3D, fullscreen);
+        VBox assistant = insightCard();
+        assistant.setVisible(false);
+        assistant.setManaged(false);
+        ToggleButton help = new ToggleButton(I18n.t("Mostra spiegazione"));
+        help.getStyleClass().addAll("ghost-button", "help-toggle");
+        help.selectedProperty().addListener((obs, oldValue, selected) -> {
+            assistant.setVisible(selected);
+            assistant.setManaged(selected);
+            help.setText(I18n.t(selected ? "Nascondi spiegazione" : "Mostra spiegazione"));
+        });
+        HBox actions = new HBox(8, help, profile3D, fullscreen);
         actions.setAlignment(Pos.CENTER_RIGHT);
-        HBox header = new HBox(12, note, actions);
+        HBox header = new HBox(12, UiFactory.spacer(), actions);
         header.setAlignment(Pos.CENTER_LEFT);
 
         VBox chartArea = new VBox(8, profileLegend(), curveChart);
         HBox.setHgrow(chartArea, Priority.ALWAYS);
         VBox.setVgrow(curveChart, Priority.ALWAYS);
-        HBox body = new HBox(14, chartArea, insightCard());
+        HBox body = new HBox(14, chartArea, assistant);
         HBox.setHgrow(chartArea, Priority.ALWAYS);
         box.getChildren().addAll(header, body);
         return box;
@@ -654,6 +661,7 @@ public final class PopulationPage extends BorderPane {
 
     private void configureTable() {
         resultTable.getStyleClass().add("data-table");
+        TablePreferences.install(resultTable, "population.results");
         resultTable.setPlaceholder(UiFactory.wrappedLabel(
                 "Nessun GRB incluso. Controlla i filtri oppure esegui una nuova analisi.",
                 "empty-message"));
@@ -671,7 +679,49 @@ public final class PopulationPage extends BorderPane {
                                                          java.util.function.Function<PopulationEvent, String> mapper) {
         TableColumn<PopulationEvent, String> column = new TableColumn<>(title);
         column.setCellValueFactory(value -> new ReadOnlyStringWrapper(mapper.apply(value.getValue())));
+        column.setCellFactory(ignored -> new javafx.scene.control.TableCell<>() {
+            @Override protected void updateItem(String value, boolean empty) {
+                super.updateItem(value, empty);
+                setText(empty ? null : value);
+                if (!empty) TablePreferences.alignCell(this, value);
+            }
+        });
         return column;
+    }
+
+    private void configureAnalysisOverlay() {
+        analysisOverlay.getStyleClass().add("population-analysis-overlay");
+        analysisOverlay.setAlignment(Pos.CENTER);
+        analysisOverlay.setPadding(new Insets(36));
+        analysisOverlayProgress.setPrefWidth(440);
+        analysisOverlayProgress.setMaxWidth(520);
+        analysisOverlayProgress.getStyleClass().add("modern-progress");
+        analysisOverlayDetail.setWrapText(true);
+        analysisOverlayDetail.setMaxWidth(620);
+        analysisOverlay.getChildren().setAll(
+                UiFactory.label("⌁", "loading-icon"),
+                analysisOverlayTitle,
+                analysisOverlayDetail,
+                analysisOverlayProgress);
+        analysisOverlay.setVisible(false);
+        analysisOverlay.setManaged(false);
+    }
+
+    private void showAnalysisOverlay(Task<?> task) {
+        analysisOverlay.setVisible(true);
+        analysisOverlay.setManaged(true);
+        analysisOverlay.toFront();
+        analysisOverlayProgress.progressProperty().unbind();
+        analysisOverlayDetail.textProperty().unbind();
+        analysisOverlayProgress.progressProperty().bind(task.progressProperty());
+        analysisOverlayDetail.textProperty().bind(task.messageProperty());
+    }
+
+    private void hideAnalysisOverlay() {
+        analysisOverlayProgress.progressProperty().unbind();
+        analysisOverlayDetail.textProperty().unbind();
+        analysisOverlay.setVisible(false);
+        analysisOverlay.setManaged(false);
     }
 
     private void startAnalysis() {
@@ -773,6 +823,7 @@ public final class PopulationPage extends BorderPane {
         progress.progressProperty().bind(runningTask.progressProperty());
         status.textProperty().bind(runningTask.messageProperty());
         setRunning(true);
+        showAnalysisOverlay(runningTask);
         runningTask.setOnSucceeded(event -> finishAnalysis(runningTask.getValue()));
         runningTask.setOnCancelled(event -> finishCancelled());
         runningTask.setOnFailed(event -> finishFailed(runningTask.getException()));
@@ -788,6 +839,7 @@ public final class PopulationPage extends BorderPane {
     }
 
     private void finishAnalysis(AnalysisResult result) {
+        hideAnalysisOverlay();
         progress.progressProperty().unbind();
         status.textProperty().unbind();
         sessionData.putAll(result.loaded());
@@ -823,6 +875,7 @@ public final class PopulationPage extends BorderPane {
     }
 
     private void finishCancelled() {
+        hideAnalysisOverlay();
         progress.progressProperty().unbind();
         status.textProperty().unbind();
         setStatus("Analisi annullata", "status-warning");
@@ -831,6 +884,7 @@ public final class PopulationPage extends BorderPane {
     }
 
     private void finishFailed(Throwable error) {
+        hideAnalysisOverlay();
         progress.progressProperty().unbind();
         status.textProperty().unbind();
         setStatus("Analisi non riuscita: " + (error == null ? "errore sconosciuto" : error.getMessage()), "status-warning");
@@ -1256,12 +1310,11 @@ public final class PopulationPage extends BorderPane {
 
     private static VBox filterGroup(String title, String detail, Node control, double width) {
         Label caption = UiFactory.label(title, "filter-label");
-        Label note = UiFactory.label(detail, "filter-detail");
         if (control instanceof Region value) {
             value.setPrefWidth(width);
             value.setMaxWidth(width);
         }
-        VBox box = new VBox(5, caption, control, note);
+        VBox box = new VBox(5, caption, control);
         box.getStyleClass().add("population-filter-group");
         box.setPrefWidth(width);
         return box;

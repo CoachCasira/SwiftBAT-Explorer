@@ -9,6 +9,7 @@ import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Labeled;
 import javafx.scene.control.Tooltip;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -23,8 +24,13 @@ public final class UiFactory {
     }
 
     public static Label label(String text, String... styleClasses) {
-        Label label = new Label(text);
+        Label label = new Label(I18n.t(text));
+        label.getProperties().put("swiftbat.originalText", text);
         label.getStyleClass().addAll(styleClasses);
+        I18n.languageProperty().addListener((obs, oldValue, newValue) -> {
+            Object original = label.getProperties().get("swiftbat.originalText");
+            if (original instanceof String source) label.setText(I18n.t(source));
+        });
         autoTooltip(label);
         return label;
     }
@@ -37,10 +43,14 @@ public final class UiFactory {
     }
 
     public static Button button(String text, String styleClass) {
-        String displayText = "Schermo intero".equals(text) ? "Schermo intero ⛶" : text;
-        Button button = new Button(displayText);
+        Button button = new Button(I18n.t(text == null ? "" : text.replace("  ⛶", "").replace(" ⛶", "")));
+        button.getProperties().put("swiftbat.originalText", text == null ? "" : text.replace("  ⛶", "").replace(" ⛶", ""));
         button.getStyleClass().add(styleClass);
         button.setCursor(javafx.scene.Cursor.HAND);
+        I18n.languageProperty().addListener((obs, oldValue, newValue) -> {
+            Object original = button.getProperties().get("swiftbat.originalText");
+            if (original instanceof String source) button.setText(I18n.t(source));
+        });
         autoTooltip(button);
         return button;
     }
@@ -58,6 +68,7 @@ public final class UiFactory {
     /** Per i menu a scelta il tooltip mostra sempre il valore selezionato per intero. */
     public static <T> ChoiceBox<T> autoTooltip(ChoiceBox<T> choice) {
         if (choice == null) return null;
+        I18n.installChoiceBox(choice);
         Runnable refresh = () -> {
             T value = choice.getValue();
             choice.setTooltip(value == null || value.toString().isBlank() ? null : quickTooltip(value.toString()));
@@ -158,4 +169,21 @@ public final class UiFactory {
         row.getChildren().addAll(label, value);
         return row;
     }
+    public static VBox collapsibleHelp(String title, Node content) {
+        ToggleButton toggle = new ToggleButton(I18n.t("Mostra spiegazione"));
+        toggle.getStyleClass().addAll("ghost-button", "help-toggle");
+        content.setVisible(false);
+        content.setManaged(false);
+        toggle.selectedProperty().addListener((obs, oldValue, selected) -> {
+            content.setVisible(selected);
+            content.setManaged(selected);
+            toggle.setText(I18n.t(selected ? "Nascondi spiegazione" : "Mostra spiegazione"));
+        });
+        I18n.languageProperty().addListener((obs, oldValue, newValue) ->
+                toggle.setText(I18n.t(toggle.isSelected() ? "Nascondi spiegazione" : "Mostra spiegazione")));
+        VBox box = new VBox(8, toggle, content);
+        box.getStyleClass().add("collapsible-help");
+        return box;
+    }
+
 }

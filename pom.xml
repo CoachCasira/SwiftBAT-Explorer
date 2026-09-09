@@ -107,6 +107,7 @@
                     <launcher>swiftbat-explorer</launcher>
                     <options>
                         <option>--enable-native-access=javafx.graphics,javafx.swing</option>
+                        <option>-Dfile.encoding=UTF-8</option>
                         <option>${javafx.unsafe.memory.option}</option>
                     </options>
                 </configuration>

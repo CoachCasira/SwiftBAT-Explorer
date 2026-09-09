@@ -21,6 +21,8 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
+import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -200,7 +202,22 @@ public final class MainView {
         Button official = UiFactory.iconButton("↗", "Apri il catalogo ufficiale");
         official.setOnAction(event -> hostServices.showDocument(SwiftCatalogService.CATALOG_URL));
 
-        bar.getChildren().addAll(product, live, spacer, catalogStatus, sessionStatus, connectionStatus, refresh, official);
+        ToggleButton italian = new ToggleButton("IT");
+        ToggleButton english = new ToggleButton("EN");
+        italian.getStyleClass().add("language-toggle");
+        english.getStyleClass().add("language-toggle");
+        ToggleGroup languages = new ToggleGroup();
+        italian.setToggleGroup(languages);
+        english.setToggleGroup(languages);
+        if (I18n.language() == I18n.Language.EN) english.setSelected(true); else italian.setSelected(true);
+        italian.setOnAction(event -> I18n.setLanguage(I18n.Language.IT));
+        english.setOnAction(event -> I18n.setLanguage(I18n.Language.EN));
+        HBox languageBox = new HBox(2, italian, english);
+        languageBox.getStyleClass().add("language-switch");
+        I18n.languageProperty().addListener((obs, oldValue, newValue) -> Platform.runLater(() -> I18n.localizeTree(root)));
+
+        bar.getChildren().addAll(product, live, spacer, catalogStatus, sessionStatus, connectionStatus,
+                languageBox, refresh, official);
         return bar;
     }
 
@@ -215,6 +232,7 @@ public final class MainView {
             default -> homePage;
         };
         pageHost.getChildren().setAll(node);
+        Platform.runLater(() -> I18n.localizeTree(node));
         boolean foundVisibleButton = false;
         for (Node navNode : navigation.getChildren()) {
             if (navNode instanceof Button button && page.equals(button.getUserData())) {
