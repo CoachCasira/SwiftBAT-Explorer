@@ -36,7 +36,7 @@ public final class AboutPage extends ScrollPane {
                 UiFactory.wrappedLabel(
                         "SwiftBAT Explorer è l'applicazione sviluppata per la tesi di Matteo Casiraghi per consultare e comprendere i prodotti pubblici Swift/BAT dei Gamma-Ray Burst.",
                         "page-subtitle"),
-                UiFactory.label("Versione 1.3.0 · Java 17 · dati online", "definition-kicker"));
+                UiFactory.label("v1.3.0 · Java 17 · online", "definition-kicker"));
         HBox.setHgrow(copy, Priority.ALWAYS);
         Button guide = UiFactory.button("Apri guida ai dati  →", "primary-button");
         guide.setOnAction(event -> openGlossary.run());
