@@ -21,6 +21,7 @@ import java.util.List;
 public final class UiBugFixes {
     private static final String WATCHED = UiBugFixes.class.getName() + ".watched";
     private static final String METADATA_SORT_FIXED = UiBugFixes.class.getName() + ".metadataSortFixed";
+    private static final String METADATA_QUERY = UiBugFixes.class.getName() + ".metadataQuery";
 
     private UiBugFixes() {
     }
@@ -59,17 +60,18 @@ public final class UiBugFixes {
 
     private static void fixNode(Node node) {
         if (node instanceof HBox toolbar && hasStyle(toolbar, "metadata-field-toolbar")) {
-            fixMetadataSortPopup(toolbar);
+            fixMetadataSearch(toolbar);
         }
     }
 
     /**
-     * Il pulsante A/Z non deve lasciare il focus nell'editor del ComboBox.
-     * In caso contrario il rebuild della lista interpreta il click sul sort
-     * come se l'utente stesse ancora digitando e riapre automaticamente un
-     * popup molto alto sopra il controllo.
+     * Comportamento desiderato del selettore metadata:
+     * - il campo di ricerca parte vuoto anche se la tabella ha gia' selezionato SIMPLE;
+     * - il testo digitato non viene sostituito dalla selezione corrente quando il focus esce;
+     * - il popup mostra due risultati alla volta e usa la scrollbar per gli altri;
+     * - A/Z riordina la lista mantenendo query e popup aperti.
      */
-    private static void fixMetadataSortPopup(HBox toolbar) {
+    private static void fixMetadataSearch(HBox toolbar) {
         if (Boolean.TRUE.equals(toolbar.getProperties().get(METADATA_SORT_FIXED))) return;
 
         ComboBox<?> combo = toolbar.getChildren().stream()
@@ -82,21 +84,59 @@ public final class UiBugFixes {
                 .map(Button.class::cast)
                 .filter(candidate -> hasStyle(candidate, "metadata-sort-button"))
                 .findFirst().orElse(null);
-        if (combo == null || sort == null) return;
+        if (combo == null || sort == null || combo.getEditor() == null) return;
 
         toolbar.getProperties().put(METADATA_SORT_FIXED, Boolean.TRUE);
 
-        // Mantiene il menu compatto anche con centinaia di keyword FITS.
-        combo.setVisibleRowCount(7);
+        // Popup volutamente compatto: due risultati visibili, gli altri via scrollbar.
+        combo.setVisibleRowCount(2);
+        combo.getProperties().put(METADATA_QUERY, "");
 
-        // Il click sul sort deve togliere il focus dal campo di ricerca.
-        // Cosi' il rebuild non richiama show() automaticamente.
-        sort.setFocusTraversable(true);
-        sort.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> combo.hide());
-        sort.addEventHandler(ActionEvent.ACTION, event ->
-                // Doppio runLater: viene eseguito anche dopo l'eventuale show()
-                // gia' accodato dal listener del filtro.
-                Platform.runLater(() -> Platform.runLater(combo::hide)));
+        // Conserva esclusivamente cio' che l'utente vede/digita mentre l'editor e' attivo.
+        combo.getEditor().textProperty().addListener((obs, oldValue, newValue) -> {
+            if (combo.getEditor().isFocused()) {
+                combo.getProperties().put(METADATA_QUERY, newValue == null ? "" : newValue);
+            }
+        });
+
+        // Il bridge originale riallinea l'editor al campo selezionato (es. SIMPLE) alla
+        // perdita del focus. Questo listener, installato dopo il bridge, ripristina la
+        // query dell'utente senza cambiare la riga metadata realmente selezionata.
+        combo.getEditor().focusedProperty().addListener((obs, oldValue, focused) -> {
+            if (focused) return;
+            Object saved = combo.getProperties().get(METADATA_QUERY);
+            String query = saved instanceof String text ? text : "";
+            Platform.runLater(() -> {
+                if (combo.getEditor().isFocused()) return;
+                combo.setValue(null);
+                combo.getEditor().setText(query);
+                combo.getEditor().positionCaret(query.length());
+            });
+        });
+
+        // Il sort non prende il focus: cosi' il campo resta in modalita' ricerca e il
+        // rebuild gia' presente in UiRefinements puo' riordinare la lista senza chiuderla.
+        sort.setFocusTraversable(false);
+        sort.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+            combo.requestFocus();
+            combo.getEditor().requestFocus();
+        });
+        sort.addEventHandler(ActionEvent.ACTION, event -> Platform.runLater(() -> {
+            String query = combo.getEditor().getText() == null ? "" : combo.getEditor().getText();
+            combo.getProperties().put(METADATA_QUERY, query);
+            combo.getEditor().requestFocus();
+            combo.getEditor().positionCaret(query.length());
+            if (!combo.getItems().isEmpty()) combo.show();
+        }));
+
+        // Il campo visibile e' una ricerca, non la rappresentazione della selezione
+        // iniziale della tabella: all'apertura deve quindi essere vuoto.
+        Platform.runLater(() -> {
+            combo.hide();
+            combo.setValue(null);
+            combo.getEditor().clear();
+            combo.getProperties().put(METADATA_QUERY, "");
+        });
     }
 
     private static boolean hasStyle(Node node, String styleClass) {
