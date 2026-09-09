@@ -174,6 +174,54 @@
     -fx-background-color: #8b6bff;
 }
 
+/* ---------- Selected filter values: always visible and visually consistent ---------- */
+.reference-redesign .choice-box,
+.reference-redesign .choice-box-modern,
+.reference-redesign .combo-box-base {
+    -fx-background-color: rgba(3, 14, 33, 0.96);
+    -fx-border-color: rgba(42, 150, 211, 0.52);
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+}
+
+.reference-redesign .choice-box > .label,
+.reference-redesign .choice-box-modern > .label {
+    -fx-text-fill: #f1f6ff;
+    -fx-font-weight: 600;
+    -fx-background-color: linear-gradient(to right, rgba(203, 45, 218, 0.34), rgba(43, 105, 236, 0.34));
+    -fx-background-radius: 9px 0 0 9px;
+    -fx-padding: 8px 12px;
+}
+
+.reference-redesign .combo-box-base > .list-cell,
+.reference-redesign .combo-box > .list-cell {
+    -fx-text-fill: #f1f6ff;
+    -fx-font-weight: 600;
+    -fx-background-color: linear-gradient(to right, rgba(203, 45, 218, 0.34), rgba(43, 105, 236, 0.34));
+    -fx-background-radius: 9px 0 0 9px;
+    -fx-padding: 8px 12px;
+}
+
+.reference-redesign .choice-box .open-button,
+.reference-redesign .choice-box-modern .open-button,
+.reference-redesign .combo-box-base .arrow-button {
+    -fx-background-color: rgba(3, 14, 33, 0.98);
+    -fx-background-radius: 0 9px 9px 0;
+}
+
+.reference-redesign .choice-box .arrow,
+.reference-redesign .choice-box-modern .arrow,
+.reference-redesign .combo-box-base .arrow {
+    -fx-background-color: #dceaff;
+}
+
+.reference-redesign .choice-box:disabled > .label,
+.reference-redesign .choice-box-modern:disabled > .label,
+.reference-redesign .combo-box-base:disabled > .list-cell {
+    -fx-text-fill: #8192af;
+    -fx-background-color: rgba(28, 40, 65, 0.42);
+}
+
 /* Keep the side navigation clean: spectroscopy remains inside Explorer. */
 .reference-redesign .main-navigation {
     -fx-spacing: 7px;
