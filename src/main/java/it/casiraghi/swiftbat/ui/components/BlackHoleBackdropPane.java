@@ -1,5 +1,6 @@
 package it.casiraghi.swiftbat.ui.components;
 
+import javafx.animation.AnimationTimer;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.effect.GaussianBlur;
@@ -13,29 +14,58 @@ import javafx.scene.shape.ArcType;
 /**
  * Fondale procedurale usato esclusivamente dal tema sperimentale Black Hole.
  * Non rappresenta dati scientifici e non intercetta gli eventi del mouse.
+ *
+ * Il fondale pesante resta statico; soltanto un overlay leggero anima stelle
+ * e piccole particelle attorno ai due buchi neri decorativi.
  */
 public final class BlackHoleBackdropPane extends Region {
-    private final Canvas canvas = new Canvas();
+    private final Canvas staticCanvas = new Canvas();
+    private final Canvas motionCanvas = new Canvas();
+    private long startNanos;
+    private long lastFrame;
+
+    private final AnimationTimer animation = new AnimationTimer() {
+        @Override
+        public void handle(long now) {
+            if (startNanos == 0L) startNanos = now;
+            if (now - lastFrame < 50_000_000L) return; // ~20 fps, sufficiente per il fondale
+            lastFrame = now;
+            double seconds = (now - startNanos) / 1_000_000_000.0;
+            drawMotion(Math.max(1, getWidth()), Math.max(1, getHeight()), seconds);
+        }
+    };
 
     public BlackHoleBackdropPane() {
         getStyleClass().add("black-hole-backdrop");
         setMouseTransparent(true);
-        getChildren().add(canvas);
+        getChildren().addAll(staticCanvas, motionCanvas);
         widthProperty().addListener((obs, oldValue, newValue) -> requestLayout());
         heightProperty().addListener((obs, oldValue, newValue) -> requestLayout());
+        sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene == null) {
+                animation.stop();
+            } else {
+                startNanos = 0L;
+                lastFrame = 0L;
+                animation.start();
+            }
+        });
     }
 
     @Override
     protected void layoutChildren() {
         double width = Math.max(1, getWidth());
         double height = Math.max(1, getHeight());
-        canvas.setWidth(width);
-        canvas.setHeight(height);
-        draw(width, height);
+        staticCanvas.setWidth(width);
+        staticCanvas.setHeight(height);
+        motionCanvas.setWidth(width);
+        motionCanvas.setHeight(height);
+        drawStatic(width, height);
+        drawMotion(width, height, 0.0);
     }
 
-    private void draw(double width, double height) {
-        GraphicsContext gc = canvas.getGraphicsContext2D();
+    private void drawStatic(double width, double height) {
+        GraphicsContext gc = staticCanvas.getGraphicsContext2D();
         gc.clearRect(0, 0, width, height);
         drawNebulae(gc, width, height);
         drawStars(gc, width, height);
@@ -131,6 +161,39 @@ public final class BlackHoleBackdropPane extends Region {
                     : Color.rgb(211, 222, 255, Math.min(0.38, alpha));
             gc.setFill(star);
             gc.fillOval(x, y, size, size);
+        }
+    }
+
+    private void drawMotion(double width, double height, double seconds) {
+        GraphicsContext gc = motionCanvas.getGraphicsContext2D();
+        gc.clearRect(0, 0, width, height);
+        double scale = Math.min(width, Math.max(620, height));
+        drawOrbiters(gc, width * 0.78, Math.max(118, height * 0.12),
+                Math.max(66, scale * 0.095), -7, seconds, 18, 0.82);
+        drawOrbiters(gc, width * 0.10, height * 0.83,
+                Math.max(42, scale * 0.060), 14, seconds * 0.72, 9, 0.36);
+    }
+
+    private void drawOrbiters(GraphicsContext gc, double cx, double cy, double core,
+                              double tiltDegrees, double seconds, int count, double opacity) {
+        double tilt = Math.toRadians(tiltDegrees);
+        for (int i = 0; i < count; i++) {
+            double radius = core * (1.7 + (i % 6) * 0.44);
+            double angle = seconds * (0.24 + (i % 4) * 0.04) + i * 2.399963229728653;
+            double ox = Math.cos(angle) * radius;
+            double oy = Math.sin(angle) * radius * 0.30;
+            double x = cx + ox * Math.cos(tilt) - oy * Math.sin(tilt);
+            double y = cy + ox * Math.sin(tilt) + oy * Math.cos(tilt);
+            double front = (Math.sin(angle) + 1.0) * 0.5;
+            double size = 0.65 + (i % 3) * 0.45 + front * 0.50;
+            double alpha = opacity * (0.20 + front * 0.55);
+            Color color = i % 4 == 0
+                    ? Color.rgb(51, 220, 255, alpha)
+                    : i % 5 == 0
+                    ? Color.rgb(240, 72, 226, alpha)
+                    : Color.rgb(230, 236, 255, alpha);
+            gc.setFill(color);
+            gc.fillOval(x - size / 2.0, y - size / 2.0, size, size);
         }
     }
 }
