@@ -1,5 +1,6 @@
 package it.casiraghi.swiftbat.ui;
 
+import it.casiraghi.swiftbat.ui.components.BrandLogoAsset;
 import javafx.application.HostServices;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -29,16 +30,17 @@ public final class AboutPage extends ScrollPane {
         hero.getStyleClass().add("info-hero");
         hero.setPadding(new Insets(28));
         hero.setAlignment(Pos.CENTER_LEFT);
+        Node brandLogo = BrandLogoAsset.view(82);
         VBox copy = new VBox(8,
                 UiFactory.label("Informazioni", "page-title"),
                 UiFactory.wrappedLabel(
                         "SwiftBAT Explorer è l'applicazione sviluppata per la tesi di Matteo Casiraghi per consultare e comprendere i prodotti pubblici Swift/BAT dei Gamma-Ray Burst.",
                         "page-subtitle"),
-                UiFactory.label("Versione 1.2.0 · Java 17 · dati online", "definition-kicker"));
+                UiFactory.label("Versione 1.3.0 · Java 17 · dati online", "definition-kicker"));
         HBox.setHgrow(copy, Priority.ALWAYS);
         Button guide = UiFactory.button("Apri guida ai dati  →", "primary-button");
         guide.setOnAction(event -> openGlossary.run());
-        hero.getChildren().addAll(copy, guide);
+        hero.getChildren().addAll(brandLogo, copy, guide);
 
         GridPane cards = new GridPane();
         cards.setHgap(14);
