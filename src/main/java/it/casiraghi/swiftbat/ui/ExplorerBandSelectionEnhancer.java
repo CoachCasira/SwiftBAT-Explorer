@@ -19,7 +19,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Estende il selettore delle bande della curva 2D dell'Explorer senza toccare
@@ -123,8 +122,7 @@ public final class ExplorerBandSelectionEnhancer {
     }
 
     private static void applyBandFilter(LineChart<Number, Number> chart) {
-        if (chart == null || totalMode) return;
-        if (selectedBands.isEmpty()) return;
+        if (chart == null || totalMode || selectedBands.isEmpty()) return;
         List<XYChart.Series<Number, Number>> remove = new ArrayList<>();
         for (XYChart.Series<Number, Number> series : chart.getData()) {
             String name = series.getName();
@@ -221,10 +219,29 @@ public final class ExplorerBandSelectionEnhancer {
             Platform.runLater(this::show);
         }
 
+        /**
+         * Il grafico storico si ricostruisce soltanto quando cambia davvero il
+         * valore del ChoiceBox. Dopo la prima selezione multipla il suo valore e'
+         * gia' "Tutte le bande": impostarlo di nuovo allo stesso valore non emette
+         * alcun change event e quindi non ripristina le serie eliminate dal filtro.
+         *
+         * Forziamo percio' un refresh completo passando brevemente dal totale e poi
+         * tornando a tutte le bande. Solo dopo la ricostruzione applichiamo il
+         * sottoinsieme scelto dall'utente. In questo modo aggiungere una seconda,
+         * terza o quarta banda rende visibili davvero tutte le curve selezionate.
+         */
         private void applyBandsToOriginal() {
-            original.setValue(ALL_BANDS);
             refreshButtonText();
-            Platform.runLater(ExplorerBandSelectionEnhancer::refreshAllLightCurves);
+            if (ALL_BANDS.equals(original.getValue())) {
+                original.setValue(TOTAL);
+                Platform.runLater(() -> {
+                    original.setValue(ALL_BANDS);
+                    Platform.runLater(ExplorerBandSelectionEnhancer::refreshAllLightCurves);
+                });
+            } else {
+                original.setValue(ALL_BANDS);
+                Platform.runLater(ExplorerBandSelectionEnhancer::refreshAllLightCurves);
+            }
         }
 
         private void refreshLabels() {
