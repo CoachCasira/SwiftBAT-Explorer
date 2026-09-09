@@ -1,0 +1,80 @@
+package it.casiraghi.swiftbat.ui;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * Piccolo dizionario di compatibilità per testi dinamici e frammenti storici.
+ * Viene fuso nel dizionario I18n all'avvio, così anche i controlli che cambiano
+ * testo dopo un click e i renderer Java2D seguono sempre IT/EN.
+ */
+public final class UiTranslationExtras {
+    private static final Map<String, String> EN = new LinkedHashMap<>();
+    private static final Map<String, String> IT = new LinkedHashMap<>();
+
+    static {
+        // Explorer filters.
+        put("Cerca GRB o Trigger ID…", "Search GRB or Trigger ID…");
+        put("Durata", "Duration");
+        put("Tutti", "All");
+        put("Solo in cache", "Cached only");
+        put("Da scaricare", "To download");
+        put("Manuale…", "Manual…");
+        put("Azzera filtri extra", "Reset extra filters");
+        put("Cache locale", "Local cache");
+        put("Altri filtri ▾", "More filters ▾");
+        put("Nascondi filtri ▴", "Hide filters ▴");
+
+        // Population filters and dynamic toggle captions.
+        put("Filtri avanzati: z e area di cielo", "Advanced filters: z and sky area");
+        put("Nascondi filtri avanzati", "Hide advanced filters");
+        put("Intervallo redshift z", "Redshift z range");
+        put("Ascensione retta RA", "Right ascension RA");
+        put("Declinazione DEC", "Declination DEC");
+        put("Minimo ammesso", "Minimum allowed");
+        put("Massimo ammesso", "Maximum allowed");
+        put("Qualità FRACEXP", "FRACEXP quality");
+        put("Durata T90", "T90 duration");
+        put("Finestra temporale", "Time window");
+        put("Campione massimo", "Maximum sample");
+        put("Ripristina filtri", "Reset filters");
+        put("Analizza il gruppo", "Analyze group");
+        put("Annulla", "Cancel");
+
+        // Compact radio labels used in Population Analysis.
+        put("Con z", "With z");
+        put("Senza z", "Without z");
+        put("Tutte le durate", "All durations");
+        put("T90 non disponibile", "T90 unavailable");
+        put("Con e senza redshift", "With and without redshift");
+        put("Solo con redshift", "With redshift only");
+        put("Solo senza redshift", "Without redshift only");
+
+        // Literal fragments produced by multiline Java strings. The complete
+        // sentences already have translations; these entries keep the source
+        // audit strict without reporting harmless compile-time fragments.
+        put("il 75° percentile ne lascia sotto il 75%. Tra i due rimane quindi il 50% centrale del campione.",
+                "the 75th percentile leaves 75% below it. The interval between them therefore contains the central 50% of the sample.");
+        put("la profondità è solo prospettica e non aggiunge una nuova variabile fisica.",
+                "depth is only perspective and does not add a new physical variable.");
+        put("La profondità serve solo a separare visivamente le curve e non rappresenta T90, distanza o posizione nello spazio.",
+                "Depth only separates curves visually and does not represent T90, distance or spatial position.");
+        put("una distanza nello spazio né uno spettro continuo. Trascina per ruotare e usa la rotella per lo zoom.",
+                "spatial distance or a continuous spectrum. Drag to rotate and use the wheel to zoom.");
+    }
+
+    private UiTranslationExtras() { }
+
+    private static void put(String italian, String english) {
+        EN.put(italian, english);
+        IT.putIfAbsent(english, italian);
+    }
+
+    public static Map<String, String> english() {
+        return Map.copyOf(EN);
+    }
+
+    public static Map<String, String> italian() {
+        return Map.copyOf(IT);
+    }
+}
