@@ -50,6 +50,13 @@ public final class UiTranslationExtras {
         put("Solo con redshift", "With redshift only");
         put("Solo senza redshift", "Without redshift only");
 
+        // Export dialogs.
+        put("Esportazione PNG non riuscita", "PNG export failed");
+        put("Nessuna colonna visibile", "No visible columns");
+        put("Mostra almeno una colonna prima di esportare.",
+                "Show at least one column before exporting.");
+        put("Esportazione Excel non riuscita", "Excel export failed");
+
         // Literal fragments produced by multiline Java strings. The complete
         // sentences already have translations; these entries keep the source
         // audit strict without reporting harmless compile-time fragments.
