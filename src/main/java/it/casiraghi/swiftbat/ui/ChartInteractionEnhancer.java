@@ -17,6 +17,8 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Control;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
@@ -32,13 +34,15 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/** Shared interactions for the scientific JavaFX charts. */
+/** Shared interactions for the scientific JavaFX charts and population result table. */
 public final class ChartInteractionEnhancer {
     private static final String WATCHED = ChartInteractionEnhancer.class.getName() + ".watched";
     private static final String LINE_DONE = ChartInteractionEnhancer.class.getName() + ".lineDone";
     private static final String BAR_DONE = ChartInteractionEnhancer.class.getName() + ".barDone";
     private static final String EXPORT_DONE = ChartInteractionEnhancer.class.getName() + ".exportDone";
     private static final String FILTER_DONE = ChartInteractionEnhancer.class.getName() + ".filterDone";
+    private static final String TABLE_WATCHED = ChartInteractionEnhancer.class.getName() + ".tableWatched";
+    private static final String TABLE_DONE = ChartInteractionEnhancer.class.getName() + ".tableDone";
     private static final String FOCUS = ChartInteractionEnhancer.class.getName() + ".focus";
     private static final String NORMAL_TABS_HEIGHT = ChartInteractionEnhancer.class.getName() + ".normalTabsHeight";
 
@@ -86,6 +90,7 @@ public final class ChartInteractionEnhancer {
     private static void enhance(Node node) {
         if (node instanceof LineChart<?, ?> lineChart) enhanceLineChart(lineChart);
         else if (node instanceof BarChart<?, ?> barChart) enhanceBarChart(barChart);
+        else if (node instanceof TableView<?> table) enhanceTableCandidate(table);
         if (node instanceof Region region && region.getStyleClass().contains("population-filter-card")) enhancePopulationFilters(region);
     }
 
@@ -198,7 +203,11 @@ public final class ChartInteractionEnhancer {
             if (current instanceof TabPane tabs) {
                 for (Tab tab : tabs.getTabs()) {
                     String text = tab.getText() == null ? "" : tab.getText().toLowerCase(Locale.ROOT);
-                    if (text.contains("3d")) { tabs.getSelectionModel().select(tab); return true; }
+                    if (text.contains("3d")) {
+                        tabs.getSelectionModel().select(tab);
+                        Platform.runLater(() -> openTabFullscreen(tab));
+                        return true;
+                    }
                 }
             }
             if (current instanceof Parent parent) {
@@ -208,6 +217,28 @@ public final class ChartInteractionEnhancer {
             if (current.getStyleClass().contains("page-root")) break;
         }
         return false;
+    }
+
+    private static void openTabFullscreen(Tab tab) {
+        Node content = tab == null ? null : tab.getContent();
+        if (!(content instanceof Parent parent)) return;
+        Button fullscreen = findFullscreenButton(parent);
+        if (fullscreen != null && !fullscreen.isDisabled()) fullscreen.fire();
+    }
+
+    private static Button findFullscreenButton(Parent root) {
+        for (Node child : root.getChildrenUnmodifiable()) {
+            if (child instanceof Button button && button.isVisible() && button.isManaged()) {
+                String text = button.getText() == null ? "" : button.getText().toLowerCase(Locale.ROOT);
+                String compact = text.replace(" ", "");
+                if (text.contains("schermo intero") || text.contains("full screen") || compact.contains("fullscreen")) return button;
+            }
+            if (child instanceof Parent parent) {
+                Button nested = findFullscreenButton(parent);
+                if (nested != null) return nested;
+            }
+        }
+        return null;
     }
 
     private static Button findThreeDButton(Parent root, boolean requireEnabled) {
@@ -237,6 +268,46 @@ public final class ChartInteractionEnhancer {
         if (card instanceof Region region && chart instanceof BarChart<?, ?>) {
             region.setMinHeight(400); region.setPrefHeight(420); region.setMaxHeight(Double.MAX_VALUE);
         }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static void enhanceTableCandidate(TableView<?> rawTable) {
+        TableView table = rawTable;
+        if (!Boolean.TRUE.equals(table.getProperties().get(TABLE_WATCHED))) {
+            table.getProperties().put(TABLE_WATCHED, Boolean.TRUE);
+            table.getColumns().addListener((ListChangeListener<TableColumn>) change ->
+                    Platform.runLater(() -> enhanceTableCandidate(table)));
+        }
+        if (Boolean.TRUE.equals(table.getProperties().get(TABLE_DONE)) || !isPopulationResultTable(table)) return;
+        if (!(table.getParent() instanceof VBox box) || box.getChildren().isEmpty()) return;
+
+        table.getProperties().put(TABLE_DONE, Boolean.TRUE);
+        Button export = UiFactory.button("", "ghost-button");
+        I18n.setText(export, "Esporta Excel", "Export Excel");
+        export.setOnAction(event -> ExportSupport.exportTableExcel(
+                export, table, "population_included_grbs.xlsx", "GRB inclusi"));
+
+        Node first = box.getChildren().get(0);
+        box.getChildren().remove(first);
+        Region spacer = new Region();
+        HBox.setHgrow(first, Priority.ALWAYS);
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox toolbar = new HBox(8, first, spacer, export);
+        toolbar.setMaxWidth(Double.MAX_VALUE);
+        box.getChildren().add(0, toolbar);
+    }
+
+    private static boolean isPopulationResultTable(TableView<?> table) {
+        if (table.getColumns().size() < 5) return false;
+        boolean grb = false, t90 = false, redshift = false, quality = false;
+        for (TableColumn<?, ?> column : table.getColumns()) {
+            String text = column.getText() == null ? "" : column.getText().toLowerCase(Locale.ROOT);
+            grb |= text.equals("grb");
+            t90 |= text.contains("t90");
+            redshift |= text.contains("redshift");
+            quality |= text.contains("qualità") || text.contains("quality") || text.contains("flag");
+        }
+        return grb && t90 && redshift && quality;
     }
 
     private static Parent findAncestorWithStyle(Node node, String styleClass) {
