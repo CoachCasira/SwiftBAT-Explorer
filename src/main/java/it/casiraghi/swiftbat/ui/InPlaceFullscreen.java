@@ -38,20 +38,14 @@ public final class InPlaceFullscreen {
             return;
         }
         Scene scene = owner.getScene();
-        if (scene.getProperties().containsKey(ACTIVE_SESSION)) {
-            return;
-        }
+        if (scene.getProperties().containsKey(ACTIVE_SESSION)) return;
         new Session(scene, stage, owner, title, content).open();
     }
 
     public static void close(Node owner) {
-        if (owner == null || owner.getScene() == null) {
-            return;
-        }
+        if (owner == null || owner.getScene() == null) return;
         Object activeSession = owner.getScene().getProperties().get(ACTIVE_SESSION);
-        if (activeSession instanceof Session session) {
-            session.close(false);
-        }
+        if (activeSession instanceof Session session) session.close(false);
     }
 
     private static final class Session {
@@ -100,36 +94,24 @@ public final class InPlaceFullscreen {
             back.setOnAction(event -> close(false));
             keyHandler = this::handleKeyPressed;
             fullscreenListener = (observable, wasFullscreen, isFullscreen) -> {
-                if (active && wasFullscreen && !isFullscreen) {
-                    close(true);
-                }
+                if (active && wasFullscreen && !isFullscreen) close(true);
             };
         }
 
         private Node prepareContent(String title, Node content) {
             String normalized = title == null ? "" : title;
-            if (normalized.contains("Modello spettrale 3D")) {
-                return wrapSpectralModel3D(content);
-            }
-            if (normalized.contains("Modello spettrale")) {
-                return wrapSpectralModel2D(content);
-            }
-            if (normalized.contains("Flusso energetico 3D")) {
-                return wrapFlux3D(content);
-            }
-            if (normalized.contains("Flusso energetico per banda")) {
-                return wrapFlux2D(content);
-            }
-            if (normalized.contains("Mappa tempo–energia")) {
-                return wrapTimeEnergy(content);
-            }
+            if (normalized.contains("Modello spettrale 3D")) return wrapSpectralModel3D(content);
+            if (normalized.contains("Modello spettrale")) return wrapSpectralModel2D(content);
+            if (normalized.contains("Flusso energetico 3D")) return wrapFlux3D(content);
+            if (normalized.contains("Flusso energetico per banda")) return wrapFlux2D(content);
+            if (normalized.contains("Mappa tempo–energia")) return wrapTimeEnergy(content);
             return content;
         }
 
         private Node wrapSpectralModel2D(Node content) {
             VBox reading = spectroscopyReadingCard(
                     "Come leggere il modello 2D",
-                    "Curva — la linea arancione rappresenta la funzione spettrale ricostruita dal fit ufficiale BAT selezionato. Non è una successione di punti grezzi misurati dal rivelatore.",
+                    "Curva — la linea azzurra rappresenta la funzione spettrale ricostruita dal fit ufficiale BAT selezionato. Non è una successione di punti grezzi misurati dal rivelatore.",
                     "Asse X — mostra l'energia dei fotoni in keV, da 15 a 150 keV nella vista corrente.",
                     "Asse Y — mostra log₁₀ N(E), cioè il logaritmo del flusso fotonico differenziale. Valori negativi sono perfettamente normali e indicano N(E) < 1 nelle unità riportate.",
                     "Forma — la pendenza della curva descrive come il contributo previsto dal modello cambia con l'energia. Un andamento più ripido indica una diminuzione più rapida verso le energie elevate.",
@@ -142,7 +124,7 @@ public final class InPlaceFullscreen {
         private Node wrapSpectralModel3D(Node content) {
             VBox reading = spectroscopyReadingCard(
                     "Come leggere la vista 3D",
-                    "Modello — la curva arancione rappresenta la stessa funzione spettrale ricostruita mostrata nella vista 2D. Non sono aggiunti nuovi punti osservativi.",
+                    "Modello — la curva azzurra rappresenta la stessa funzione spettrale ricostruita mostrata nella vista 2D. Non sono aggiunti nuovi punti osservativi.",
                     "Assi — X indica l'energia dei fotoni in keV; Y indica log₁₀ N(E), il logaritmo del flusso fotonico differenziale previsto dal fit.",
                     "Forma della curva — la pendenza mostra come il contributo del modello diminuisce o varia passando verso energie più elevate.",
                     "Profondità — il piano arretrato e i collegamenti servono soltanto alla prospettiva. Non rappresentano tempo, distanza, intensità o una terza variabile fisica.",
@@ -257,14 +239,12 @@ public final class InPlaceFullscreen {
                 split.setBottom(readingScroll);
                 BorderPane.setMargin(content, Insets.EMPTY);
                 BorderPane.setMargin(readingScroll, new Insets(12, 0, 0, 0));
-
                 readingScroll.setMinWidth(0);
                 readingScroll.setPrefWidth(Region.USE_COMPUTED_SIZE);
                 readingScroll.setMaxWidth(Double.MAX_VALUE);
                 readingScroll.setMinHeight(210);
                 readingScroll.setPrefHeight(280);
                 readingScroll.setMaxHeight(320);
-
                 reading.setMinWidth(0);
                 reading.setPrefWidth(Region.USE_COMPUTED_SIZE);
                 reading.setMaxWidth(Double.MAX_VALUE);
@@ -273,7 +253,6 @@ public final class InPlaceFullscreen {
                 split.setRight(readingScroll);
                 BorderPane.setMargin(content, new Insets(0, 14, 0, 0));
                 BorderPane.setMargin(readingScroll, Insets.EMPTY);
-
                 double sideWidth = Math.max(320, Math.min(430, width * 0.255));
                 readingScroll.setMinWidth(Math.min(300, sideWidth));
                 readingScroll.setPrefWidth(sideWidth);
@@ -281,7 +260,6 @@ public final class InPlaceFullscreen {
                 readingScroll.setMinHeight(0);
                 readingScroll.setPrefHeight(Region.USE_COMPUTED_SIZE);
                 readingScroll.setMaxHeight(Double.MAX_VALUE);
-
                 reading.setMinWidth(0);
                 reading.setPrefWidth(sideWidth);
                 reading.setMaxWidth(Double.MAX_VALUE);
@@ -291,7 +269,6 @@ public final class InPlaceFullscreen {
         private VBox spectroscopyReadingCard(String title, String... paragraphs) {
             VBox card = new VBox(10);
             configureReadingCard(card);
-
             Label titleLabel = UiFactory.label(title, "card-title");
             styleReadingTitle(titleLabel);
             card.getChildren().add(titleLabel);
@@ -324,7 +301,9 @@ public final class InPlaceFullscreen {
 
         private VBox readingSection(String paragraph, int index) {
             String italian = paragraph == null ? "" : paragraph;
-            String english = I18n.english(italian);
+            String translationSource = italian.replace("linea azzurra", "linea arancione")
+                    .replace("curva azzurra", "curva arancione");
+            String english = I18n.english(translationSource).replace("orange", "cyan");
             String[] itParts = splitReadingParagraph(italian);
             String[] enParts = splitReadingParagraph(english);
 
@@ -372,7 +351,6 @@ public final class InPlaceFullscreen {
         private void polishSpectroscopyAssistant(Node node, String title) {
             if (node instanceof VBox box && box.getStyleClass().contains("spectroscopy-assistant")) {
                 configureReadingCard(box);
-
                 if (title.contains("Mappa tempo–energia")) {
                     rebuildMapReadingCard(box);
                 } else {
@@ -380,19 +358,14 @@ public final class InPlaceFullscreen {
                         if (child instanceof Label label) {
                             label.setMinHeight(Region.USE_PREF_SIZE);
                             label.setMaxWidth(Double.MAX_VALUE);
-                            if (label.getStyleClass().contains("card-title")) {
-                                styleReadingTitle(label);
-                            } else {
-                                label.setStyle("-fx-text-fill: #e7f0ff; -fx-font-size: 13.2px; -fx-line-spacing: 3px;");
-                            }
+                            if (label.getStyleClass().contains("card-title")) styleReadingTitle(label);
+                            else label.setStyle("-fx-text-fill: #e7f0ff; -fx-font-size: 13.2px; -fx-line-spacing: 3px;");
                         }
                     }
                 }
             }
             if (node instanceof Parent parent) {
-                for (Node child : parent.getChildrenUnmodifiable()) {
-                    polishSpectroscopyAssistant(child, title);
-                }
+                for (Node child : parent.getChildrenUnmodifiable()) polishSpectroscopyAssistant(child, title);
             }
         }
 
@@ -401,11 +374,8 @@ public final class InPlaceFullscreen {
             List<String> paragraphs = new ArrayList<>();
             for (Node child : List.copyOf(box.getChildren())) {
                 if (child instanceof Label label) {
-                    if (label.getStyleClass().contains("card-title") && titleLabel == null) {
-                        titleLabel = label;
-                    } else if (label.getText() != null && !label.getText().isBlank()) {
-                        paragraphs.add(label.getText());
-                    }
+                    if (label.getStyleClass().contains("card-title") && titleLabel == null) titleLabel = label;
+                    else if (label.getText() != null && !label.getText().isBlank()) paragraphs.add(label.getText());
                 }
             }
 
@@ -417,9 +387,7 @@ public final class InPlaceFullscreen {
             }
 
             box.getChildren().clear();
-            if (titleLabel == null) {
-                titleLabel = UiFactory.label("Come leggere la mappa", "card-title");
-            }
+            if (titleLabel == null) titleLabel = UiFactory.label("Come leggere la mappa", "card-title");
             styleReadingTitle(titleLabel);
             box.getChildren().add(titleLabel);
             for (int index = 0; index < paragraphs.size(); index++) {
@@ -436,9 +404,7 @@ public final class InPlaceFullscreen {
             stage.fullScreenProperty().addListener(fullscreenListener);
             scene.setRoot(fullscreenRoot);
             stage.setFullScreenExitHint("");
-            if (!stage.isFullScreen()) {
-                stage.setFullScreen(true);
-            }
+            if (!stage.isFullScreen()) stage.setFullScreen(true);
         }
 
         private void handleKeyPressed(KeyEvent event) {
@@ -449,9 +415,7 @@ public final class InPlaceFullscreen {
         }
 
         private void close(boolean leaveFullscreen) {
-            if (!active) {
-                return;
-            }
+            if (!active) return;
             active = false;
             scene.removeEventFilter(KeyEvent.KEY_PRESSED, keyHandler);
             stage.fullScreenProperty().removeListener(fullscreenListener);
@@ -459,12 +423,8 @@ public final class InPlaceFullscreen {
             scene.setRoot(originalRoot);
             stage.setFullScreenExitHint(originalExitHint);
 
-            if (leaveFullscreen || !originallyFullscreen) {
-                stage.setFullScreen(false);
-            }
-            if (previousFocus != null) {
-                previousFocus.requestFocus();
-            }
+            if (leaveFullscreen || !originallyFullscreen) stage.setFullScreen(false);
+            if (previousFocus != null) previousFocus.requestFocus();
         }
     }
 }
