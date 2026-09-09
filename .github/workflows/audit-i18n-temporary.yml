@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  patch-audit-verify:
+  patch-and-verify:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -28,65 +28,7 @@ jobs:
           cache: maven
       - name: Apply UI and i18n fixes
         run: python3 scripts/apply-global-i18n-layout-fixes.py
-      - name: Full source localization audit
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import re
-          ROOT = Path('src/main/java')
-          i18n = Path('src/main/java/it/casiraghi/swiftbat/ui/I18n.java').read_text(encoding='utf-8')
-          def unescape(s):
-              return (s.replace('\\n','\n').replace('\\t','\t')
-                       .replace('\\"','"').replace("\\'", "'")
-                       .replace('\\\\','\\'))
-          mapped=set()
-          for m in re.finditer(r'put\("((?:\\.|[^"\\])*)",\s*"((?:\\.|[^"\\])*)"\);', i18n):
-              mapped.add(unescape(m.group(1)))
-          markers=[
-              ' il ',' lo ',' la ',' gli ',' le ',' un ',' una ',' di ',' del ',' della ',' dei ',' delle ',
-              ' è ',' per ',' con ',' senza ',' non ',' dal ',' nel ',' nella ',' nelle ',' alla ',' alle ',
-              'mostra','nascond','apri','scegli','cerca','dati','mappa','analisi','durata','tempo','valore',
-              'qualità','spiegazione','disponibile','intervallo','flusso','modello','energia','banda','tabella',
-              'righe','esposizione','guida','informazioni','evento','confront','schermo','descrizione','caric',
-              'campione','coordinate','celeste','sessione','lettura','risultati','errore','picco','durezza',
-              'fonte','ufficiale','filtro','filtri','visualizz','nessun','nessuna','tutte','tutti','seleziona',
-              'ripristina','centra','trascina','rotella','secondo','prima ','dopo ','indica','rappresenta',
-              'contiene','serve ','perché','attenzione','totale','media ','deviazione','soglia','classificazione',
-              'catalogo','scaric','locale','prodotto','finestra','conteggi','incertezza','rapporto','ascensione',
-              'declinazione','piano galattico','osservazione','spettro','spettrale','parametri','limiti','misura',
-              'probabilità','riga ','colonna','colonne','metadati','commento','voce ','voci ','unità','indice ',
-              'distribuzione','mediana','singoli ','fascia ','copertura','elaborazione','annull','inclusi','esclusi'
-          ]
-          def italian(s):
-              if not s or len(s.strip()) < 2: return False
-              lower=' '+s.lower().replace('\n',' ')+' '
-              if re.fullmatch(r'[A-Z0-9_./:+#%<>=%×·±−–—→↗↻⌁◎✦⇄! ?()\[\],;*\\-]+', s): return False
-              if re.search(r'[àèéìòù]', lower): return True
-              return any(x in lower for x in markers)
-          literal_re=re.compile(r'"((?:\\.|[^"\\])*)"')
-          missing=[]
-          for path in sorted(ROOT.rglob('*.java')):
-              if path.name == 'I18n.java': continue
-              src=path.read_text(encoding='utf-8')
-              for m in literal_re.finditer(src):
-                  s=unescape(m.group(1))
-                  if not italian(s): continue
-                  prefix=src[max(0,m.start()-260):m.start()]
-                  if re.search(r'I18n\.(?:dynamic|setText)\s*\([^;]{0,240}$', prefix, re.S): continue
-                  if s in mapped: continue
-                  line=src.count('\n',0,m.start())+1
-                  missing.append((str(path),line,s))
-          seen=set(); out=[]
-          for item in missing:
-              key=(item[0],item[2])
-              if key in seen: continue
-              seen.add(key); out.append(item)
-          print(f'UNTRANSLATED_COUNT={len(out)}')
-          for p,l,s in out:
-              print(f'{p}:{l}: {s!r}')
-          if out: raise SystemExit(1)
-          PY
-      - name: Maven verify
+      - name: Maven verify and UI translation coverage
         run: mvn -B verify
       - name: Remove temporary patch files
         run: rm scripts/apply-global-i18n-layout-fixes.py .github/workflows/audit-i18n-temporary.yml
