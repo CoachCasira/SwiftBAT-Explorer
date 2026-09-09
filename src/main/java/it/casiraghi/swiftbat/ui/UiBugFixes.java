@@ -7,6 +7,7 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 
@@ -59,9 +60,36 @@ public final class UiBugFixes {
     }
 
     private static void fixNode(Node node) {
+        fixBoundPrompt(node);
         if (node instanceof HBox toolbar && hasStyle(toolbar, "metadata-field-toolbar")) {
             fixMetadataSearch(toolbar);
         }
+    }
+
+    /**
+     * JavaFX crea internamente un FakeFocusTextField per i ComboBox editabili e ne
+     * lega la promptTextProperty al controllo proprietario. I18n.localizeTree visita
+     * anche questi nodi interni; chiamare setPromptText su una property bound genera
+     * IllegalArgumentException ("A bound value cannot be set").
+     *
+     * Il nodo interno non ha bisogno di mantenere quel binding: il prompt visibile
+     * viene gia' gestito dal ComboBox/editor. Lo sblocchiamo appena compare nello
+     * scene graph, prima che il localizzatore possa provare a modificarlo.
+     */
+    private static void fixBoundPrompt(Node node) {
+        if (!(node instanceof TextInputControl input)) return;
+        if (!input.promptTextProperty().isBound()) return;
+        if (!isInsideEditableCombo(node)) return;
+        input.promptTextProperty().unbind();
+    }
+
+    private static boolean isInsideEditableCombo(Node node) {
+        Parent parent = node == null ? null : node.getParent();
+        while (parent != null) {
+            if (parent instanceof ComboBox<?> combo) return combo.isEditable();
+            parent = parent.getParent();
+        }
+        return false;
     }
 
     /**
