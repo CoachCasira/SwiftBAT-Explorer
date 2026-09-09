@@ -1,6 +1,7 @@
 package it.casiraghi.swiftbat.ui.components;
 
 import it.casiraghi.swiftbat.ui.I18n;
+import it.casiraghi.swiftbat.ui.UiTranslations;
 
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -10,9 +11,9 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.FontMetrics;
-import java.awt.GradientPaint;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.LinearGradientPaint;
 import java.awt.Point;
 import java.awt.Polygon;
 import java.awt.RenderingHints;
@@ -33,6 +34,11 @@ public final class Java2DGroupedBarPanel extends JPanel {
     private static final Color TEXT = new Color(226, 236, 253);
     private static final Color MUTED = new Color(137, 159, 198);
     private static final Color TOOLTIP_BG = new Color(9, 18, 38, 240);
+
+    // Exact palette used by the 2D spectroscopy bars.
+    private static final Color SPECTRAL_CYAN = new Color(17, 207, 233);
+    private static final Color SPECTRAL_BLUE = new Color(40, 127, 242);
+    private static final Color SPECTRAL_PURPLE = new Color(174, 93, 244);
 
     private Dataset dataset = Dataset.empty();
     private final List<BarHit> bars = new ArrayList<>();
@@ -98,6 +104,7 @@ public final class Java2DGroupedBarPanel extends JPanel {
                 zoom = clamp(zoom * Math.pow(1.08, -event.getPreciseWheelRotation()), 0.68, 1.55);
                 hover = null;
                 repaint();
+                event.consume();
             }
         };
         addMouseListener(mouse);
@@ -130,20 +137,16 @@ public final class Java2DGroupedBarPanel extends JPanel {
         try {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-            g.setPaint(new GradientPaint(0, 0, BACKGROUND_TOP, 0, getHeight(), BACKGROUND_BOTTOM));
+            g.setPaint(new java.awt.GradientPaint(0, 0, BACKGROUND_TOP, 0, getHeight(), BACKGROUND_BOTTOM));
             g.fillRect(0, 0, getWidth(), getHeight());
-            if (dataset.isEmpty()) {
-                paintEmpty(g);
-            } else {
-                paintChart(g);
-            }
+            if (dataset.isEmpty()) paintEmpty(g); else paintChart(g);
         } finally {
             g.dispose();
         }
     }
 
     private void paintEmpty(Graphics2D g) {
-        String text = "Nessun dato disponibile per questa distribuzione 3D.";
+        String text = UiTranslations.t("Nessun dato disponibile per questa distribuzione 3D.");
         g.setColor(MUTED);
         g.setFont(new Font("SansSerif", Font.PLAIN, 15));
         FontMetrics metrics = g.getFontMetrics();
@@ -225,14 +228,29 @@ public final class Java2DGroupedBarPanel extends JPanel {
         Polygon side = polygon(frontBottomRight, backBottomRight, backTopRight, frontTopRight);
         Polygon top = polygon(frontTopLeft, frontTopRight, backTopRight, backTopLeft);
 
-        g.setColor(withAlpha(color, count == 0 ? 35 : 205));
-        g.fill(front);
-        g.setColor(withAlpha(darken(color, 0.72), count == 0 ? 25 : 190));
-        g.fill(side);
-        g.setColor(withAlpha(lighten(color, 0.24), count == 0 ? 45 : 220));
-        g.fill(top);
+        if (dataset.spectralGradient() && count != 0) {
+            float bottomY = (float) Math.max(frontBottomLeft.getY(), frontBottomRight.getY());
+            float topY = (float) Math.min(frontTopLeft.getY(), frontTopRight.getY());
+            if (Math.abs(bottomY - topY) < 1f) topY = bottomY - 1f;
+            g.setPaint(new LinearGradientPaint(0f, bottomY, 0f, topY,
+                    new float[]{0f, 0.55f, 1f},
+                    new Color[]{SPECTRAL_CYAN, SPECTRAL_BLUE, SPECTRAL_PURPLE}));
+            g.fill(front);
+            g.setColor(darken(SPECTRAL_BLUE, 0.72));
+            g.fill(side);
+            g.setColor(lighten(SPECTRAL_PURPLE, 0.18));
+            g.fill(top);
+            g.setColor(withAlpha(SPECTRAL_CYAN, 245));
+        } else {
+            g.setColor(withAlpha(color, count == 0 ? 35 : 205));
+            g.fill(front);
+            g.setColor(withAlpha(darken(color, 0.72), count == 0 ? 25 : 190));
+            g.fill(side);
+            g.setColor(withAlpha(lighten(color, 0.24), count == 0 ? 45 : 220));
+            g.fill(top);
+            g.setColor(withAlpha(color, count == 0 ? 70 : 245));
+        }
 
-        g.setColor(withAlpha(color, count == 0 ? 70 : 245));
         g.setStroke(new BasicStroke(1.1f));
         g.draw(front);
         g.draw(side);
@@ -258,18 +276,18 @@ public final class Java2DGroupedBarPanel extends JPanel {
         double width = 1.0 / dataset.categories().length;
         for (int category = 0; category < dataset.categories().length; category++) {
             Point2D point = geometry.project((category + 0.5) * width, 0, 0);
-            String label = dataset.categories()[category];
+            String label = UiTranslations.t(dataset.categories()[category]);
             int textWidth = g.getFontMetrics().stringWidth(label);
             g.drawString(label, (float) point.getX() - textWidth / 2f, (float) point.getY() + 20);
         }
 
         g.setFont(new Font("SansSerif", Font.BOLD, 12));
         g.setColor(TEXT);
-        String xLabel = I18n.t(dataset.xAxisLabel());
+        String xLabel = UiTranslations.t(dataset.xAxisLabel());
         g.drawString(xLabel,
                 (float) ((origin.getX() + xEnd.getX()) / 2.0 - g.getFontMetrics().stringWidth(xLabel) / 2.0),
                 (float) Math.max(origin.getY(), xEnd.getY()) + 43);
-        String yLabel = I18n.t(dataset.valueLabel());
+        String yLabel = UiTranslations.t(dataset.valueLabel());
         Graphics2D verticalAxis = (Graphics2D) g.create();
         verticalAxis.rotate(-Math.PI / 2);
         double yCenter = (origin.getY() + yEnd.getY()) / 2.0;
@@ -279,22 +297,26 @@ public final class Java2DGroupedBarPanel extends JPanel {
                 (float) labelX);
         verticalAxis.dispose();
         g.setColor(new Color(198, 174, 250));
-        g.drawString(I18n.t(dataset.depthAxisLabel()), (float) zEnd.getX() - 20, (float) zEnd.getY() - 10);
+        g.drawString(UiTranslations.t(dataset.depthAxisLabel()), (float) zEnd.getX() - 20, (float) zEnd.getY() - 10);
 
         g.setFont(new Font("SansSerif", Font.BOLD, 11));
         for (int group = 0; group < dataset.groups().length; group++) {
             double z = dataset.groups().length == 1 ? 0.18 : group / (double) (dataset.groups().length - 1);
             Point2D point = geometry.project(1, 0, z);
-            g.setColor(dataset.colors()[group]);
+            g.setColor(legendColor(group));
             g.fillOval((int) point.getX() + 8, (int) point.getY() - 4, 8, 8);
-            g.drawString(I18n.t(dataset.groups()[group]), (float) point.getX() + 21, (float) point.getY() + 4);
+            g.drawString(UiTranslations.t(dataset.groups()[group]), (float) point.getX() + 21, (float) point.getY() + 4);
         }
+    }
+
+    private Color legendColor(int group) {
+        return dataset.spectralGradient() ? SPECTRAL_BLUE : dataset.colors()[group];
     }
 
     private void paintHint(Graphics2D g) {
         g.setFont(new Font("SansSerif", Font.PLAIN, 10));
         g.setColor(new Color(MUTED.getRed(), MUTED.getGreen(), MUTED.getBlue(), 185));
-        g.drawString(I18n.t("Trascina: ruota prospettiva   ·   Rotella: zoom   ·   Doppio clic: centra"),
+        g.drawString(UiTranslations.t("Trascina: ruota prospettiva   ·   Rotella: zoom   ·   Doppio clic: centra"),
                 18, getHeight() - 17);
     }
 
@@ -314,9 +336,9 @@ public final class Java2DGroupedBarPanel extends JPanel {
 
     private void paintTooltip(Graphics2D g, BarHit selected) {
         String[] lines = {
-                I18n.t(dataset.groups()[selected.group()]),
-                I18n.t(dataset.xAxisLabel()) + ": " + I18n.t(dataset.categories()[selected.category()]),
-                I18n.t(dataset.valueLabel()) + ": " + selected.count()
+                UiTranslations.t(dataset.groups()[selected.group()]),
+                UiTranslations.t(dataset.xAxisLabel()) + ": " + UiTranslations.t(dataset.categories()[selected.category()]),
+                UiTranslations.t(dataset.valueLabel()) + ": " + selected.count()
         };
         g.setFont(new Font("SansSerif", Font.PLAIN, 12));
         FontMetrics metrics = g.getFontMetrics();
@@ -329,7 +351,7 @@ public final class Java2DGroupedBarPanel extends JPanel {
 
         g.setColor(TOOLTIP_BG);
         g.fillRoundRect(x, y, width, height, 14, 14);
-        g.setColor(dataset.colors()[selected.group()]);
+        g.setColor(legendColor(selected.group()));
         g.setStroke(new BasicStroke(1.2f));
         g.drawRoundRect(x, y, width, height, 14, 14);
         g.setFont(new Font("SansSerif", Font.BOLD, 12));
@@ -367,7 +389,8 @@ public final class Java2DGroupedBarPanel extends JPanel {
     }
 
     public record Dataset(String[] categories, String[] groups, int[][] counts, Color[] colors,
-                          String xAxisLabel, String depthAxisLabel, String valueLabel) {
+                          String xAxisLabel, String depthAxisLabel, String valueLabel,
+                          boolean spectralGradient) {
         public Dataset {
             categories = categories == null ? new String[0] : categories;
             groups = groups == null ? new String[0] : groups;
@@ -379,12 +402,19 @@ public final class Java2DGroupedBarPanel extends JPanel {
         }
 
         public Dataset(String[] categories, String[] groups, int[][] counts, Color[] colors,
+                       String xAxisLabel, String depthAxisLabel, String valueLabel) {
+            this(categories, groups, counts, colors, xAxisLabel, depthAxisLabel, valueLabel,
+                    isSpectralFlux(valueLabel));
+        }
+
+        public Dataset(String[] categories, String[] groups, int[][] counts, Color[] colors,
                        String xAxisLabel, String depthAxisLabel) {
-            this(categories, groups, counts, colors, xAxisLabel, depthAxisLabel, "Numero di GRB");
+            this(categories, groups, counts, colors, xAxisLabel, depthAxisLabel, "Numero di GRB", false);
         }
 
         public static Dataset empty() {
-            return new Dataset(new String[0], new String[0], new int[0][], new Color[0], "Intervallo", "Gruppo");
+            return new Dataset(new String[0], new String[0], new int[0][], new Color[0],
+                    "Intervallo", "Gruppo", "Numero di GRB", false);
         }
 
         public boolean isEmpty() {
@@ -404,12 +434,17 @@ public final class Java2DGroupedBarPanel extends JPanel {
             int[][] copied = new int[counts.length][];
             for (int index = 0; index < counts.length; index++) copied[index] = Arrays.copyOf(counts[index], counts[index].length);
             return new Dataset(Arrays.copyOf(categories, categories.length), Arrays.copyOf(groups, groups.length),
-                    copied, Arrays.copyOf(colors, colors.length), xAxisLabel, depthAxisLabel, valueLabel);
+                    copied, Arrays.copyOf(colors, colors.length), xAxisLabel, depthAxisLabel, valueLabel, spectralGradient);
+        }
+
+        private static boolean isSpectralFlux(String valueLabel) {
+            if (valueLabel == null) return false;
+            String lower = valueLabel.toLowerCase(java.util.Locale.ROOT);
+            return lower.contains("flusso energetico") || lower.contains("energy flux");
         }
     }
 
-    private record BarHit(Polygon shape, int group, int category, int count, Point2D anchor) {
-    }
+    private record BarHit(Polygon shape, int group, int category, int count, Point2D anchor) { }
 
     private static final class Geometry {
         private final double plotWidth;
