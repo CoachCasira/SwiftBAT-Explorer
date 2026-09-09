@@ -64,8 +64,6 @@ public final class AboutPage extends ScrollPane {
         VBox reading = infoCard("Lettura dei risultati",
                 "Grafici, mappe, filtri e assistenti di lettura servono a mettere in evidenza pattern e differenze nel campione. Le viste 2D e 3D sono strumenti esplorativi e mantengono sempre separata la rappresentazione grafica dall'interpretazione fisica.");
 
-        // Tutte le sei card condividono la stessa griglia: le tre righe sono quindi
-        // perfettamente allineate, anche ridimensionando la finestra.
         cards.add(data, 0, 0);
         cards.add(curves, 1, 0);
         cards.add(sky, 0, 1);
@@ -88,13 +86,16 @@ public final class AboutPage extends ScrollPane {
         I18n.setText(creditText,
                 "Realizzato da Matteo Casiraghi · UniBG",
                 "Realized by Matteo Casiraghi · UniBG");
-        VBox creditCopy = new VBox(2,
-                creditText,
-                UiFactory.label("SwiftBAT Explorer · thesis project", "info-credit-subtitle"));
-        HBox credit = new HBox(10, new UniBgMarkPane(38), creditCopy);
+        creditText.setStyle("-fx-font-size: 11px; -fx-font-weight: 700;");
+
+        Label creditSubtitle = UiFactory.label("SwiftBAT Explorer · thesis project", "info-credit-subtitle");
+        creditSubtitle.setStyle("-fx-font-size: 9px;");
+
+        VBox creditCopy = new VBox(1, creditText, creditSubtitle);
+        HBox credit = new HBox(7, new UniBgMarkPane(27), creditCopy);
         credit.getStyleClass().add("info-credit-card");
         credit.setAlignment(Pos.CENTER_LEFT);
-        credit.setPadding(new Insets(10, 14, 10, 14));
+        credit.setPadding(new Insets(6, 10, 6, 10));
 
         HBox footer = new HBox(18, actions, UiFactory.spacer(), credit);
         footer.setAlignment(Pos.CENTER_LEFT);
