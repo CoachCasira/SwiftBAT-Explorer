@@ -1,0 +1,38 @@
+name: Completa feedback relatori
+
+on:
+  push:
+    branches:
+      - feature/analysis-population-1.3.0
+    paths:
+      - scripts/apply_professor_feedback_2.py
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: feature/analysis-population-1.3.0
+          fetch-depth: 0
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - name: Completa modifiche
+        run: python3 scripts/apply_professor_feedback_2.py
+      - name: Verifica Maven
+        run: mvn --batch-mode --no-transfer-progress verify
+      - name: Commit e push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Completa feedback relatori su descrizioni e localizzazione"
+          git push origin HEAD:feature/analysis-population-1.3.0
