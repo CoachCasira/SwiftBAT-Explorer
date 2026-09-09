@@ -28,6 +28,7 @@ public final class UiTranslationExtras {
         // Population filters and dynamic toggle captions.
         put("Filtri avanzati: z e area di cielo", "Advanced filters: z and sky area");
         put("Nascondi filtri avanzati", "Hide advanced filters");
+        put("Mostra filtri", "Show filters");
         put("Intervallo redshift z", "Redshift z range");
         put("Ascensione retta RA", "Right ascension RA");
         put("Declinazione DEC", "Declination DEC");
