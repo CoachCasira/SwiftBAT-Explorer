@@ -21,6 +21,8 @@ public final class SwiftBatExplorerApp extends Application {
                 SwiftBatExplorerApp.class.getResource("/black-hole-theme.css").toExternalForm());
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/reference-redesign.css").toExternalForm());
+        scene.getStylesheets().add(
+                SwiftBatExplorerApp.class.getResource("/reference-redesign-final.css").toExternalForm());
 
         stage.setTitle("SwiftBAT Explorer 1.3.0 — Reference UI Preview");
         var iconStream = SwiftBatExplorerApp.class.getResourceAsStream("/app-icon.png");

@@ -11,6 +11,8 @@ import it.casiraghi.swiftbat.service.SkyCatalogService;
 import it.casiraghi.swiftbat.service.SpectralCatalogService;
 import it.casiraghi.swiftbat.service.SwiftCatalogService;
 import it.casiraghi.swiftbat.ui.components.BlackHoleBackdropPane;
+import it.casiraghi.swiftbat.ui.components.LanguageFlagIcon;
+import it.casiraghi.swiftbat.ui.components.OrbitLogoPane;
 import javafx.application.HostServices;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -144,7 +146,6 @@ public final class MainView {
         Button home = navButton("⌂", "Home", "home");
         Button explorer = navButton("⌕", "Esplora", "explorer");
         Button sky = navButton("◇", "Mappa celeste", "sky");
-        Button spectroscopy = navButton("⌁", "Spettroscopia", "spectroscopy");
         Button population = navButton("≋", "Analisi di popolazione", "population");
         Button compare = navButton("⇄", "Confronta", "compare");
         Button about = navButton("ⓘ", "Info", "about");
@@ -154,8 +155,15 @@ public final class MainView {
 
         Separator separator = new Separator();
         separator.getStyleClass().add("soft-separator");
+
+        OrbitLogoPane footerLogo = new OrbitLogoPane();
+        footerLogo.setMinSize(27, 27);
+        footerLogo.setPrefSize(27, 27);
+        HBox footerBrand = new HBox(7, footerLogo,
+                UiFactory.label("SwiftBAT Explorer", "nav-footer-title"));
+        footerBrand.setAlignment(Pos.CENTER_LEFT);
         VBox footer = new VBox(4,
-                UiFactory.label("◉  SwiftBAT Explorer", "nav-footer-title"),
+                footerBrand,
                 UiFactory.label("v1.3.0", "nav-footer-version"),
                 UiFactory.label("INAF – OAS Bologna", "nav-footer-line"),
                 UiFactory.wrappedLabel("Un progetto per la scienza aperta", "nav-footer-line"));
@@ -167,7 +175,7 @@ public final class MainView {
         source.setMaxWidth(Double.MAX_VALUE);
         source.setOnAction(event -> hostServices.showDocument(SwiftCatalogService.CATALOG_URL));
 
-        navigation.getChildren().addAll(home, explorer, sky, spectroscopy, population, compare, about,
+        navigation.getChildren().addAll(home, explorer, sky, population, compare, about,
                 spacer, separator, footer, online, source);
         return navigation;
     }
@@ -197,15 +205,17 @@ public final class MainView {
     }
 
     private Node buildTopBar() {
-        HBox bar = new HBox(12);
+        HBox bar = new HBox(8);
         bar.getStyleClass().add("top-bar");
-        bar.setPadding(new Insets(9, 16, 9, 16));
+        bar.setPadding(new Insets(7, 12, 7, 12));
         bar.setAlignment(Pos.CENTER_LEFT);
 
-        HBox brand = new HBox(9);
+        HBox brand = new HBox(7);
         brand.getStyleClass().add("top-brand");
         brand.setAlignment(Pos.CENTER_LEFT);
-        Label logo = UiFactory.label("◉", "top-orbit-logo");
+        OrbitLogoPane logo = new OrbitLogoPane();
+        logo.setMinSize(38, 38);
+        logo.setPrefSize(40, 40);
         VBox brandCopy = new VBox(0,
                 UiFactory.label("SwiftBAT Explorer", "top-brand-title"),
                 UiFactory.label("Esplora i lampi di raggi gamma", "top-brand-subtitle"));
@@ -214,24 +224,27 @@ public final class MainView {
         TextField globalSearch = new TextField();
         globalSearch.getStyleClass().add("global-search-field");
         globalSearch.setPromptText("⌕   Cerca un GRB (es. GRB250605A, 231107A, …)");
-        globalSearch.setPrefWidth(560);
-        globalSearch.setMaxWidth(Double.MAX_VALUE);
+        globalSearch.setMinWidth(245);
+        globalSearch.setPrefWidth(410);
+        globalSearch.setMaxWidth(520);
         HBox.setHgrow(globalSearch, Priority.ALWAYS);
         globalSearch.setOnAction(event -> runGlobalSearch(globalSearch));
 
-        Button dataset = topActionButton("▱", "Dataset");
+        Button dataset = topActionButton("▱", "Dataset", 78);
         dataset.setOnAction(event -> navigate("explorer"));
-        Button tools = topActionButton("⌁", "Strumenti");
+        Button tools = topActionButton("⌁", "Strumenti", 88);
         tools.setOnAction(event -> navigate("compare"));
-        Button guide = topActionButton("?", "Guida");
+        Button guide = topActionButton("?", "Guida", 68);
         guide.setOnAction(event -> navigate("about"));
 
         Button refresh = UiFactory.iconButton("↻", "Aggiorna il catalogo online");
+        refresh.getStyleClass().add("top-square-action");
         refresh.setOnAction(event -> {
             loadCatalog();
             loadSpectralCatalog(true);
         });
         Button official = UiFactory.iconButton("⚙", "Apri il catalogo ufficiale");
+        official.getStyleClass().add("top-square-action");
         official.setOnAction(event -> hostServices.showDocument(SwiftCatalogService.CATALOG_URL));
 
         ToggleButton italian = new ToggleButton("IT");
@@ -244,14 +257,18 @@ public final class MainView {
         if (I18n.language() == I18n.Language.EN) english.setSelected(true); else italian.setSelected(true);
         italian.setOnAction(event -> I18n.setLanguage(I18n.Language.IT));
         english.setOnAction(event -> I18n.setLanguage(I18n.Language.EN));
-        HBox languageBox = new HBox(2, italian, english);
+
+        HBox languageBox = new HBox(4,
+                languageChoice(italian, LanguageFlagIcon.Flag.ITALY),
+                languageChoice(english, LanguageFlagIcon.Flag.UNITED_KINGDOM));
+        languageBox.setAlignment(Pos.CENTER);
         languageBox.getStyleClass().add("language-switch");
         I18n.languageProperty().addListener((obs, oldValue, newValue) -> Platform.runLater(() -> {
             I18n.localizeTree(root);
             updateCacheStatus();
         }));
 
-        HBox telemetry = new HBox(5, catalogStatus, sessionStatus, connectionStatus);
+        HBox telemetry = new HBox(4, catalogStatus, sessionStatus, connectionStatus);
         telemetry.getStyleClass().add("top-telemetry");
         telemetry.setAlignment(Pos.CENTER_RIGHT);
 
@@ -260,9 +277,19 @@ public final class MainView {
         return bar;
     }
 
-    private Button topActionButton(String glyph, String text) {
+    private VBox languageChoice(ToggleButton toggle, LanguageFlagIcon.Flag flag) {
+        LanguageFlagIcon icon = new LanguageFlagIcon(flag);
+        VBox box = new VBox(1, toggle, icon);
+        box.getStyleClass().add("language-choice");
+        box.setAlignment(Pos.CENTER);
+        return box;
+    }
+
+    private Button topActionButton(String glyph, String text, double minWidth) {
         Button button = UiFactory.button(glyph + "  " + text, "top-nav-button");
         button.setFocusTraversable(false);
+        button.setMinWidth(minWidth);
+        button.setPrefWidth(minWidth);
         return button;
     }
 
@@ -294,10 +321,6 @@ public final class MainView {
         Node node = switch (page) {
             case "explorer" -> {
                 explorerPage.showTab("Curva 2D");
-                yield explorerPage;
-            }
-            case "spectroscopy" -> {
-                explorerPage.showTab("Spettroscopia");
                 yield explorerPage;
             }
             case "compare" -> comparePage;

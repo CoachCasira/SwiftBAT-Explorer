@@ -1,0 +1,152 @@
+/* Final refinements for the accepted reference redesign. Loaded last. */
+
+/* ---------- Compact top bar for 13-inch displays ---------- */
+.reference-redesign .top-bar {
+    -fx-min-height: 74px;
+    -fx-pref-height: 74px;
+    -fx-spacing: 8px;
+}
+
+.reference-redesign .top-brand {
+    -fx-min-width: 220px;
+    -fx-pref-width: 232px;
+    -fx-max-width: 242px;
+    -fx-padding: 0 4px 0 0;
+}
+
+.reference-redesign .orbit-logo-pane {
+    -fx-effect: dropshadow(gaussian, rgba(101, 84, 255, 0.55), 13, 0.35, 0, 0);
+}
+
+.reference-redesign .top-brand-title {
+    -fx-font-size: 16px;
+}
+
+.reference-redesign .top-brand-subtitle {
+    -fx-font-size: 8px;
+}
+
+.reference-redesign .global-search-field {
+    -fx-min-width: 245px;
+    -fx-pref-width: 410px;
+    -fx-max-width: 520px;
+    -fx-min-height: 38px;
+    -fx-pref-height: 38px;
+    -fx-padding: 0 11px;
+}
+
+.reference-redesign .top-nav-button {
+    -fx-font-size: 10px;
+    -fx-padding: 9px 7px;
+    -fx-content-display: left;
+}
+
+.reference-redesign .top-telemetry {
+    -fx-spacing: 3px;
+}
+
+.reference-redesign .top-telemetry .top-info,
+.reference-redesign .top-telemetry .status-pill {
+    -fx-font-size: 7px;
+    -fx-padding: 4px 6px;
+}
+
+.reference-redesign .language-switch {
+    -fx-padding: 2px 3px;
+    -fx-spacing: 4px;
+    -fx-alignment: center;
+    -fx-background-color: rgba(5, 17, 38, 0.94);
+    -fx-border-color: rgba(60, 132, 194, 0.34);
+    -fx-border-radius: 9px;
+    -fx-background-radius: 9px;
+}
+
+.reference-redesign .language-choice {
+    -fx-alignment: center;
+    -fx-spacing: 1px;
+    -fx-padding: 1px 2px;
+}
+
+.reference-redesign .language-toggle {
+    -fx-min-width: 28px;
+    -fx-pref-width: 28px;
+    -fx-min-height: 23px;
+    -fx-pref-height: 23px;
+    -fx-padding: 2px 4px;
+    -fx-font-size: 9px;
+    -fx-font-weight: 800;
+}
+
+.reference-redesign .language-flag-icon {
+    -fx-opacity: 0.96;
+}
+
+.reference-redesign .top-square-action {
+    -fx-min-width: 37px;
+    -fx-pref-width: 37px;
+    -fx-max-width: 37px;
+    -fx-min-height: 37px;
+    -fx-pref-height: 37px;
+    -fx-padding: 0;
+}
+
+/* ---------- Shared neon treatment for every 3D visualization ---------- */
+.reference-redesign .three-d-panel,
+.reference-redesign .sky-map-surface {
+    -fx-background-color:
+        radial-gradient(center 78% 18%, radius 62%, rgba(107, 54, 217, 0.13), transparent),
+        linear-gradient(to bottom right, rgba(3, 14, 32, 0.98), rgba(2, 9, 23, 0.99));
+    -fx-background-radius: 11px;
+    -fx-border-radius: 11px;
+    -fx-border-width: 1px;
+    -fx-border-color: rgba(31, 194, 238, 0.58) rgba(122, 73, 239, 0.58) rgba(226, 63, 215, 0.46) rgba(31, 194, 238, 0.58);
+    -fx-effect: dropshadow(gaussian, rgba(41, 84, 196, 0.24), 18, 0.20, 0, 5);
+}
+
+.reference-redesign .three-d-viewer {
+    -fx-background-color: linear-gradient(to bottom, #060d1d, #091730);
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-border-color: rgba(47, 126, 202, 0.32);
+}
+
+.reference-redesign .three-d-header,
+.reference-redesign .three-d-footer {
+    -fx-background-color: rgba(3, 16, 36, 0.91);
+    -fx-border-color: rgba(45, 136, 207, 0.32);
+}
+
+.reference-redesign .three-d-header {
+    -fx-background-radius: 10px 10px 0 0;
+    -fx-border-width: 0 0 1px 0;
+}
+
+.reference-redesign .three-d-footer {
+    -fx-background-radius: 0 0 10px 10px;
+    -fx-border-width: 1px 0 0 0;
+    -fx-padding: 9px 12px;
+}
+
+.reference-redesign .three-d-context,
+.reference-redesign .three-d-zoom-inline,
+.reference-redesign .sky-zoom-label {
+    -fx-background-color: rgba(9, 30, 59, 0.92);
+    -fx-background-radius: 999px;
+    -fx-border-color: rgba(44, 207, 242, 0.42);
+    -fx-border-radius: 999px;
+    -fx-text-fill: #bfefff;
+    -fx-padding: 5px 9px;
+}
+
+.reference-redesign .three-d-panel .choice-box-modern,
+.reference-redesign .three-d-panel .secondary-button,
+.reference-redesign .sky-map-surface .secondary-button {
+    -fx-background-color: rgba(5, 20, 43, 0.94);
+    -fx-border-color: rgba(51, 178, 232, 0.50);
+    -fx-text-fill: #e5f4ff;
+}
+
+/* Keep the side navigation clean: spectroscopy remains inside Explorer. */
+.reference-redesign .main-navigation {
+    -fx-spacing: 7px;
+}
