@@ -1,0 +1,133 @@
+/*
+ * Final dropdown pass.
+ * Loaded after the reference redesign so every selector/filter uses the same
+ * compact geometry and the arrow can never cover the selected value.
+ */
+
+.reference-redesign .choice-box,
+.reference-redesign .choice-box.choice-box-modern,
+.reference-redesign .combo-box-base,
+.reference-redesign .combo-box,
+.reference-redesign .menu-button.choice-box-modern {
+    -fx-min-height: 38px;
+    -fx-pref-height: 38px;
+    -fx-max-height: 38px;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+    -fx-background-color: linear-gradient(to bottom, rgba(8, 24, 47, 0.98), rgba(5, 17, 36, 0.98));
+    -fx-background-radius: 10px;
+    -fx-border-color: rgba(24, 166, 218, 0.72);
+    -fx-border-width: 1px;
+    -fx-border-radius: 10px;
+    -fx-effect: none;
+}
+
+.reference-redesign .choice-box:hover,
+.reference-redesign .choice-box.choice-box-modern:hover,
+.reference-redesign .combo-box-base:hover,
+.reference-redesign .combo-box:hover,
+.reference-redesign .menu-button.choice-box-modern:hover {
+    -fx-border-color: rgba(44, 211, 242, 0.92);
+    -fx-background-color: linear-gradient(to bottom, rgba(10, 31, 58, 0.99), rgba(6, 21, 43, 0.99));
+}
+
+.reference-redesign .choice-box:focused,
+.reference-redesign .choice-box:showing,
+.reference-redesign .combo-box-base:focused,
+.reference-redesign .combo-box-base:showing,
+.reference-redesign .menu-button.choice-box-modern:focused,
+.reference-redesign .menu-button.choice-box-modern:showing {
+    -fx-border-color: #27d8f3;
+    -fx-effect: dropshadow(gaussian, rgba(39, 216, 243, 0.18), 8, 0.15, 0, 0);
+}
+
+/* Selected value: one clean surface, no coloured block behind the text. */
+.reference-redesign .choice-box > .label,
+.reference-redesign .choice-box.choice-box-modern > .label,
+.reference-redesign .menu-button.choice-box-modern > .label,
+.reference-redesign .combo-box-base > .list-cell,
+.reference-redesign .combo-box > .list-cell {
+    -fx-min-width: 0;
+    -fx-max-width: infinity;
+    -fx-padding: 0 11px 0 12px;
+    -fx-background-color: transparent;
+    -fx-background-radius: 9px 0 0 9px;
+    -fx-text-fill: #edf6ff;
+    -fx-font-weight: 600;
+    -fx-alignment: center-left;
+    -fx-text-overrun: ellipsis;
+}
+
+/* The right side is a fixed, narrow arrow lane with a subtle separator. */
+.reference-redesign .choice-box > .open-button,
+.reference-redesign .choice-box.choice-box-modern > .open-button,
+.reference-redesign .combo-box-base > .arrow-button,
+.reference-redesign .combo-box > .arrow-button,
+.reference-redesign .menu-button.choice-box-modern > .arrow-button {
+    -fx-min-width: 32px;
+    -fx-pref-width: 32px;
+    -fx-max-width: 32px;
+    -fx-min-height: 36px;
+    -fx-pref-height: 36px;
+    -fx-max-height: 36px;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+    -fx-background-color: rgba(9, 29, 55, 0.98);
+    -fx-background-radius: 0 9px 9px 0;
+    -fx-border-color: transparent transparent transparent rgba(45, 137, 191, 0.46);
+    -fx-border-width: 0 0 0 1px;
+    -fx-alignment: center;
+}
+
+/* Explicitly size the triangle instead of using padding: this fixes the huge
+   white arrows visible in T90, redshift, maximum sample and metadata filters. */
+.reference-redesign .choice-box > .open-button > .arrow,
+.reference-redesign .choice-box.choice-box-modern > .open-button > .arrow,
+.reference-redesign .combo-box-base > .arrow-button > .arrow,
+.reference-redesign .combo-box > .arrow-button > .arrow,
+.reference-redesign .menu-button.choice-box-modern > .arrow-button > .arrow {
+    -fx-padding: 0;
+    -fx-min-width: 8px;
+    -fx-pref-width: 8px;
+    -fx-max-width: 8px;
+    -fx-min-height: 5px;
+    -fx-pref-height: 5px;
+    -fx-max-height: 5px;
+    -fx-shape: "M 0 0 L 8 0 L 4 5 Z";
+    -fx-scale-shape: false;
+    -fx-background-color: #bcd8ef;
+    -fx-effect: none;
+}
+
+.reference-redesign .choice-box:hover > .open-button > .arrow,
+.reference-redesign .combo-box-base:hover > .arrow-button > .arrow,
+.reference-redesign .menu-button.choice-box-modern:hover > .arrow-button > .arrow {
+    -fx-background-color: #eff9ff;
+}
+
+/* Editable selectors (metadata / compare) keep their editor clear of the arrow
+   without the oversized 44 px padding used by the previous pass. */
+.reference-redesign .combo-box-base:editable > .text-field,
+.reference-redesign .combo-box:editable > .text-field,
+.reference-redesign .compare-combo:editable > .text-field,
+.reference-redesign .metadata-search-combo:editable > .text-field {
+    -fx-padding: 0 10px 0 12px;
+    -fx-background-insets: 0;
+    -fx-background-color: transparent;
+    -fx-text-fill: #edf6ff;
+    -fx-prompt-text-fill: #7890ad;
+}
+
+.reference-redesign .choice-box:disabled,
+.reference-redesign .combo-box-base:disabled,
+.reference-redesign .menu-button.choice-box-modern:disabled {
+    -fx-opacity: 0.62;
+}
+
+/* Compact menus used as filters should stay visually aligned with ChoiceBox. */
+.reference-redesign .population-filter-group .choice-box-modern,
+.reference-redesign .explorer-filter-card .choice-box-modern,
+.reference-redesign .metadata-field-toolbar .choice-box-modern,
+.reference-redesign .compare-control-bar .choice-box-modern {
+    -fx-font-size: 12px;
+}
