@@ -146,6 +146,34 @@
     -fx-text-fill: #e5f4ff;
 }
 
+/* ---------- Scientific palette: same meaning = same color in 2D and 3D ---------- */
+.reference-redesign .spectral-model-chart .chart-series-line {
+    -fx-stroke: #12dff7;
+    -fx-stroke-width: 3px;
+    -fx-effect: dropshadow(gaussian, rgba(18, 223, 247, 0.50), 9, 0.34, 0, 0);
+}
+
+.reference-redesign .spectral-model-chart .chart-line-symbol {
+    -fx-background-color: #12dff7, #12dff7;
+}
+
+.reference-redesign .spectral-flux-chart .chart-bar,
+.reference-redesign .bar-chart .chart-bar {
+    -fx-bar-fill: linear-gradient(to top, #11cfe9 0%, #287ff2 55%, #ae5df4 100%);
+}
+
+.reference-redesign .population-legend-single {
+    -fx-background-color: #54d7ff;
+}
+
+.reference-redesign .population-legend-median {
+    -fx-background-color: #f247d3;
+}
+
+.reference-redesign .population-legend-quartile {
+    -fx-background-color: #8b6bff;
+}
+
 /* Keep the side navigation clean: spectroscopy remains inside Explorer. */
 .reference-redesign .main-navigation {
     -fx-spacing: 7px;
