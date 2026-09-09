@@ -107,15 +107,28 @@ public final class TablePreferences {
         List<TableColumn<?, ?>> leaves = new ArrayList<>();
         for (TableColumn<?, ?> column : table.getColumns()) collectLeaves(column, leaves);
         hiddenBar.getChildren().clear();
+
+        boolean hasHidden = false;
         for (TableColumn<?, ?> column : leaves) {
             if (column.isVisible()) continue;
+            hasHidden = true;
             String name = columnName(column);
             Button restore = new Button("+ " + I18n.t(name));
             restore.getStyleClass().add("hidden-column-chip");
             restore.setOnAction(event -> column.setVisible(true));
             hiddenBar.getChildren().add(restore);
         }
-        boolean hasHidden = !hiddenBar.getChildren().isEmpty();
+
+        if (hasHidden) {
+            Button restoreAll = new Button("↶ " + I18n.dynamic("Ripristina tutte", "Restore all"));
+            restoreAll.getStyleClass().addAll("hidden-column-chip", "hidden-column-restore-all");
+            restoreAll.setFocusTraversable(false);
+            restoreAll.setOnAction(event -> {
+                for (TableColumn<?, ?> column : leaves) column.setVisible(true);
+            });
+            hiddenBar.getChildren().add(restoreAll);
+        }
+
         hiddenBar.setVisible(hasHidden);
         hiddenBar.setManaged(hasHidden);
     }
