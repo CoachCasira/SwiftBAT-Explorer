@@ -51,12 +51,24 @@ public final class UiTranslationExtras {
         put("Solo con redshift", "With redshift only");
         put("Solo senza redshift", "Without redshift only");
 
-        // Export dialogs.
+        // Export dialogs and result tables.
         put("Esportazione PNG non riuscita", "PNG export failed");
         put("Nessuna colonna visibile", "No visible columns");
         put("Mostra almeno una colonna prima di esportare.",
                 "Show at least one column before exporting.");
         put("Esportazione Excel non riuscita", "Excel export failed");
+        put("Esporta Excel", "Export Excel");
+        put("GRB inclusi", "Included GRBs");
+
+        // Interactive time-energy map.
+        put("Clic: fissa · trascina: aggiungi · clic in alto: seleziona l'istante · doppio clic: azzera",
+                "Click: pin · drag: add · click the top strip: select time · double-click: reset");
+        put("Area selezionata", "Selected area");
+        put("Celle selezionate", "Selected cells");
+        put("Rate medio", "Mean rate");
+        put("Intervallo temporale", "Time interval");
+        put("Istante", "Time bin");
+        put("Banda dominante", "Dominant band");
 
         // Literal fragments produced by multiline Java strings. The complete
         // sentences already have translations; these entries keep the source
