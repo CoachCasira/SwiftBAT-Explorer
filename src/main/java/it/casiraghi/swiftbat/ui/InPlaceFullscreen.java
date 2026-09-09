@@ -79,8 +79,9 @@ public final class InPlaceFullscreen {
             this.originalExitHint = stage.getFullScreenExitHint();
 
             Button back = UiFactory.button("← Torna all'app", "secondary-button");
-            Label heading = UiFactory.label(title == null || title.isBlank() ? "Schermo intero" : title,
-                    "fullscreen-title");
+            String italianTitle = title == null || title.isBlank() ? "Schermo intero" : title;
+            Label heading = UiFactory.label("", "fullscreen-title");
+            I18n.setText(heading, italianTitle, I18n.english(italianTitle));
             Label shortcut = UiFactory.label("ESC per uscire", "subtle-text");
             Region spacer = new Region();
             HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -120,7 +121,7 @@ public final class InPlaceFullscreen {
                 return wrapFlux2D(content);
             }
             if (normalized.contains("Mappa tempo–energia")) {
-                polishSpectroscopyAssistant(content, normalized);
+                return wrapTimeEnergy(content);
             }
             return content;
         }
@@ -173,6 +174,20 @@ public final class InPlaceFullscreen {
                     "Profondità — serve esclusivamente a separare graficamente le barre. Non è una distanza e non aggiunge una nuova grandezza fisica.",
                     "Interazione — trascina per cambiare prospettiva, usa la rotellina per lo zoom e il pulsante Centra vista per tornare all'inquadratura iniziale.",
                     "Da ricordare — i limiti al 90% restano consultabili nella tabella 2D; la vista 3D mostra i valori centrali del fit ufficiale."
+            );
+            return responsiveReadingLayout(content, reading);
+        }
+
+        private Node wrapTimeEnergy(Node content) {
+            VBox reading = spectroscopyReadingCard(
+                    "Come leggere la mappa",
+                    "Assi — X rappresenta il tempo rispetto al trigger t = 0; Y separa le quattro bande energetiche BAT.",
+                    "Colore — arancio indica un rate netto positivo, blu una fluttuazione negativa dopo la sottrazione del fondo; i toni scuri indicano valori vicini a zero.",
+                    "Dettaglio — spostando il mouse sulla mappa puoi leggere banda energetica, centro del bin, rate e larghezza della banda nel punto osservato.",
+                    "Scala temporale — ogni cella deriva dai rate ASCII a bin di 1 secondo e la finestra visualizzata è la stessa scelta nella scheda Spettroscopia.",
+                    "Confronto tra bande — leggendo verticalmente lo stesso istante puoi confrontare come il rate si distribuisce tra 15–25, 25–50, 50–100 e 100–350 keV. Le differenze di colore evidenziano variazioni relative del segnale tra i canali.",
+                    "Interpretazione — una zona arancione intensa individua un intervallo temporale in cui il rate netto è elevato in quella banda. Il confronto resta descrittivo: per ottenere un flusso fisico servono risposta strumentale e fit spettroscopico.",
+                    "Da ricordare — questa mappa descrive i rate BAT nel tempo: non è un fit XSPEC e non converte direttamente i conteggi in flusso fisico."
             );
             return responsiveReadingLayout(content, reading);
         }
@@ -304,22 +319,21 @@ public final class InPlaceFullscreen {
         }
 
         private VBox readingSection(String paragraph, int index) {
-            String heading = paragraph == null ? "" : paragraph;
-            String body = "";
-            int separator = heading.indexOf(" — ");
-            if (separator >= 0) {
-                body = heading.substring(separator + 3).trim();
-                heading = heading.substring(0, separator).trim();
-            }
+            String italian = paragraph == null ? "" : paragraph;
+            String english = I18n.english(italian);
+            String[] itParts = splitReadingParagraph(italian);
+            String[] enParts = splitReadingParagraph(english);
 
-            Label sectionTitle = UiFactory.label(heading, "assistant-copy");
+            Label sectionTitle = UiFactory.label("", "assistant-copy");
+            I18n.setText(sectionTitle, itParts[0], enParts[0]);
             sectionTitle.setWrapText(true);
             sectionTitle.setMinHeight(Region.USE_PREF_SIZE);
             sectionTitle.setMaxWidth(Double.MAX_VALUE);
             sectionTitle.setStyle("-fx-text-fill: " + READING_COLORS[index % READING_COLORS.length]
                     + "; -fx-font-size: 13.5px; -fx-font-weight: bold;");
 
-            Label sectionBody = UiFactory.wrappedLabel(body, "assistant-copy");
+            Label sectionBody = UiFactory.wrappedLabel("", "assistant-copy");
+            I18n.setText(sectionBody, itParts[1], enParts[1]);
             sectionBody.setMinHeight(Region.USE_PREF_SIZE);
             sectionBody.setMaxWidth(Double.MAX_VALUE);
             sectionBody.setStyle("-fx-text-fill: #e7f0ff; -fx-font-size: 13.2px; -fx-line-spacing: 3px;");
@@ -336,6 +350,13 @@ public final class InPlaceFullscreen {
                             + "-fx-border-radius: 9;"
             );
             return section;
+        }
+
+        private String[] splitReadingParagraph(String paragraph) {
+            String value = paragraph == null ? "" : paragraph;
+            int separator = value.indexOf(" — ");
+            if (separator < 0) return new String[]{value, ""};
+            return new String[]{value.substring(0, separator).trim(), value.substring(separator + 3).trim()};
         }
 
         private void styleReadingTitle(Label label) {

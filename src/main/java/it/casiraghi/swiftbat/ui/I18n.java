@@ -391,6 +391,85 @@ public final class I18n {
         put("Incertezza per energia", "Uncertainty by energy");
         put("Metadato", "Metadata field");
         put("ASCII e FITS", "ASCII and FITS");
+        // UX / i18n hardening 1.3.0 - runtime-generated text and fullscreen copy
+        put("Senza z", "No z");
+        put("non disponibile", "unavailable");
+        put("dal trigger", "from trigger");
+        put("s dal trigger", "s from trigger");
+        put("rispetto al trigger", "relative to trigger");
+        put("Confronta la forma temporale di un gruppo di GRB e descrivi durata, distanza e qualità del campione.",
+                "Compare the temporal shape of a GRB sample and inspect duration, distance and data quality.");
+        put("linee normalizzate e allineate al trigger", "normalized lines aligned to the trigger");
+        put("comportamento centrale del gruppo a ogni secondo", "central behavior of the group at each second");
+        put("tra i due limiti cade il 50% centrale delle curve", "the central 50% of curves lies between the two limits");
+        put("Rate normalizzato (picco = 1)", "Normalized rate (peak = 1)");
+        put("curve normalizzate e allineate a t = 0", "curves normalized and aligned at t = 0");
+        put("GRB corrispondono ai filtri preliminari", "GRBs match the preliminary filters");
+        put("saranno esaminati", "will be examined");
+        put("già in RAM", "already in RAM");
+        put("GRB inclusi su", "GRBs included out of");
+        put("esaminati", "examined");
+        put("copertura rilevata", "observed coverage");
+        put("fuori dal filtro", "outside filter");
+        put("non leggibili", "unreadable");
+        put("Attendo catalogo e metadati scientifici…", "Waiting for catalog and scientific metadata…");
+        put("Caricamento parallelo", "Parallel loading");
+        put("Preparazione confronto…", "Preparing comparison…");
+        put("Modello spettrale", "Spectral model");
+        put("Flusso energetico 3D", "3D energy flux");
+        put("Rate nel tempo per banda", "Rate over time by band");
+        put("vista 3D", "3D view");
+        put("quattro bande ASCII a 1 s", "four 1-s ASCII bands");
+        put("Confronto tra bande — leggendo verticalmente lo stesso istante puoi confrontare come il rate si distribuisce tra 15–25, 25–50, 50–100 e 100–350 keV. Le differenze di colore evidenziano variazioni relative del segnale tra i canali.",
+                "Band comparison — read vertically at the same instant to compare how rate is distributed across 15–25, 25–50, 50–100 and 100–350 keV. Color differences highlight relative signal changes between channels.");
+        put("Interpretazione — una zona arancione intensa individua un intervallo temporale in cui il rate netto è elevato in quella banda. Il confronto resta descrittivo: per ottenere un flusso fisico servono risposta strumentale e fit spettroscopico.",
+                "Interpretation — an intense orange region marks a time interval with high net rate in that band. The comparison is descriptive: instrumental response and spectral fitting are required to obtain physical flux.");
+        put("Esegui un'analisi per ottenere un commento automatico sul campione.",
+                "Run an analysis to obtain an automatic summary of the sample.");
+        put("Il testo deriva solo dalle statistiche del grafico e non sostituisce l'interpretazione scientifica.",
+                "The text is derived only from chart statistics and does not replace scientific interpretation.");
+        put("ANALISI LOCALE · RIPRODUCIBILE", "LOCAL · REPRODUCIBLE ANALYSIS");
+        put("curve incluse: il profilo mediano raggiunge il massimo a t =",
+                "curves included: the median profile reaches its maximum at t =");
+        put("Posizione temporale — Il massimo della mediana cade", "Timing — The median maximum occurs");
+        put("in prossimità del trigger", "near the trigger");
+        put("prima del trigger", "before the trigger");
+        put("dopo il trigger", "after the trigger");
+        put("resta sopra metà massimo per circa", "stays above half maximum for about");
+        put("Il massimo cade sul bordo della finestra: prova una finestra più ampia.",
+                "The maximum lies at the edge of the window: try a wider window.");
+        put("Forma prima/dopo il trigger — Il segnale positivo non è sufficiente per stimare lo sbilanciamento.",
+                "Pre/post-trigger shape — Positive signal is insufficient to estimate the asymmetry.");
+        put("Forma prima/dopo il trigger — La mediana ha più area positiva dopo t = 0: nel campione selezionato prevale una coda post-trigger.",
+                "Pre/post-trigger shape — The median has more positive area after t = 0: the selected sample is dominated by a post-trigger tail.");
+        put("Forma prima/dopo il trigger — La mediana ha più area positiva prima di t = 0: il profilo selezionato è sbilanciato verso il pre-trigger.",
+                "Pre/post-trigger shape — The median has more positive area before t = 0: the selected profile is skewed toward the pre-trigger interval.");
+        put("Forma prima/dopo il trigger — Le aree positive prima e dopo t = 0 sono relativamente bilanciate.",
+                "Pre/post-trigger shape — Positive areas before and after t = 0 are relatively balanced.");
+        put("Variabilità — I percentili disponibili non bastano per stimare la dispersione tra le curve.",
+                "Variability — Available percentiles are insufficient to estimate dispersion between curves.");
+        put("Variabilità — La fascia 25°–75° ha ampiezza media",
+                "Variability — The 25th–75th percentile band has mean width");
+        put("contiene il 50% centrale delle curve e indica una dispersione",
+                "contains the central 50% of curves and indicates");
+        put("contenuta", "low dispersion");
+        put("moderata", "moderate dispersion");
+        put("elevata", "high dispersion");
+        put("Campione —", "Sample —");
+        put("nessun redshift disponibile", "no redshift available");
+        put("redshift per", "redshift for");
+        put("eventi (mediana z =", "events (median z =");
+        put("copertura FRACEXP mediana", "median FRACEXP coverage");
+        put("copertura FRACEXP non stimabile", "FRACEXP coverage cannot be estimated");
+        put("senza T90", "without T90");
+        put("Campione piccolo: mediana e percentili possono cambiare molto aggiungendo pochi eventi.",
+                "Small sample: median and percentiles may change substantially when only a few events are added.");
+        put("eventi esaminati non sono stati letti e non contribuiscono al profilo.",
+                "examined events could not be read and do not contribute to the profile.");
+        put("Il redshift è disponibile solo per il", "Redshift is available for only");
+        put("del campione: la distribuzione z non è completa.", "of the sample: the z distribution is incomplete.");
+        put("Le curve sono divise per il proprio picco: il confronto riguarda la forma relativa, non la luminosità assoluta.",
+                "Curves are divided by their own peak: the comparison concerns relative shape, not absolute luminosity.");
     }
 
     private I18n() {}
@@ -461,8 +540,11 @@ public final class I18n {
     public static String english(String italian) {
         if (italian == null) return null;
         String translated = translateDirect(italian, EN, IT);
-        return translated.equals(italian) && requiresTranslation(italian)
-                ? "[Missing English translation]" : translated;
+        if (!translated.equals(italian)) return translated;
+        if (IT.containsKey(italian)) return italian;
+        String composed = translateComposedEnglish(italian);
+        if (!composed.equals(italian)) return composed;
+        return requiresTranslation(italian) ? "[Missing English translation]" : italian;
     }
 
     public static boolean hasEnglish(String italian) {

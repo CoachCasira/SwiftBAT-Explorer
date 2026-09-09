@@ -16,6 +16,7 @@ import javafx.scene.chart.XYChart;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressIndicator;
 import javafx.scene.control.TextFormatter;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
@@ -37,8 +38,9 @@ import java.util.function.Consumer;
 
 public final class ComparePage extends javafx.scene.layout.BorderPane {
     private static final int MAX_SUGGESTIONS = 15;
-    private static final int VISIBLE_SUGGESTIONS = 4;
+    private static final int VISIBLE_SUGGESTIONS = 2;
     private static final String GHOST_KEY = ComparePage.class.getName() + ".ghostSuggestion";
+    private static final String COMMITTING_KEY = ComparePage.class.getName() + ".committing";
 
     private final ObservableMap<String, GrbData> sessionData;
     private final Consumer<CatalogEntry> loadRequest;
@@ -53,6 +55,7 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
     private final Map<String, CatalogEntry> catalogEntries = new LinkedHashMap<>();
     private final Set<String> requestedLoads = new LinkedHashSet<>();
     private List<String> availableNames = List.of();
+    private int comparisonVersion;
 
     public ComparePage(ObservableMap<String, GrbData> sessionData, Consumer<CatalogEntry> loadRequest) {
         this.sessionData = sessionData;
@@ -180,6 +183,7 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
             }
         });
         combo.setOnAction(event -> {
+            if (Boolean.TRUE.equals(combo.getProperties().get(COMMITTING_KEY))) return;
             String value = combo.getValue();
             if (value != null && availableNames.contains(value)) commitSelection(combo, value);
         });
@@ -203,9 +207,14 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         ghost.suffix().setText(ghostValue.isBlank() ? "" : ghostValue.substring(normalized.length()));
         ghost.box().setVisible(combo.getEditor().isFocused() && !ghostValue.isBlank());
 
+        if (!combo.getEditor().isFocused()) {
+            combo.hide();
+            return;
+        }
         if (matches.size() <= MAX_SUGGESTIONS && !matches.isEmpty() && normalized.length() > 3) {
-            combo.setItems(FXCollections.observableArrayList(matches));
-            if (combo.getEditor().isFocused() && !combo.isShowing()) Platform.runLater(combo::show);
+            List<String> visible = matches.stream().limit(VISIBLE_SUGGESTIONS).toList();
+            combo.setItems(FXCollections.observableArrayList(visible));
+            if (!combo.isShowing()) Platform.runLater(combo::show);
         } else {
             combo.hide();
             combo.setItems(FXCollections.observableArrayList());
@@ -213,14 +222,19 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
     }
 
     private void commitSelection(ComboBox<String> combo, String value) {
-        if (value == null || !availableNames.contains(value)) return;
-        combo.setValue(value);
-        combo.getEditor().setText(value);
-        combo.getEditor().positionCaret(value.length());
-        combo.hide();
-        combo.getProperties().put(GHOST_KEY, "");
+        if (value == null || !availableNames.contains(value)
+                || Boolean.TRUE.equals(combo.getProperties().get(COMMITTING_KEY))) return;
+        combo.getProperties().put(COMMITTING_KEY, Boolean.TRUE);
+        try {
+            combo.setValue(value);
+            combo.getEditor().setText(value);
+            combo.getEditor().positionCaret(value.length());
+            combo.hide();
+            combo.getProperties().put(GHOST_KEY, "");
+        } finally {
+            combo.getProperties().remove(COMMITTING_KEY);
+        }
         ensureLoaded(value);
-        refreshChoices();
         refreshComparison();
     }
 
@@ -260,6 +274,7 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
     }
 
     private void refreshComparison() {
+        int version = ++comparisonVersion;
         String aName = selected(first);
         String bName = selected(second);
         if (aName != null) ensureLoaded(aName);
@@ -275,11 +290,34 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         GrbData a = sessionData.get(aName);
         GrbData b = sessionData.get(bName);
         if (a == null || b == null) {
-            showEmpty("Caricamento dei GRB selezionati…", "Loading selected GRBs…");
+            showComparisonLoading(aName, bName, true);
             return;
         }
-        content.getChildren().setAll(buildComparison(a, b));
-        I18n.localizeTree(content);
+        showComparisonLoading(aName, bName, false);
+        Platform.runLater(() -> {
+            if (version != comparisonVersion) return;
+            if (!aName.equals(selected(first)) || !bName.equals(selected(second))) return;
+            GrbData currentA = sessionData.get(aName);
+            GrbData currentB = sessionData.get(bName);
+            if (currentA == null || currentB == null) return;
+            content.getChildren().setAll(buildComparison(currentA, currentB));
+            I18n.localizeTree(content);
+        });
+    }
+
+    private void showComparisonLoading(String aName, String bName, boolean downloading) {
+        VBox loading = new VBox(12);
+        loading.getStyleClass().add("loading-state");
+        loading.setAlignment(Pos.CENTER);
+        ProgressIndicator spinner = new ProgressIndicator();
+        spinner.setMaxSize(48, 48);
+        Label title = UiFactory.label("", "loading-title");
+        I18n.setText(title, downloading ? "Caricamento confronto…" : "Preparazione confronto…",
+                downloading ? "Loading comparison…" : "Preparing comparison…");
+        Label detail = UiFactory.label("", "loading-detail");
+        I18n.setText(detail, aName + " · " + bName, aName + " · " + bName);
+        loading.getChildren().addAll(spinner, title, detail);
+        content.getChildren().setAll(loading);
     }
 
     private void showEmpty(String italian, String english) {
@@ -324,10 +362,13 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         VBox card = new VBox(8);
         card.getStyleClass().add("metric-card");
         card.setMinWidth(230);
-        card.getChildren().addAll(
-                UiFactory.label(title, "metric-eyebrow"),
-                UiFactory.label(nameA + "  " + a, "compare-value-a"),
-                UiFactory.label(nameB + "  " + b, "compare-value-b"));
+        Label titleLabel = UiFactory.label("", "metric-eyebrow");
+        I18n.setText(titleLabel, title, I18n.english(title));
+        Label valueA = UiFactory.label("", "compare-value-a");
+        Label valueB = UiFactory.label("", "compare-value-b");
+        I18n.setText(valueA, nameA + "  " + a, nameA + "  " + I18n.english(a));
+        I18n.setText(valueB, nameB + "  " + b, nameB + "  " + I18n.english(b));
+        card.getChildren().addAll(titleLabel, valueA, valueB);
         return card;
     }
 

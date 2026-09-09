@@ -258,17 +258,17 @@ public final class PopulationPage extends BorderPane {
         VBox exposureBox = new VBox(6, exposureIntro, exposureControls);
         exposureBox.setAlignment(Pos.TOP_LEFT);
         exposureBox.getStyleClass().addAll("population-filter-section", "population-filter-side", "population-fracexp-inline");
-        exposureBox.setMinWidth(300);
-        exposureBox.setPrefWidth(350);
-        exposureBox.setMaxWidth(Double.MAX_VALUE);
+        exposureBox.setMinWidth(270);
+        exposureBox.setPrefWidth(285);
+        exposureBox.setMaxWidth(300);
 
-        VBox durationGroup = filterGroup("Durata T90", "", duration, 170);
-        VBox redshiftGroup = filterGroup("Redshift", "", redshiftControl, 220);
-        VBox windowGroup = filterGroup("Finestra temporale", "", windowControl, 215);
-        VBox limitGroup = filterGroup("Campione massimo", "", limit, 135);
-        HBox topFilters = new HBox(8, durationGroup, redshiftGroup, windowGroup, exposureBox, limitGroup);
+        VBox durationGroup = filterGroup("Durata T90", "", duration, 155);
+        VBox redshiftGroup = filterGroup("Redshift", "", redshiftControl, 205);
+        VBox windowGroup = filterGroup("Finestra temporale", "", windowControl, 195);
+        VBox limitGroup = filterGroup("Campione massimo", "", limit, 125);
+        HBox topFilters = new HBox(7, durationGroup, redshiftGroup, windowGroup, exposureBox, limitGroup);
         topFilters.setAlignment(Pos.TOP_LEFT);
-        HBox.setHgrow(exposureBox, Priority.ALWAYS);
+        HBox.setHgrow(exposureBox, Priority.NEVER);
 
         HBox actions = new HBox(8);
         actions.setAlignment(Pos.CENTER_LEFT);
@@ -657,7 +657,7 @@ public final class PopulationPage extends BorderPane {
 
     private void configureChart() {
         configureChart(curveChart, curveXAxis, curveYAxis);
-        curveChart.setTitle("Nessuna analisi eseguita");
+        curveChart.setTitle(I18n.t("Nessuna analisi eseguita"));
         curveChart.setMinHeight(300);
         curveChart.setPrefHeight(350);
         curveChart.setMaxHeight(390);
@@ -776,7 +776,8 @@ public final class PopulationPage extends BorderPane {
                 List<LoadedCandidate> outcomes = new ArrayList<>();
                 try {
                     for (int completed = 0; completed < selected.size() && !isCancelled(); completed++) {
-                        updateMessage("Caricamento parallelo · " + completed + "/" + selected.size());
+                        updateMessage(I18n.dynamic("Caricamento parallelo · " + completed + "/" + selected.size(),
+                                "Parallel loading · " + completed + "/" + selected.size()));
                         try {
                             outcomes.add(completion.take().get());
                         } catch (ExecutionException error) {
@@ -929,7 +930,7 @@ public final class PopulationPage extends BorderPane {
         curveXAxis.setLowerBound(-result.halfWindow());
         curveXAxis.setUpperBound(result.halfWindow());
         curveXAxis.setTickUnit(result.halfWindow() <= 20 ? 5 : result.halfWindow() <= 60 ? 15 : 30);
-        curveChart.setTitle(result.curves().size() + " curve normalizzate e allineate a t = 0");
+        curveChart.setTitle(I18n.t(result.curves().size() + " curve normalizzate e allineate a t = 0"));
     }
 
     private void populateInsight(AnalysisResult result) {
@@ -945,7 +946,7 @@ public final class PopulationPage extends BorderPane {
         PopulationInsightService.Narrative narrative = insightService.analyze(
                 result.curves(), result.profile(), facts, result.examined(), result.failures(), result.halfWindow());
         lastNarrative = narrative;
-        insightHeadline.setText(narrative.headline());
+        I18n.setText(insightHeadline, narrative.headline(), I18n.english(narrative.headline()));
         insightObservations.getChildren().setAll(narrative.observations().stream()
                 .map(text -> insightLine("●", text, "population-insight-dot"))
                 .toList());
@@ -967,8 +968,9 @@ public final class PopulationPage extends BorderPane {
         bullet.setMinWidth(14);
         bullet.setAlignment(Pos.CENTER);
         Label copy = expanded
-                ? UiFactory.wrappedLabel(text, "population-insight-text")
-                : UiFactory.label(text, "population-insight-text");
+                ? UiFactory.wrappedLabel("", "population-insight-text")
+                : UiFactory.label("", "population-insight-text");
+        I18n.setText(copy, text, I18n.english(text));
         copy.setWrapText(expanded);
         copy.setMinWidth(0);
         copy.setMaxWidth(Double.MAX_VALUE);
@@ -1191,7 +1193,7 @@ public final class PopulationPage extends BorderPane {
     }
 
     private void setStatus(String text, String style) {
-        status.setText(text);
+        I18n.setText(status, text, I18n.english(text));
         status.getStyleClass().removeAll("status-neutral", "status-online", "status-warning");
         status.getStyleClass().add(style);
     }
@@ -1214,14 +1216,15 @@ public final class PopulationPage extends BorderPane {
         insightHeadline.setText("Esegui un'analisi per ottenere un commento automatico sul campione.");
         insightObservations.getChildren().clear();
         insightCautions.getChildren().clear();
-        curveChart.setTitle("Nessuna analisi eseguita");
+        curveChart.setTitle(I18n.t("Nessuna analisi eseguita"));
     }
 
     private void updateCandidatePreview() {
         if (catalog.isEmpty() || metadata.isEmpty() || duration.getValue() == null
                 || redshiftAvailability.getValue() == null || limit.getValue() == null
                 || window.getValue() == null) {
-            candidatePreview.setText("Attendo catalogo e metadati scientifici…");
+            I18n.setText(candidatePreview, "Attendo catalogo e metadati scientifici…",
+                    "Waiting for catalog and scientific metadata…");
             return;
         }
         try {
@@ -1232,10 +1235,13 @@ public final class PopulationPage extends BorderPane {
                     .limit(selected)
                     .filter(candidate -> sessionData.containsKey(candidate.entry().grbName()))
                     .count();
-            candidatePreview.setText(matches.size() + " GRB corrispondono ai filtri preliminari · "
-                    + selected + " saranno esaminati · " + inMemory + " già in RAM");
+            String italian = matches.size() + " GRB corrispondono ai filtri preliminari · "
+                    + selected + " saranno esaminati · " + inMemory + " già in RAM";
+            String english = matches.size() + " GRBs match the preliminary filters · "
+                    + selected + " will be examined · " + inMemory + " already in RAM";
+            I18n.setText(candidatePreview, italian, english);
         } catch (IllegalArgumentException error) {
-            candidatePreview.setText(error.getMessage());
+            I18n.setText(candidatePreview, error.getMessage(), I18n.english(error.getMessage()));
         }
     }
 

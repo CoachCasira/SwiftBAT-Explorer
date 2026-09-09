@@ -659,42 +659,7 @@ public final class SpectroscopyPane extends BorderPane {
         enlarged.setPrefHeight(760);
         enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
-        VBox reading = new VBox(12);
-        reading.getStyleClass().addAll("card", "spectroscopy-assistant");
-        reading.setPadding(new Insets(18));
-        reading.setMinWidth(300);
-        reading.setPrefWidth(350);
-        reading.setMaxWidth(390);
-        reading.getChildren().addAll(
-                UiFactory.label("Come leggere la mappa", "card-title"),
-                fullscreenReading("Assi — X rappresenta il tempo rispetto al trigger t = 0; Y separa le quattro bande energetiche BAT."),
-                fullscreenReading("Colore — arancio indica un rate netto positivo, blu una fluttuazione negativa dopo la sottrazione del fondo; i toni scuri indicano valori vicini a zero."),
-                fullscreenReading("Dettaglio — spostando il mouse sulla mappa puoi leggere banda energetica, centro del bin, rate e larghezza della banda nel punto osservato."),
-                fullscreenReading("Scala temporale — ogni cella deriva dai rate ASCII a bin di 1 secondo e la finestra visualizzata è la stessa scelta nella scheda Spettroscopia."),
-                fullscreenReading("Da ricordare — questa mappa descrive i rate BAT nel tempo: non è un fit XSPEC e non converte direttamente i conteggi in flusso fisico."));
-
-        reading.setVisible(false);
-        reading.setManaged(false);
-        ToggleButton help = new ToggleButton(I18n.t("Mostra spiegazione"));
-        help.getStyleClass().addAll("ghost-button", "help-toggle");
-        help.selectedProperty().addListener((obs, oldValue, selected) -> {
-            reading.setVisible(selected);
-            reading.setManaged(selected);
-            help.setText(I18n.t(selected ? "Nascondi spiegazione" : "Mostra spiegazione"));
-        });
-        HBox helpBar = new HBox(UiFactory.spacer(), help);
-        helpBar.setAlignment(Pos.CENTER_RIGHT);
-
-        HBox body = new HBox(14, enlarged, reading);
-        body.setPadding(new Insets(0, 14, 12, 14));
-        body.setMinSize(0, 0);
-        body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        HBox.setHgrow(enlarged, Priority.ALWAYS);
-        VBox fullscreen = new VBox(8, helpBar, body);
-        fullscreen.setMinSize(0, 0);
-        fullscreen.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        VBox.setVgrow(body, Priority.ALWAYS);
-        InPlaceFullscreen.show(this, grbData.grbName() + " · Mappa tempo–energia dei rate", fullscreen);
+        InPlaceFullscreen.show(this, grbData.grbName() + " · Mappa tempo–energia dei rate", enlarged);
     }
 
     private Label fullscreenReading(String text) {

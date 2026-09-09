@@ -1721,7 +1721,7 @@
 }
 
 .bar-chart .chart-bar {
-    -fx-background-color: linear-gradient(to top, #7b56c9, #4fd5ef);
+    -fx-bar-fill: #7767d7;
     -fx-background-radius: 5px 5px 0 0;
 }
 
@@ -2353,4 +2353,48 @@
     -fx-min-width: 25px;
     -fx-min-height: 25px;
     -fx-padding: 2px;
+}
+
+
+/* ---------- UX stabilization 1.3.0 ---------- */
+.compact-radio {
+    -fx-padding: 6px 7px;
+    -fx-font-size: 9.5px;
+}
+.population-fracexp-inline {
+    -fx-padding: 7px 8px;
+}
+.population-fracexp-inline .percentage-control {
+    -fx-padding: 5px 6px;
+}
+.population-fracexp-inline .percentage-field {
+    -fx-min-width: 48px;
+    -fx-pref-width: 52px;
+    -fx-max-width: 56px;
+}
+.population-fracexp-inline .filter-reset-button {
+    -fx-min-width: 25px;
+    -fx-min-height: 25px;
+    -fx-pref-width: 25px;
+    -fx-pref-height: 25px;
+}
+.compare-combo, .compare-combo .text-field, .compare-combo > .list-cell {
+    -fx-background-color: #0b1019;
+    -fx-text-fill: #e7ebf2;
+}
+.compare-combo .arrow-button {
+    -fx-background-color: rgba(255,255,255,0.045);
+}
+.compare-combo .combo-box-popup .list-view {
+    -fx-background-color: #090d15;
+    -fx-control-inner-background: #090d15;
+}
+.compare-combo .combo-box-popup .list-cell {
+    -fx-background-color: #090d15;
+    -fx-text-fill: #dfe5ee;
+}
+.compare-combo .combo-box-popup .list-cell:hover,
+.compare-combo .combo-box-popup .list-cell:selected {
+    -fx-background-color: rgba(255,174,91,0.12);
+    -fx-text-fill: #fff3e4;
 }
