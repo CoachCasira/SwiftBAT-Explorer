@@ -32,14 +32,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * Interazioni comuni per i grafici scientifici JavaFX.
- *
- * <p>Aggiunge tooltip di lettura alle curve, selezione cumulativa delle serie,
- * doppio clic verso la corrispondente vista 3D, export PNG visibile nei grafici
- * di Population Analysis e la chiusura animata del pannello filtri della pagina
- * di popolazione.</p>
- */
+/** Shared interactions for the scientific JavaFX charts. */
 public final class ChartInteractionEnhancer {
     private static final String WATCHED = ChartInteractionEnhancer.class.getName() + ".watched";
     private static final String LINE_DONE = ChartInteractionEnhancer.class.getName() + ".lineDone";
@@ -49,7 +42,7 @@ public final class ChartInteractionEnhancer {
     private static final String FOCUS = ChartInteractionEnhancer.class.getName() + ".focus";
     private static final String NORMAL_TABS_HEIGHT = ChartInteractionEnhancer.class.getName() + ".normalTabsHeight";
 
-    private static final double HIT_RADIUS = 16.0;
+    private static final double HIT_RADIUS = 18.0;
     private static final DecimalFormat NUMBER_FORMAT;
 
     static {
@@ -104,10 +97,9 @@ public final class ChartInteractionEnhancer {
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static void enhanceLineChart(LineChart<?, ?> rawChart) {
         if (Boolean.TRUE.equals(rawChart.getProperties().get(LINE_DONE))) return;
-        if (!(rawChart.getXAxis() instanceof Axis<?>) || !(rawChart.getYAxis() instanceof Axis<?>)) return;
         rawChart.getProperties().put(LINE_DONE, Boolean.TRUE);
-
         LineChart chart = rawChart;
+
         Tooltip tooltip = new Tooltip();
         tooltip.setAutoHide(false);
         tooltip.setShowDelay(Duration.ZERO);
@@ -121,12 +113,15 @@ public final class ChartInteractionEnhancer {
             }
             String xLabel = chart.getXAxis().getLabel();
             String yLabel = chart.getYAxis().getLabel();
-            String seriesName = hit.series().getName() == null ? I18n.dynamic("Curva", "Curve") : hit.series().getName();
+            String seriesName = hit.series().getName() == null
+                    ? I18n.dynamic("Curva", "Curve") : hit.series().getName();
             tooltip.setText(seriesName + "\n"
                     + (xLabel == null || xLabel.isBlank() ? "X" : xLabel) + ": " + format(hit.data().getXValue()) + "\n"
                     + (yLabel == null || yLabel.isBlank() ? "Y" : yLabel) + ": " + format(hit.data().getYValue()));
-            if (!tooltip.isShowing()) {
-                tooltip.show(chart, event.getScreenX() + 14, event.getScreenY() + 14);
+            if (!tooltip.isShowing()) tooltip.show(chart, event.getScreenX() + 14, event.getScreenY() + 14);
+            else {
+                tooltip.setAnchorX(event.getScreenX() + 14);
+                tooltip.setAnchorY(event.getScreenY() + 14);
             }
         });
         chart.addEventHandler(MouseEvent.MOUSE_EXITED, event -> tooltip.hide());
@@ -170,8 +165,8 @@ public final class ChartInteractionEnhancer {
             }
         });
         if (findAncestorWithStyle(chart, "population-histogram-card") != null) {
-            chart.setMinHeight(310);
-            chart.setPrefHeight(350);
+            chart.setMinHeight(300);
+            chart.setPrefHeight(340);
             chart.setMaxHeight(Double.MAX_VALUE);
         }
         installPopulationExport(chart);
@@ -242,14 +237,14 @@ public final class ChartInteractionEnhancer {
             if (node == null) continue;
             String name = series.getName();
             boolean trigger = name != null && name.toLowerCase(Locale.ROOT).startsWith("trigger");
-            double opacity = selected.isEmpty() || selected.contains(series) ? 1.0 : trigger ? 0.55 : 0.10;
+            double opacity = selected.isEmpty() || selected.contains(series) ? 1.0 : trigger ? 0.50 : 0.09;
             node.setOpacity(opacity);
         }
     }
 
     private static boolean openThreeD(Node source) {
         Node current = source;
-        for (int depth = 0; current != null && depth < 10; depth++, current = current.getParent()) {
+        for (int depth = 0; current != null && depth < 12; depth++, current = current.getParent()) {
             if (current instanceof TabPane tabs) {
                 for (Tab tab : tabs.getTabs()) {
                     String text = tab.getText() == null ? "" : tab.getText().toLowerCase(Locale.ROOT);
@@ -260,7 +255,7 @@ public final class ChartInteractionEnhancer {
                 }
             }
             if (current instanceof Parent parent) {
-                Button local = findThreeDButton(parent);
+                Button local = findThreeDButton(parent, true);
                 if (local != null) {
                     local.fire();
                     return true;
@@ -271,16 +266,17 @@ public final class ChartInteractionEnhancer {
         return false;
     }
 
-    private static Button findThreeDButton(Parent root) {
+    private static Button findThreeDButton(Parent root, boolean requireEnabled) {
         for (Node child : root.getChildrenUnmodifiable()) {
             if (child instanceof Button button) {
                 String text = button.getText() == null ? "" : button.getText().toLowerCase(Locale.ROOT);
-                if (text.contains("3d") && button.isVisible() && button.isManaged() && !button.isDisabled()) {
+                if (text.contains("3d") && button.isVisible() && button.isManaged()
+                        && (!requireEnabled || !button.isDisabled())) {
                     return button;
                 }
             }
             if (child instanceof Parent parent) {
-                Button nested = findThreeDButton(parent);
+                Button nested = findThreeDButton(parent, requireEnabled);
                 if (nested != null) return nested;
             }
         }
@@ -294,7 +290,7 @@ public final class ChartInteractionEnhancer {
             card = findAncestorWithStyle(chart, "population-chart-card");
         }
         if (card == null) return;
-        Button threeD = findThreeDButton(card);
+        Button threeD = findThreeDButton(card, false);
         if (threeD == null || !(threeD.getParent() instanceof HBox actions)) return;
 
         chart.getProperties().put(EXPORT_DONE, Boolean.TRUE);
@@ -307,8 +303,8 @@ public final class ChartInteractionEnhancer {
         actions.getChildren().add(Math.max(0, index), export);
 
         if (card instanceof Region region && chart instanceof BarChart<?, ?>) {
-            region.setMinHeight(405);
-            region.setPrefHeight(430);
+            region.setMinHeight(400);
+            region.setPrefHeight(420);
             region.setMaxHeight(Double.MAX_VALUE);
         }
     }
@@ -329,9 +325,9 @@ public final class ChartInteractionEnhancer {
 
         TabPane tabs = findDescendant(page, TabPane.class);
         if (tabs != null) {
-            double normalHeight = Math.max(610, tabs.getPrefHeight());
+            double normalHeight = Math.max(640, tabs.getPrefHeight());
             tabs.getProperties().put(NORMAL_TABS_HEIGHT, normalHeight);
-            tabs.setMinHeight(520);
+            tabs.setMinHeight(560);
             tabs.setPrefHeight(normalHeight);
             tabs.setMaxHeight(Double.MAX_VALUE);
         }
@@ -377,7 +373,7 @@ public final class ChartInteractionEnhancer {
         if (tabs != null) {
             double normal = normalTabsHeight(tabs);
             timeline.getKeyFrames().add(new KeyFrame(Duration.millis(260),
-                    new KeyValue(tabs.prefHeightProperty(), normal + Math.min(210, Math.max(130, height * 0.70)), Interpolator.EASE_BOTH)));
+                    new KeyValue(tabs.prefHeightProperty(), normal + Math.min(260, Math.max(150, height * 0.75)), Interpolator.EASE_BOTH)));
         }
         timeline.setOnFinished(event -> {
             card.setVisible(false);
@@ -417,7 +413,7 @@ public final class ChartInteractionEnhancer {
 
     private static double normalTabsHeight(TabPane tabs) {
         Object value = tabs.getProperties().get(NORMAL_TABS_HEIGHT);
-        return value instanceof Number number ? number.doubleValue() : Math.max(610, tabs.getPrefHeight());
+        return value instanceof Number number ? number.doubleValue() : Math.max(640, tabs.getPrefHeight());
     }
 
     private static <T extends Node> T findDescendant(Parent root, Class<T> type) {
