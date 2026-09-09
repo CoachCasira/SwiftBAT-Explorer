@@ -1,6 +1,7 @@
 package it.casiraghi.swiftbat.ui;
 
 import it.casiraghi.swiftbat.ui.components.BlackHoleHeroPane;
+import javafx.beans.value.ObservableValue;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -14,125 +15,206 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 public final class HomePage extends ScrollPane {
-    public HomePage(Runnable openExplorer, Runnable openSky, Runnable openCompare, Runnable openInfo) {
-        getStyleClass().addAll("page-scroll", "home-page-scroll");
+    public HomePage(Runnable openExplorer,
+                    Runnable openSky,
+                    Runnable openPopulation,
+                    Runnable openCompare,
+                    Runnable openInfo,
+                    ObservableValue<? extends String> catalogText,
+                    ObservableValue<? extends String> sessionText,
+                    ObservableValue<? extends String> connectionText) {
+        getStyleClass().addAll("page-scroll", "home-page-scroll", "mockup-home-page");
         setFitToWidth(true);
         setHbarPolicy(ScrollBarPolicy.NEVER);
-        setContent(buildContent(openExplorer, openSky, openCompare, openInfo));
+        setContent(buildContent(openExplorer, openSky, openPopulation, openCompare, openInfo,
+                catalogText, sessionText, connectionText));
     }
 
-    private Node buildContent(Runnable openExplorer, Runnable openSky, Runnable openCompare, Runnable openInfo) {
-        VBox page = new VBox(24);
-        page.getStyleClass().addAll("page-content", "home-content");
-        page.setPadding(new Insets(28, 34, 42, 34));
+    private Node buildContent(Runnable openExplorer,
+                              Runnable openSky,
+                              Runnable openPopulation,
+                              Runnable openCompare,
+                              Runnable openInfo,
+                              ObservableValue<? extends String> catalogText,
+                              ObservableValue<? extends String> sessionText,
+                              ObservableValue<? extends String> connectionText) {
+        VBox page = new VBox(14);
+        page.getStyleClass().addAll("page-content", "home-content", "mockup-home-content");
+        page.setPadding(new Insets(20, 26, 30, 26));
 
-        HBox hero = new HBox(28);
-        hero.getStyleClass().add("event-horizon-hero");
+        HBox welcome = new HBox(18);
+        welcome.setAlignment(Pos.CENTER_LEFT);
+        VBox welcomeCopy = new VBox(3,
+                gradientTitle("Benvenuto su ", "SwiftBAT Explorer"),
+                UiFactory.wrappedLabel(
+                        "Esplora, analizza e interpreta i lampi di raggi gamma con i dati di Swift/BAT.",
+                        "mockup-welcome-subtitle"));
+        HBox.setHgrow(welcomeCopy, Priority.ALWAYS);
+        Label quote = UiFactory.wrappedLabel(
+                "“Dove l'Universo diventa estremo, inizia la scoperta.”",
+                "mockup-welcome-quote");
+        quote.setMaxWidth(310);
+        welcome.getChildren().addAll(welcomeCopy, quote);
+
+        HBox metrics = new HBox(12);
+        metrics.getChildren().addAll(
+                metricCard("◇", "GRB nel catalogo", catalogText, "Eventi Swift/BAT", "cyan"),
+                metricCard("✺", "Connessione", connectionText, "Accesso ai dati online", "purple"),
+                metricCard("▱", "File in cache", sessionText, "Sessione e cache locale", "cyan"),
+                staticMetricCard("◷", "Pipeline", "1 s", "Binning curve di luce", "purple"));
+        for (Node node : metrics.getChildren()) HBox.setHgrow(node, Priority.ALWAYS);
+
+        HBox hero = new HBox(18);
+        hero.getStyleClass().add("mockup-home-hero");
         hero.setAlignment(Pos.CENTER_LEFT);
-        hero.setPadding(new Insets(34, 34, 34, 38));
-        hero.setMinHeight(430);
+        hero.setPadding(new Insets(24, 24, 22, 28));
+        hero.setMinHeight(310);
 
-        VBox copy = new VBox(16);
-        copy.setAlignment(Pos.CENTER_LEFT);
-        copy.setMaxWidth(690);
-        Label kicker = UiFactory.label("SWIFT / BAT  ·  LIVE DATA", "home-kicker");
-        Label title = UiFactory.wrappedLabel("SwiftBAT\nExplorer", "home-title");
+        VBox heroCopy = new VBox(10);
+        heroCopy.setAlignment(Pos.CENTER_LEFT);
+        heroCopy.setMaxWidth(610);
+        Label kicker = UiFactory.label("AI CONFINI DELL'UNIVERSO PIÙ ESTREMO", "mockup-hero-kicker");
+        Label lineOne = UiFactory.label("I lampi di raggi gamma", "mockup-hero-title");
+        Label lineTwo = UiFactory.label("illuminano l'Universo estremo", "mockup-hero-title-secondary");
         Label subtitle = UiFactory.wrappedLabel(
-                "Esplora i Gamma-Ray Burst dal catalogo al cielo. Curve di luce, dati FITS e coordinate celesti in un'unica app.",
-                "home-subtitle");
-        subtitle.setMaxWidth(620);
+                "Esplora il catalogo Swift/BAT, visualizza gli eventi sulla mappa celeste e analizza curve di luce, spettroscopia e proprietà di popolazione senza uscire dall'app.",
+                "mockup-hero-body");
+        subtitle.setMaxWidth(590);
 
-        HBox actions = new HBox(11);
-        Button explore = UiFactory.button("Esplora i GRB  →", "primary-button");
-        explore.getStyleClass().add("home-primary-action");
+        HBox actions = new HBox(10);
+        Button explore = UiFactory.button("⌕   Apri Esplora", "primary-button");
+        explore.getStyleClass().add("mockup-hero-action");
         explore.setOnAction(event -> openExplorer.run());
-        Button sky = UiFactory.button("Apri la mappa celeste", "secondary-button");
+        Button sky = UiFactory.button("⌾   Mappa celeste", "secondary-button");
+        sky.getStyleClass().add("mockup-hero-action");
         sky.setOnAction(event -> openSky.run());
-        actions.getChildren().addAll(explore, sky);
+        Button analysis = UiFactory.button("⌁   Nuova analisi", "secondary-button");
+        analysis.getStyleClass().addAll("mockup-hero-action", "mockup-hero-action-magenta");
+        analysis.setOnAction(event -> openPopulation.run());
+        actions.getChildren().addAll(explore, sky, analysis);
 
-        HBox trust = new HBox(12,
-                microPill("● Online"),
-                microPill("1 s binning"),
-                microPill("DAT + FITS"));
-        copy.getChildren().addAll(kicker, title, subtitle, actions, trust);
-        HBox.setHgrow(copy, Priority.ALWAYS);
+        heroCopy.getChildren().addAll(kicker, lineOne, lineTwo, subtitle, actions);
+        HBox.setHgrow(heroCopy, Priority.ALWAYS);
 
         BlackHoleHeroPane graphic = new BlackHoleHeroPane();
-        graphic.setMinWidth(300);
-        graphic.setPrefWidth(470);
+        graphic.getStyleClass().add("mockup-hero-graphic");
+        graphic.setMinWidth(390);
+        graphic.setPrefWidth(590);
         HBox.setHgrow(graphic, Priority.ALWAYS);
-        hero.getChildren().addAll(copy, graphic);
+        hero.getChildren().addAll(heroCopy, graphic);
 
-        HBox quickActions = new HBox(14);
-        quickActions.getChildren().addAll(
-                actionCard("✦", "Esplora", "Cerca un evento e apri curve, dati e metadati.", "Apri catalogo", openExplorer),
-                actionCard("◎", "Mappa celeste", "Guarda i GRB sulla Mollweide o sulla sfera 3D.", "Esplora il cielo", openSky),
-                actionCard("⇄", "Confronta", "Sovrapponi due eventi già aperti nella sessione.", "Confronta eventi", openCompare));
-        for (Node node : quickActions.getChildren()) HBox.setHgrow(node, Priority.ALWAYS);
+        HBox lower = new HBox(12);
+        lower.getChildren().addAll(
+                infoPanel("◷", "Sessione", new String[]{
+                        "Eventi già aperti restano in RAM",
+                        "I prodotti locali vengono riutilizzati",
+                        "Il confronto usa i GRB della sessione"}, null),
+                infoPanel("▱", "Dataset Swift/BAT", new String[]{
+                        "Catalogo scientifico online",
+                        "Curve a binning di 1 secondo",
+                        "ASCII, FITS e metadati integrati"}, openExplorer),
+                shortcutPanel(openExplorer, openSky, openPopulation, openCompare),
+                infoPanel("◎", "Strumenti", new String[]{
+                        "Mollweide 2D e sfera 3D",
+                        "Analisi di popolazione",
+                        "Confronto e spettroscopia"}, openInfo));
+        for (Node node : lower.getChildren()) HBox.setHgrow(node, Priority.ALWAYS);
 
-        HBox lower = new HBox(14);
-        VBox workflow = new VBox(14);
-        workflow.getStyleClass().add("simple-panel");
-        workflow.setPadding(new Insets(22));
-        workflow.getChildren().addAll(
-                UiFactory.label("Tre passaggi, niente file manuali", "section-title-compact"),
-                simpleStep("01", "Scegli un GRB", "Cerca nome o Trigger ID."),
-                simpleStep("02", "Aprilo", "L'app recupera e interpreta i prodotti Swift/BAT online."),
-                simpleStep("03", "Esplora", "Passa da curva, 3D, tabelle, metadati e mappa celeste."));
-        HBox.setHgrow(workflow, Priority.ALWAYS);
-
-        VBox info = new VBox(14);
-        info.getStyleClass().add("simple-panel");
-        info.setPadding(new Insets(22));
-        Label infoTitle = UiFactory.label("Serve una spiegazione?", "section-title-compact");
-        Label infoText = UiFactory.wrappedLabel(
-                "Le schermate mantengono il dato originale e affiancano spiegazioni brevi per trigger, rate, errori, FRACEXP, FITS, RA, DEC e T90.",
-                "simple-panel-text");
-        Button infoButton = UiFactory.button("Apri info e guida", "ghost-button");
-        infoButton.setOnAction(event -> openInfo.run());
-        info.getChildren().addAll(infoTitle, infoText, infoButton);
-        HBox.setHgrow(info, Priority.ALWAYS);
-        lower.getChildren().addAll(workflow, info);
-
-        page.getChildren().addAll(hero, quickActions, lower);
+        page.getChildren().addAll(welcome, metrics, hero, lower);
         return page;
     }
 
-    private VBox actionCard(String glyph, String title, String text, String action, Runnable runnable) {
-        VBox card = new VBox(10);
-        card.getStyleClass().add("home-action-card");
-        card.setPadding(new Insets(20));
-        card.setMaxWidth(Double.MAX_VALUE);
-        card.setCursor(javafx.scene.Cursor.HAND);
-        card.setOnMouseClicked(event -> {
-            if (event.getButton() == MouseButton.PRIMARY) runnable.run();
-        });
-        Label icon = UiFactory.label(glyph, "home-action-icon");
-        Label titleLabel = UiFactory.label(title, "home-action-title");
-        Label textLabel = UiFactory.wrappedLabel(text, "home-action-text");
-        Region spacer = new Region();
-        VBox.setVgrow(spacer, Priority.ALWAYS);
-        HBox actionHint = new HBox(5,
-                UiFactory.label(action, "home-link-button"),
-                UiFactory.label("→", "home-link-button"));
-        actionHint.setMouseTransparent(true);
-        card.getChildren().addAll(icon, titleLabel, textLabel, spacer, actionHint);
+    private HBox gradientTitle(String prefix, String accent) {
+        HBox title = new HBox(7,
+                UiFactory.label(prefix, "mockup-welcome-title"),
+                UiFactory.label(accent, "mockup-welcome-title-accent"));
+        title.setAlignment(Pos.CENTER_LEFT);
+        return title;
+    }
+
+    private VBox metricCard(String glyph, String title,
+                            ObservableValue<? extends String> value,
+                            String detail, String accent) {
+        VBox card = metricShell(glyph, title, detail, accent);
+        Label valueLabel = UiFactory.label("", "mockup-metric-value");
+        valueLabel.textProperty().bind(value);
+        card.getChildren().add(2, valueLabel);
         return card;
     }
 
-    private HBox simpleStep(String number, String title, String detail) {
-        HBox row = new HBox(13);
-        row.setAlignment(Pos.CENTER_LEFT);
-        Label numberLabel = UiFactory.label(number, "simple-step-number");
-        VBox copy = new VBox(3,
-                UiFactory.label(title, "simple-step-title"),
-                UiFactory.wrappedLabel(detail, "simple-step-text"));
-        HBox.setHgrow(copy, Priority.ALWAYS);
-        row.getChildren().addAll(numberLabel, copy);
-        return row;
+    private VBox staticMetricCard(String glyph, String title, String value, String detail, String accent) {
+        VBox card = metricShell(glyph, title, detail, accent);
+        card.getChildren().add(2, UiFactory.label(value, "mockup-metric-value"));
+        return card;
     }
 
-    private Label microPill(String text) {
-        return UiFactory.label(text, "home-micro-pill");
+    private VBox metricShell(String glyph, String title, String detail, String accent) {
+        VBox card = new VBox(4);
+        card.getStyleClass().addAll("mockup-metric-card", "mockup-accent-" + accent);
+        card.setPadding(new Insets(14, 16, 13, 16));
+        card.setMinWidth(180);
+        card.setMaxWidth(Double.MAX_VALUE);
+        HBox head = new HBox(9,
+                UiFactory.label(glyph, "mockup-metric-icon"),
+                UiFactory.label(title, "mockup-metric-title"));
+        head.setAlignment(Pos.CENTER_LEFT);
+        Label spacer = UiFactory.label("", "mockup-metric-value");
+        spacer.setVisible(false);
+        spacer.setManaged(false);
+        Label detailLabel = UiFactory.label(detail, "mockup-metric-detail");
+        card.getChildren().addAll(head, spacer, detailLabel);
+        return card;
+    }
+
+    private VBox infoPanel(String glyph, String title, String[] lines, Runnable action) {
+        VBox panel = new VBox(9);
+        panel.getStyleClass().add("mockup-lower-panel");
+        panel.setPadding(new Insets(15));
+        panel.setMaxWidth(Double.MAX_VALUE);
+        HBox head = new HBox(8,
+                UiFactory.label(glyph, "mockup-lower-icon"),
+                UiFactory.label(title, "mockup-lower-title"));
+        head.setAlignment(Pos.CENTER_LEFT);
+        panel.getChildren().add(head);
+        for (String line : lines) {
+            panel.getChildren().add(UiFactory.wrappedLabel("›  " + line, "mockup-lower-line"));
+        }
+        if (action != null) {
+            Region spacer = new Region();
+            VBox.setVgrow(spacer, Priority.ALWAYS);
+            Button button = UiFactory.button("Apri  →", "mockup-inline-link");
+            button.setOnAction(event -> action.run());
+            panel.getChildren().addAll(spacer, button);
+            panel.setCursor(javafx.scene.Cursor.HAND);
+            panel.setOnMouseClicked(event -> {
+                if (event.getButton() == MouseButton.PRIMARY && event.getTarget() != button) action.run();
+            });
+        }
+        return panel;
+    }
+
+    private VBox shortcutPanel(Runnable openExplorer, Runnable openSky,
+                               Runnable openPopulation, Runnable openCompare) {
+        VBox panel = new VBox(5);
+        panel.getStyleClass().add("mockup-lower-panel");
+        panel.setPadding(new Insets(15));
+        panel.setMaxWidth(Double.MAX_VALUE);
+        HBox head = new HBox(8,
+                UiFactory.label("⚡", "mockup-lower-icon"),
+                UiFactory.label("Scorciatoie", "mockup-lower-title"));
+        panel.getChildren().addAll(head,
+                shortcut("⌕", "Cerca un GRB", openExplorer),
+                shortcut("⌾", "Apri mappa celeste", openSky),
+                shortcut("⌁", "Analisi di popolazione", openPopulation),
+                shortcut("⇄", "Confronta eventi", openCompare));
+        return panel;
+    }
+
+    private Button shortcut(String glyph, String text, Runnable action) {
+        Button button = UiFactory.button(glyph + "   " + text + "    ›", "mockup-shortcut-button");
+        button.setMaxWidth(Double.MAX_VALUE);
+        button.setAlignment(Pos.CENTER_LEFT);
+        button.setOnAction(event -> action.run());
+        return button;
     }
 }
