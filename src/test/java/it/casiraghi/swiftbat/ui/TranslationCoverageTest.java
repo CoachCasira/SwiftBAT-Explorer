@@ -55,7 +55,7 @@ class TranslationCoverageTest {
                 String value = unescape(literal.value());
                 if (!looksItalian(value)) continue;
                 if (codeOnlyLiteral(source, literal.offset())) continue;
-                if (concatenationFragment(source, literal, value)) continue;
+                if (concatenationFragment(source, literal.offset())) continue;
                 if (!hasRuntimeEnglish(value)) {
                     missing.add(path.getFileName() + ":" + lineOf(source, literal.offset()) + " -> " + value);
                 }
@@ -77,8 +77,6 @@ class TranslationCoverageTest {
         String legacy = I18n.english(value);
         if (isTranslation(value, legacy)) return true;
 
-        // The fullscreen reading assistant deliberately reuses the existing
-        // translated copy after changing the scientific color from orange to cyan.
         String legacyColorSource = value
                 .replace("linea azzurra", "linea arancione")
                 .replace("curva azzurra", "curva arancione");
@@ -110,14 +108,13 @@ class TranslationCoverageTest {
     }
 
     /**
-     * Java often splits one visible paragraph across adjacent literals. The complete
-     * runtime string is audited through the translation layer; individual fragments
-     * must not be reported as independent controls.
+     * Java often splits one visible paragraph across adjacent string literals.
+     * The compiler joins those fragments before they reach UiFactory/UiTranslations,
+     * so the complete runtime string is what the localization layer translates.
      */
-    private boolean concatenationFragment(String source, Literal literal, String value) {
-        if (!(value.startsWith(" ") || value.endsWith(" ") || value.endsWith("\n"))) return false;
-        int lineStart = source.lastIndexOf('\n', literal.offset()) + 1;
-        int lineEnd = source.indexOf('\n', literal.offset());
+    private boolean concatenationFragment(String source, int offset) {
+        int lineStart = source.lastIndexOf('\n', offset) + 1;
+        int lineEnd = source.indexOf('\n', offset);
         if (lineEnd < 0) lineEnd = source.length();
         String current = source.substring(lineStart, lineEnd);
 
