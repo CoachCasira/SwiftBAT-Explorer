@@ -2247,3 +2247,17 @@
     -fx-font-size: 9px;
     -fx-padding: 0 2;
 }
+
+
+.collapsible-help {
+    -fx-spacing: 6px;
+    -fx-padding: 0;
+}
+
+.compact-radio-group .radio-button {
+    -fx-cursor: hand;
+}
+
+.in-place-fullscreen .help-toggle {
+    -fx-padding: 7 11;
+}

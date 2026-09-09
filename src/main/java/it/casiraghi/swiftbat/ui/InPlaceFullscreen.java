@@ -11,6 +11,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.BorderPane;
@@ -192,15 +193,41 @@ public final class InPlaceFullscreen {
             readingScroll.viewportBoundsProperty().addListener((obs, oldBounds, bounds) ->
                     reading.setMinHeight(Math.max(0, bounds.getHeight())));
 
+            ToggleButton help = new ToggleButton(I18n.t("Mostra spiegazione"));
+            help.getStyleClass().addAll("ghost-button", "help-toggle");
+            HBox helpBar = new HBox(UiFactory.spacer(), help);
+            helpBar.setAlignment(Pos.CENTER_RIGHT);
+
             BorderPane split = new BorderPane();
             split.setCenter(content);
             split.setMinSize(0, 0);
             split.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-            split.widthProperty().addListener((obs, oldWidth, newWidth) ->
-                    updateResponsiveReadingLayout(split, content, reading, readingScroll, newWidth.doubleValue()));
-            Platform.runLater(() ->
-                    updateResponsiveReadingLayout(split, content, reading, readingScroll, split.getWidth()));
-            return split;
+
+            Runnable relayout = () -> {
+                if (!help.isSelected()) {
+                    split.setRight(null);
+                    split.setBottom(null);
+                    BorderPane.setMargin(content, Insets.EMPTY);
+                } else {
+                    updateResponsiveReadingLayout(split, content, reading, readingScroll, split.getWidth());
+                }
+            };
+            help.selectedProperty().addListener((obs, oldValue, selected) -> {
+                help.setText(I18n.t(selected ? "Nascondi spiegazione" : "Mostra spiegazione"));
+                relayout.run();
+            });
+            I18n.languageProperty().addListener((obs, oldValue, newValue) ->
+                    help.setText(I18n.t(help.isSelected() ? "Nascondi spiegazione" : "Mostra spiegazione")));
+            split.widthProperty().addListener((obs, oldWidth, newWidth) -> {
+                if (help.isSelected()) updateResponsiveReadingLayout(
+                        split, content, reading, readingScroll, newWidth.doubleValue());
+            });
+
+            VBox wrapper = new VBox(8, helpBar, split);
+            wrapper.setMinSize(0, 0);
+            wrapper.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+            VBox.setVgrow(split, Priority.ALWAYS);
+            return wrapper;
         }
 
         private void updateResponsiveReadingLayout(BorderPane split, Node content, VBox reading,

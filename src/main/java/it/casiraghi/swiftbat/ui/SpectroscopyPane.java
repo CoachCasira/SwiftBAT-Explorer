@@ -28,6 +28,7 @@ import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.RadioButton;
 import javafx.scene.control.ToggleGroup;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -365,9 +366,8 @@ public final class SpectroscopyPane extends BorderPane {
             chart.getData().add(series);
         }
 
-        card.getChildren().addAll(
-                UiFactory.label("Modello spettrale ricostruito", "card-title"),
-                explanation);
+        card.getChildren().add(UiFactory.label("Modello spettrale ricostruito", "card-title"));
+        card.getChildren().add(UiFactory.collapsibleHelp("", explanation));
         if (showActions) {
             Button threeD = UiFactory.button("Vista 3D", "secondary-button");
             threeD.setDisable(fit == null || fit.normalization() == null || fit.alpha() == null);
@@ -437,7 +437,8 @@ public final class SpectroscopyPane extends BorderPane {
         chart.getData().add(series);
         VBox.setVgrow(chart, Priority.ALWAYS);
 
-        card.getChildren().addAll(UiFactory.label("Flusso energetico", "card-title"), explanation);
+        card.getChildren().add(UiFactory.label("Flusso energetico", "card-title"));
+        card.getChildren().add(UiFactory.collapsibleHelp("", explanation));
         if (showActions) {
             Button threeD = UiFactory.button("Vista 3D", "secondary-button");
             threeD.setDisable(fluxes.stream().noneMatch(EnergyFluxBand::available));
@@ -642,9 +643,7 @@ public final class SpectroscopyPane extends BorderPane {
 
         FlowPane controls = new FlowPane(10, 10);
         controls.getChildren().add(
-                controlBox("Finestra temporale", window,
-                        "Limita la mappa ai secondi prima e dopo t = 0; non modifica i parametri del fit ufficiale.",
-                        620));
+                controlBox("Finestra temporale", window, "", 620));
         controls.setAlignment(Pos.BOTTOM_LEFT);
 
         FlowPane chartActions = new FlowPane(8, 8);
@@ -657,10 +656,11 @@ public final class SpectroscopyPane extends BorderPane {
         chartCard.getStyleClass().addAll("card", "time-energy-card");
         chartCard.setPadding(new Insets(14));
         VBox.setVgrow(heatmap, Priority.ALWAYS);
-        box.getChildren().addAll(description, controls, chartCard,
-                UiFactory.wrappedLabel(
-                        "Nota: i rate BAT sono già corretti per il fondo; piccole celle negative rappresentano fluttuazioni statistiche dopo la sottrazione del fondo.",
-                        "spectroscopy-note"));
+        Label note = UiFactory.wrappedLabel(
+                "Nota: i rate BAT sono già corretti per il fondo; piccole celle negative rappresentano fluttuazioni statistiche dopo la sottrazione del fondo.",
+                "spectroscopy-note");
+        VBox explanationBox = new VBox(7, description, note);
+        box.getChildren().addAll(controls, chartCard, UiFactory.collapsibleHelp("", explanationBox));
         return box;
     }
 
@@ -695,12 +695,28 @@ public final class SpectroscopyPane extends BorderPane {
                 fullscreenReading("Scala temporale — ogni cella deriva dai rate ASCII a bin di 1 secondo e la finestra visualizzata è la stessa scelta nella scheda Spettroscopia."),
                 fullscreenReading("Da ricordare — questa mappa descrive i rate BAT nel tempo: non è un fit XSPEC e non converte direttamente i conteggi in flusso fisico."));
 
+        reading.setVisible(false);
+        reading.setManaged(false);
+        ToggleButton help = new ToggleButton(I18n.t("Mostra spiegazione"));
+        help.getStyleClass().addAll("ghost-button", "help-toggle");
+        help.selectedProperty().addListener((obs, oldValue, selected) -> {
+            reading.setVisible(selected);
+            reading.setManaged(selected);
+            help.setText(I18n.t(selected ? "Nascondi spiegazione" : "Mostra spiegazione"));
+        });
+        HBox helpBar = new HBox(UiFactory.spacer(), help);
+        helpBar.setAlignment(Pos.CENTER_RIGHT);
+
         HBox body = new HBox(14, enlarged, reading);
-        body.setPadding(new Insets(12, 14, 12, 14));
+        body.setPadding(new Insets(0, 14, 12, 14));
         body.setMinSize(0, 0);
         body.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         HBox.setHgrow(enlarged, Priority.ALWAYS);
-        InPlaceFullscreen.show(this, grbData.grbName() + " · Mappa tempo–energia dei rate", body);
+        VBox fullscreen = new VBox(8, helpBar, body);
+        fullscreen.setMinSize(0, 0);
+        fullscreen.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        VBox.setVgrow(body, Priority.ALWAYS);
+        InPlaceFullscreen.show(this, grbData.grbName() + " · Mappa tempo–energia dei rate", fullscreen);
     }
 
     private Label fullscreenReading(String text) {

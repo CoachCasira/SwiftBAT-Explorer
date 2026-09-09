@@ -37,6 +37,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
+import javafx.scene.control.ToggleGroup;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
@@ -219,13 +220,17 @@ public final class PopulationPage extends BorderPane {
             choice.getStyleClass().add("choice-box-modern");
             UiFactory.autoTooltip(choice);
         }
+        Node redshiftControl = compactRadioChoice(redshiftAvailability,
+                List.of(ALL_Z, WITH_Z, WITHOUT_Z), List.of("Tutti", "Con z", "Senza z"));
+        Node windowControl = compactRadioChoice(window,
+                List.of("±20 s", "±60 s", "±120 s"), List.of("±20 s", "±60 s", "±120 s"));
 
         FlowPane primary = new FlowPane(9, 7);
         primary.getStyleClass().add("population-filter-grid");
         primary.getChildren().addAll(
                 filterGroup("Durata T90", "Classe temporale", duration, 185),
-                filterGroup("Redshift", "Disponibilità della misura z", redshiftAvailability, 190),
-                filterGroup("Finestra temporale", "Secondi attorno al trigger", window, 150),
+                filterGroup("Redshift", "", redshiftControl, 245),
+                filterGroup("Finestra temporale", "", windowControl, 230),
                 filterGroup("Campione massimo", "GRB più recenti dopo i filtri", limit, 150));
         primary.setMinWidth(650);
         primary.setPrefWrapLength(690);
@@ -396,13 +401,19 @@ public final class PopulationPage extends BorderPane {
 
         VBox assistant = insightSnapshotCard(true);
         assistant.setMaxHeight(Double.MAX_VALUE);
+        assistant.setVisible(false);
+        assistant.setManaged(false);
+        ToggleButton help = fullscreenHelpToggle(assistant);
         HBox content = new HBox(18, chartColumn, assistant);
         content.setAlignment(Pos.TOP_LEFT);
         content.setFillHeight(true);
         content.setMinSize(0, 0);
         content.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         content.getStyleClass().add("population-fullscreen-content");
-        InPlaceFullscreen.show(this, "Profilo temporale della popolazione", content);
+        HBox helpBar = new HBox(UiFactory.spacer(), help);
+        VBox wrapper = new VBox(8, helpBar, content);
+        VBox.setVgrow(content, Priority.ALWAYS);
+        InPlaceFullscreen.show(this, "Profilo temporale della popolazione", wrapper);
     }
 
     private VBox insightSnapshotCard(boolean expanded) {
@@ -459,13 +470,19 @@ public final class PopulationPage extends BorderPane {
 
         VBox assistant = insightSnapshotCard(true);
         assistant.setMaxHeight(Double.MAX_VALUE);
+        assistant.setVisible(false);
+        assistant.setManaged(false);
+        ToggleButton help = fullscreenHelpToggle(assistant);
         HBox content = new HBox(18, pane, assistant);
         content.setAlignment(Pos.TOP_LEFT);
         content.setFillHeight(true);
         content.setMinSize(0, 0);
         content.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         content.getStyleClass().add("population-fullscreen-content");
-        InPlaceFullscreen.show(this, "Profilo di popolazione 3D", content);
+        HBox helpBar = new HBox(UiFactory.spacer(), help);
+        VBox wrapper = new VBox(8, helpBar, content);
+        VBox.setVgrow(content, Priority.ALWAYS);
+        InPlaceFullscreen.show(this, "Profilo di popolazione 3D", wrapper);
     }
 
     private LineChart<Number, Number> copyProfileChart() {
@@ -558,7 +575,7 @@ public final class PopulationPage extends BorderPane {
         HBox toolbar = new HBox(8, UiFactory.spacer(), threeDButton);
         VBox content = new VBox(6, toolbar, chart);
         VBox.setVgrow(chart, Priority.ALWAYS);
-        VBox card = UiFactory.card(title, subtitle, content);
+        VBox card = UiFactory.card(title, "", content);
         card.getStyleClass().add("population-histogram-card");
         return card;
     }
@@ -1306,6 +1323,46 @@ public final class PopulationPage extends BorderPane {
         box.setPrefWidth(215);
         box.setMaxWidth(Double.MAX_VALUE);
         return box;
+    }
+
+    private static Node compactRadioChoice(ChoiceBox<String> backing, List<String> values, List<String> labels) {
+        ToggleGroup group = new ToggleGroup();
+        HBox row = new HBox(5);
+        row.getStyleClass().add("compact-radio-group");
+        for (int index = 0; index < values.size(); index++) {
+            String value = values.get(index);
+            String label = labels.get(index);
+            javafx.scene.control.RadioButton radio = new javafx.scene.control.RadioButton(I18n.t(label));
+            radio.getStyleClass().add("compact-radio");
+            radio.setToggleGroup(group);
+            radio.setUserData(value);
+            radio.setSelected(java.util.Objects.equals(backing.getValue(), value));
+            radio.setOnAction(event -> backing.setValue(value));
+            I18n.languageProperty().addListener((obs, oldLanguage, newLanguage) -> radio.setText(I18n.t(label)));
+            row.getChildren().add(radio);
+        }
+        backing.valueProperty().addListener((obs, oldValue, newValue) -> {
+            for (javafx.scene.control.Toggle toggle : group.getToggles()) {
+                if (java.util.Objects.equals(toggle.getUserData(), newValue)) {
+                    group.selectToggle(toggle);
+                    break;
+                }
+            }
+        });
+        return row;
+    }
+
+    private static ToggleButton fullscreenHelpToggle(Node assistant) {
+        ToggleButton help = new ToggleButton(I18n.t("Mostra spiegazione"));
+        help.getStyleClass().addAll("ghost-button", "help-toggle");
+        help.selectedProperty().addListener((obs, oldValue, selected) -> {
+            assistant.setVisible(selected);
+            assistant.setManaged(selected);
+            help.setText(I18n.t(selected ? "Nascondi spiegazione" : "Mostra spiegazione"));
+        });
+        I18n.languageProperty().addListener((obs, oldLanguage, newLanguage) ->
+                help.setText(I18n.t(help.isSelected() ? "Nascondi spiegazione" : "Mostra spiegazione")));
+        return help;
     }
 
     private static VBox filterGroup(String title, String detail, Node control, double width) {

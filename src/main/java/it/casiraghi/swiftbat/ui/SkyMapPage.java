@@ -144,10 +144,7 @@ public final class SkyMapPage extends BorderPane {
         HBox titleRow = new HBox(16);
         titleRow.setAlignment(Pos.CENTER_LEFT);
         VBox titleText = new VBox(5,
-                UiFactory.label("Mappa celeste", "page-title"),
-                UiFactory.wrappedLabel(
-                        "Esplora la distribuzione dei GRB nel cielo con Mollweide 2D e sfera 3D interattiva.",
-                        "page-subtitle"));
+                UiFactory.label("Mappa celeste", "page-title"));
         HBox.setHgrow(titleText, Priority.ALWAYS);
         titleRow.getChildren().addAll(titleText, status);
 
@@ -195,10 +192,7 @@ public final class SkyMapPage extends BorderPane {
         mapHost.setPrefHeight(500);
         VBox.setVgrow(mapHost, Priority.ALWAYS);
         HBox.setHgrow(mapCard, Priority.ALWAYS);
-        mapCard.getChildren().addAll(mapHead, buildSkyLegend(), mapHost,
-                UiFactory.wrappedLabel(
-                        "Rotellina: zoom · trascina: sposta/ruota · doppio clic: centra. Viola = piano galattico.",
-                        "sky-map-caption"));
+        mapCard.getChildren().addAll(mapHead, buildSkyLegend(), mapHost);
 
         VBox details = buildDetailsPanel();
         details.setPrefWidth(330);
@@ -245,6 +239,7 @@ public final class SkyMapPage extends BorderPane {
         redshiftFilter.setPrefWidth(155);
 
         galacticPlane.getStyleClass().add("modern-check");
+        Node redshiftControl = compactRedshiftRadios();
         Button reset = UiFactory.button("Reset", "ghost-button");
         reset.setOnAction(event -> resetFilters());
         search.setOnAction(event -> {
@@ -255,14 +250,39 @@ public final class SkyMapPage extends BorderPane {
         HBox raRange = compactSkyRange("RA", raMin, raMax);
         HBox decRange = compactSkyRange("DEC", decMin, decMax);
         HBox zRange = compactSkyRange("z", zMin, zMax);
-        row.getChildren().addAll(search, durationFilter, redshiftFilter,
+        row.getChildren().addAll(search, durationFilter, redshiftControl,
                 raRange, decRange, zRange, galacticPlane, reset);
-
-        Label help = UiFactory.wrappedLabel(
-                "RA può attraversare 0°. I limiti RA/DEC e l'intervallo di redshift vengono applicati automaticamente.",
-                "sky-filter-help");
-        card.getChildren().addAll(row, help);
+        card.getChildren().add(row);
         return card;
+    }
+
+    private Node compactRedshiftRadios() {
+        ToggleGroup group = new ToggleGroup();
+        HBox row = new HBox(4);
+        row.getStyleClass().add("compact-radio-group");
+        String[] values = {"Con e senza redshift", "Solo con redshift", "Solo senza redshift"};
+        String[] labels = {"Tutti", "Con z", "Senza z"};
+        for (int index = 0; index < values.length; index++) {
+            final String value = values[index];
+            final String label = labels[index];
+            javafx.scene.control.RadioButton radio = new javafx.scene.control.RadioButton(I18n.t(label));
+            radio.getStyleClass().add("compact-radio");
+            radio.setToggleGroup(group);
+            radio.setUserData(value);
+            radio.setSelected(value.equals(redshiftFilter.getValue()));
+            radio.setOnAction(event -> redshiftFilter.setValue(value));
+            I18n.languageProperty().addListener((obs, oldLanguage, newLanguage) -> radio.setText(I18n.t(label)));
+            row.getChildren().add(radio);
+        }
+        redshiftFilter.valueProperty().addListener((obs, oldValue, newValue) -> {
+            for (javafx.scene.control.Toggle toggle : group.getToggles()) {
+                if (java.util.Objects.equals(toggle.getUserData(), newValue)) {
+                    group.selectToggle(toggle);
+                    break;
+                }
+            }
+        });
+        return row;
     }
 
     private HBox compactSkyRange(String label, TextField minimum, TextField maximum) {
@@ -503,7 +523,7 @@ public final class SkyMapPage extends BorderPane {
         details.getChildren().addAll(
                 UiFactory.label("GRB selezionato", "card-subtitle"),
                 selectedName, rows, selectedCatalog, openButton,
-                UiFactory.label("Nota scientifica", "card-title"), scientificNote);
+                UiFactory.collapsibleHelp("", scientificNote));
         return details;
     }
 
