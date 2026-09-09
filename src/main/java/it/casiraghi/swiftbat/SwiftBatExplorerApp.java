@@ -1,5 +1,6 @@
 package it.casiraghi.swiftbat;
 
+import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
 import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
 import it.casiraghi.swiftbat.ui.MainView;
 import it.casiraghi.swiftbat.ui.UiBugFixes;
@@ -42,6 +43,7 @@ public final class SwiftBatExplorerApp extends Application {
 
         UiLocalizationWatcher.install(mainView.getRoot());
         UiRefinements.install(mainView.getRoot());
+        ExplorerBandSelectionEnhancer.install(mainView.getRoot());
         UiBugFixes.install(mainView.getRoot());
         mainView.initialize();
     }
