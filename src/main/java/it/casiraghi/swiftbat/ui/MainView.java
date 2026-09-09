@@ -214,7 +214,10 @@ public final class MainView {
         english.setOnAction(event -> I18n.setLanguage(I18n.Language.EN));
         HBox languageBox = new HBox(2, italian, english);
         languageBox.getStyleClass().add("language-switch");
-        I18n.languageProperty().addListener((obs, oldValue, newValue) -> Platform.runLater(() -> I18n.localizeTree(root)));
+        I18n.languageProperty().addListener((obs, oldValue, newValue) -> Platform.runLater(() -> {
+            I18n.localizeTree(root);
+            updateCacheStatus();
+        }));
 
         bar.getChildren().addAll(product, live, spacer, catalogStatus, sessionStatus, connectionStatus,
                 languageBox, refresh, official);
@@ -255,7 +258,7 @@ public final class MainView {
 
     private void loadCatalog() {
         setConnection("Connessione…", "status-neutral");
-        catalogStatus.setText("Catalogo…");
+        I18n.setText(catalogStatus, "Catalogo…", "Catalog…");
         Task<List<CatalogEntry>> task = new Task<>() {
             @Override
             protected List<CatalogEntry> call() throws Exception {
@@ -267,7 +270,7 @@ public final class MainView {
             explorerPage.setCatalog(entries, false);
             skyMapPage.setBaseCatalog(entries);
             populationPage.setCatalog(entries);
-            catalogStatus.setText(entries.size() + " GRB");
+            I18n.setText(catalogStatus, entries.size() + " GRB", entries.size() + " GRBs");
             setConnection("Online", "status-online");
             loadSkyCatalog();
         });
@@ -276,7 +279,7 @@ public final class MainView {
             explorerPage.setCatalog(fallback, true);
             skyMapPage.setBaseCatalog(fallback);
             populationPage.setCatalog(fallback);
-            catalogStatus.setText(fallback.size() + " GRB ridotti");
+            I18n.setText(catalogStatus, fallback.size() + " GRB ridotti", fallback.size() + " GRBs · fallback");
             setConnection("Offline parziale", "status-warning");
             loadSkyCatalog();
         });
@@ -352,7 +355,9 @@ public final class MainView {
             }
         }
 
-        explorerPage.showLoading(0.02, "Apro " + entry.grbName(), "Recupero i prodotti Swift/BAT online.");
+        explorerPage.showLoading(0.02,
+                I18n.dynamic("Apro " + entry.grbName(), "Opening " + entry.grbName()),
+                I18n.dynamic("Recupero i prodotti Swift/BAT online.", "Retrieving Swift/BAT products online."));
 
         Task<GrbData> task = new Task<>() {
             @Override
@@ -373,12 +378,13 @@ public final class MainView {
     }
 
     private void updateCacheStatus() {
-        sessionStatus.setText(sessionData.size() + " RAM · "
-                + grbService.persistentCachedCount() + " locali");
+        I18n.setText(sessionStatus,
+                sessionData.size() + " RAM · " + grbService.persistentCachedCount() + " locali",
+                sessionData.size() + " RAM · " + grbService.persistentCachedCount() + " local");
     }
 
     private void setConnection(String text, String styleClass) {
-        connectionStatus.setText(text);
+        I18n.setText(connectionStatus, text, I18n.english(text));
         connectionStatus.getStyleClass().removeAll("status-neutral", "status-online", "status-warning");
         connectionStatus.getStyleClass().add(styleClass);
     }

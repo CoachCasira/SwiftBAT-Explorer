@@ -61,9 +61,12 @@ public final class GlossaryPage extends BorderPane {
             filtered.setPredicate(item -> query.isBlank() || item.searchableText().contains(query));
         });
 
-        Label count = UiFactory.label(definitions.size() + " voci documentate", "sidebar-caption");
-        filtered.addListener((javafx.collections.ListChangeListener<FieldDefinition>) change ->
-                count.setText(filtered.size() + " voci visualizzate"));
+        Label count = UiFactory.label("", "sidebar-caption");
+        Runnable refreshCount = () -> I18n.setText(count,
+                filtered.size() + " voci documentate", filtered.size() + " documented entries");
+        filtered.addListener((javafx.collections.ListChangeListener<FieldDefinition>) change -> refreshCount.run());
+        I18n.languageProperty().addListener((obs, oldValue, newValue) -> refreshCount.run());
+        refreshCount.run();
 
         list.getStyleClass().add("dictionary-list");
         list.setCellFactory(ignored -> new DictionaryCell());
@@ -93,7 +96,7 @@ public final class GlossaryPage extends BorderPane {
         heading.setAlignment(Pos.CENTER_LEFT);
         VBox titleBox = new VBox(5,
                 UiFactory.label(definition.field(), "definition-title"),
-                UiFactory.label(definition.category() + " · " + definition.source(), "definition-kicker"));
+                UiFactory.label(I18n.t(definition.category()) + " · " + I18n.t(definition.source()), "definition-kicker"));
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         Label unit = UiFactory.label(definition.unit().isBlank() ? "senza unità" : definition.unit(), "unit-badge");
@@ -130,7 +133,7 @@ public final class GlossaryPage extends BorderPane {
             }
             VBox box = new VBox(4);
             Label field = UiFactory.label(item.field(), "dictionary-field");
-            Label source = UiFactory.label(item.category() + " · " + item.source(), "dictionary-source");
+            Label source = UiFactory.label(I18n.t(item.category()) + " · " + I18n.t(item.source()), "dictionary-source");
             Label simple = UiFactory.wrappedLabel(item.simpleExplanation(), "dictionary-preview");
             box.getChildren().addAll(field, source, simple);
             setGraphic(box);

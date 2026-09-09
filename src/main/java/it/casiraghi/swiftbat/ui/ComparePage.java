@@ -32,7 +32,7 @@ public final class ComparePage extends BorderPane {
     private final ComboBox<String> second = new ComboBox<>();
     private final Label firstMatches = UiFactory.label("", "compare-match-count");
     private final Label secondMatches = UiFactory.label("", "compare-match-count");
-    private final CheckBox normalize = new CheckBox("Normalizza ogni curva sul proprio picco");
+    private final CheckBox normalize = new CheckBox(I18n.t("Normalizza ogni curva sul proprio picco"));
     private final StackPane content = new StackPane();
     private List<String> availableNames = List.of();
 
@@ -97,7 +97,7 @@ public final class ComparePage extends BorderPane {
         if (!query.startsWith("GRB")) query = "GRB" + query;
         final String normalized = query;
         List<String> matches = availableNames.stream().filter(name -> name.startsWith(normalized)).toList();
-        counter.setText(matches.size() + (I18n.language() == I18n.Language.IT ? " corrispondenze" : " matches"));
+        I18n.setText(counter, matches.size() + " corrispondenze", matches.size() + " matches");
         if (matches.size() <= 10 && !matches.isEmpty() && normalized.length() > 3) {
             combo.setItems(FXCollections.observableArrayList(matches));
             if (!combo.isShowing()) combo.show();
