@@ -1,17 +1,22 @@
 package it.casiraghi.swiftbat;
 
+import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
 import it.casiraghi.swiftbat.ui.MainView;
 import it.casiraghi.swiftbat.ui.UiBugFixes;
 import it.casiraghi.swiftbat.ui.UiLocalizationWatcher;
 import it.casiraghi.swiftbat.ui.UiRefinements;
+import it.casiraghi.swiftbat.ui.components.BrandLogoAsset;
 import javafx.application.Application;
 import javafx.scene.Scene;
-import javafx.scene.image.Image;
 import javafx.stage.Stage;
 
 public final class SwiftBatExplorerApp extends Application {
     @Override
     public void start(Stage stage) {
+        // Rendiamo il dizionario supplementare disponibile anche ai renderer
+        // Java2D/Swing che usano ancora direttamente I18n.t(...).
+        LegacyI18nBridge.install();
+
         MainView mainView = new MainView(getHostServices(), stage);
         Scene scene = new Scene(mainView.getRoot(), 1580, 960);
         scene.getStylesheets().add(
@@ -26,8 +31,7 @@ public final class SwiftBatExplorerApp extends Application {
                 SwiftBatExplorerApp.class.getResource("/reference-redesign-final.css").toExternalForm());
 
         stage.setTitle("SwiftBAT Explorer 1.3.0 — Reference UI Preview");
-        var iconStream = SwiftBatExplorerApp.class.getResourceAsStream("/app-icon.png");
-        if (iconStream != null) stage.getIcons().add(new Image(iconStream));
+        stage.getIcons().setAll(BrandLogoAsset.image());
         stage.setMinWidth(1240);
         stage.setMinHeight(790);
         stage.setScene(scene);
