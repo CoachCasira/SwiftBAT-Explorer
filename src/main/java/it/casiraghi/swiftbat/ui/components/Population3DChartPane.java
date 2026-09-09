@@ -1,6 +1,7 @@
 package it.casiraghi.swiftbat.ui.components;
 
 import it.casiraghi.swiftbat.service.CumulativeAnalysisService;
+import it.casiraghi.swiftbat.ui.ExportSupport;
 import it.casiraghi.swiftbat.ui.I18n;
 import it.casiraghi.swiftbat.ui.UiFactory;
 import javafx.application.Platform;
@@ -24,10 +25,9 @@ import java.util.List;
 
 /** Vista interattiva 3D degli stessi elementi statistici mostrati nel profilo 2D. */
 public final class Population3DChartPane extends BorderPane {
-    // Exact colors used by PopulationPage.profileSeriesStyle(...) in the 2D view.
-    private static final Color SINGLE_COLOR = new Color(84, 215, 255);    // #54d7ff
-    private static final Color MEDIAN_COLOR = new Color(255, 174, 74);    // #ffae4a
-    private static final Color QUARTILE_COLOR = new Color(170, 120, 219); // #aa78db
+    private static final Color SINGLE_COLOR = new Color(84, 215, 255);
+    private static final Color MEDIAN_COLOR = new Color(255, 174, 74);
+    private static final Color QUARTILE_COLOR = new Color(170, 120, 219);
 
     private final SwingNode swingNode = new SwingNode();
     private final Java2DWaterfallPanel renderer = new Java2DWaterfallPanel();
@@ -154,9 +154,13 @@ public final class Population3DChartPane extends BorderPane {
                 "subtle-text");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
+        Button export = UiFactory.button("", "secondary-button");
+        I18n.setText(export, "Esporta PNG", "Export PNG");
+        export.setOnAction(event -> ExportSupport.exportSwingPng(
+                this, renderer, "population_temporal_profile_3d.png"));
         Button reset = UiFactory.button("Centra vista", "secondary-button");
         reset.setOnAction(event -> SwingUtilities.invokeLater(renderer::resetView));
-        HBox footer = new HBox(12, note, spacer, reset);
+        HBox footer = new HBox(12, note, spacer, export, reset);
         footer.setAlignment(Pos.CENTER_LEFT);
         footer.getStyleClass().add("three-d-footer");
         return footer;
