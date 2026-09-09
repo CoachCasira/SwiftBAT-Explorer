@@ -159,6 +159,23 @@ public final class TablePreferences {
         return text.replaceAll("[^A-Za-z0-9_]+", "_").toLowerCase(Locale.ROOT);
     }
 
+    public static boolean isColumnVisible(String tableKey, String columnName) {
+        if (tableKey == null || tableKey.isBlank() || columnName == null || columnName.isBlank()) return true;
+        return PREFS.node(tableKey).getBoolean(columnId(columnName) + ".visible", true);
+    }
+
+    public static List<TableColumn<?, ?>> visibleLeafColumns(TableView<?> table) {
+        if (table == null) return List.of();
+        List<TableColumn<?, ?>> leaves = new ArrayList<>();
+        for (TableColumn<?, ?> column : table.getColumns()) collectLeaves(column, leaves);
+        leaves.removeIf(column -> !column.isVisible());
+        return List.copyOf(leaves);
+    }
+
+    public static String exportColumnName(TableColumn<?, ?> column) {
+        return I18n.t(columnName(column));
+    }
+
     public static boolean isNumeric(String text) {
         if (text == null || text.isBlank()) return false;
         String clean = text.trim().replace(',', '.').replace("%", "");
