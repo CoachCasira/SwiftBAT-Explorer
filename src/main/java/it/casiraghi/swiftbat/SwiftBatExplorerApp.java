@@ -1,6 +1,7 @@
 package it.casiraghi.swiftbat;
 
 import it.casiraghi.swiftbat.ui.MainView;
+import it.casiraghi.swiftbat.ui.UiRefinements;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
@@ -13,6 +14,8 @@ public final class SwiftBatExplorerApp extends Application {
         Scene scene = new Scene(mainView.getRoot(), 1580, 960);
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/app.css").toExternalForm());
+        scene.getStylesheets().add(
+                SwiftBatExplorerApp.class.getResource("/ui-refinements.css").toExternalForm());
 
         stage.setTitle("SwiftBAT Explorer 1.3.0 — Spectral Preview");
         var iconStream = SwiftBatExplorerApp.class.getResourceAsStream("/app-icon.png");
@@ -24,6 +27,7 @@ public final class SwiftBatExplorerApp extends Application {
         stage.setScene(scene);
         stage.show();
 
+        UiRefinements.install(mainView.getRoot());
         mainView.initialize();
     }
 
