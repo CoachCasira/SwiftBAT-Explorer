@@ -1,6 +1,5 @@
 package it.casiraghi.swiftbat.ui.components;
 
-import it.casiraghi.swiftbat.ui.I18n;
 import it.casiraghi.swiftbat.ui.UiTranslations;
 
 import javax.swing.JPanel;
@@ -40,11 +39,16 @@ public final class Java2DGroupedBarPanel extends JPanel {
     private static final Color SPECTRAL_BLUE = new Color(40, 127, 242);
     private static final Color SPECTRAL_PURPLE = new Color(174, 93, 244);
 
+    // Exact final color of the 2D Population Analysis histograms (#4fd5ef).
+    private static final Color POPULATION_CYAN = new Color(79, 213, 239);
+
     private Dataset dataset = Dataset.empty();
     private final List<BarHit> bars = new ArrayList<>();
     private double yaw = 0.34;
     private double pitch = 0.70;
     private double zoom = 1.0;
+    private double panX;
+    private double panY;
     private int dragStartX;
     private int dragStartY;
     private double dragStartYaw;
@@ -101,7 +105,7 @@ public final class Java2DGroupedBarPanel extends JPanel {
 
             @Override
             public void mouseWheelMoved(MouseWheelEvent event) {
-                zoom = clamp(zoom * Math.pow(1.08, -event.getPreciseWheelRotation()), 0.68, 1.55);
+                zoomAt(event.getX(), event.getY(), event.getPreciseWheelRotation());
                 hover = null;
                 repaint();
                 event.consume();
@@ -126,8 +130,27 @@ public final class Java2DGroupedBarPanel extends JPanel {
         yaw = 0.34;
         pitch = 0.70;
         zoom = 1.0;
+        panX = 0;
+        panY = 0;
         hover = null;
         repaint();
+    }
+
+    private void zoomAt(double mouseX, double mouseY, double wheelRotation) {
+        double oldZoom = zoom;
+        double newZoom = clamp(oldZoom * Math.pow(1.08, -wheelRotation), 0.68, 1.85);
+        if (Math.abs(newZoom - oldZoom) < 1e-9) return;
+
+        // Projection is affine around this base origin. Correcting the pan after
+        // scaling keeps the point currently under the pointer visually fixed.
+        double baseX = getWidth() * 0.43;
+        double baseY = getHeight() * 0.76;
+        double ratio = newZoom / oldZoom;
+        panX = mouseX - baseX - ratio * (mouseX - baseX - panX);
+        panY = mouseY - baseY - ratio * (mouseY - baseY - panY);
+        panX = clamp(panX, -getWidth() * 1.5, getWidth() * 1.5);
+        panY = clamp(panY, -getHeight() * 1.5, getHeight() * 1.5);
+        zoom = newZoom;
     }
 
     @Override
@@ -156,7 +179,7 @@ public final class Java2DGroupedBarPanel extends JPanel {
     private void paintChart(Graphics2D g) {
         bars.clear();
         int maxCount = Math.max(1, dataset.maximumCount());
-        Geometry geometry = new Geometry(getWidth(), getHeight(), yaw, pitch, zoom);
+        Geometry geometry = new Geometry(getWidth(), getHeight(), yaw, pitch, zoom, panX, panY);
         paintGrid(g, geometry, maxCount);
 
         int groups = dataset.groups().length;
@@ -176,7 +199,7 @@ public final class Java2DGroupedBarPanel extends JPanel {
                 double x1 = xCenter + barWidth / 2.0;
                 double height = count / (double) maxCount;
                 paintBar(g, geometry, group, category, count, x0, x1, z0, z1, height,
-                        dataset.colors()[group]);
+                        displayColor(group));
             }
         }
 
@@ -309,8 +332,20 @@ public final class Java2DGroupedBarPanel extends JPanel {
         }
     }
 
+    private boolean isPopulationHistogram() {
+        if (dataset.spectralGradient()) return false;
+        String value = dataset.valueLabel() == null ? "" : dataset.valueLabel().toLowerCase(java.util.Locale.ROOT);
+        return value.contains("numero di grb") || value.contains("number of grbs");
+    }
+
+    private Color displayColor(int group) {
+        if (isPopulationHistogram()) return POPULATION_CYAN;
+        return dataset.colors()[group];
+    }
+
     private Color legendColor(int group) {
-        return dataset.spectralGradient() ? SPECTRAL_BLUE : dataset.colors()[group];
+        if (dataset.spectralGradient()) return SPECTRAL_BLUE;
+        return displayColor(group);
     }
 
     private void paintHint(Graphics2D g) {
@@ -454,11 +489,12 @@ public final class Java2DGroupedBarPanel extends JPanel {
         private final double depthX;
         private final double depthY;
 
-        private Geometry(int width, int height, double yaw, double pitch, double zoom) {
+        private Geometry(int width, int height, double yaw, double pitch, double zoom,
+                         double panX, double panY) {
             plotWidth = Math.max(360, width * 0.66) * zoom;
             plotHeight = Math.max(200, height * 0.57) * zoom;
-            centerX = width * 0.43;
-            baselineY = height * 0.76;
+            centerX = width * 0.43 + panX;
+            baselineY = height * 0.76 + panY;
             depthX = (46 + 92 * yaw) * zoom;
             depthY = (24 + 58 * pitch) * zoom;
         }
