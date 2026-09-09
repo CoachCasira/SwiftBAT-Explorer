@@ -22,6 +22,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
+import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.BorderPane;
@@ -33,6 +34,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -61,6 +63,7 @@ public final class MainView {
     private final OnlineGrbService grbService = new OnlineGrbService();
     private final ObservableMap<String, GrbData> sessionData = FXCollections.observableHashMap();
     private final Set<String> compareLoadsInFlight = ConcurrentHashMap.newKeySet();
+    private List<CatalogEntry> currentCatalog = List.of();
 
     private final BorderPane root = new BorderPane();
     private final StackPane pageHost = new StackPane();
@@ -93,8 +96,12 @@ public final class MainView {
         homePage = new HomePage(
                 () -> navigate("explorer"),
                 () -> navigate("sky"),
+                () -> navigate("population"),
                 () -> navigate("compare"),
-                () -> navigate("about"));
+                () -> navigate("about"),
+                catalogStatus.textProperty(),
+                sessionStatus.textProperty(),
+                connectionStatus.textProperty());
         buildLayout();
         sessionData.addListener((javafx.collections.MapChangeListener<String, GrbData>) change -> {
             updateCacheStatus();
@@ -119,7 +126,7 @@ public final class MainView {
     }
 
     private void buildLayout() {
-        root.getStyleClass().addAll("app-root", "black-hole-redesign");
+        root.getStyleClass().addAll("app-root", "black-hole-redesign", "reference-redesign");
         root.setLeft(buildNavigation());
         root.setTop(buildTopBar());
         pageHost.getStyleClass().add("page-host");
@@ -130,38 +137,38 @@ public final class MainView {
 
     private Node buildNavigation() {
         navigation.getStyleClass().add("main-navigation");
-        navigation.setPadding(new Insets(20, 12, 16, 12));
-        navigation.setPrefWidth(218);
-        navigation.setMinWidth(204);
-
-        HBox brand = new HBox(10);
-        brand.getStyleClass().add("nav-brand");
-        brand.setAlignment(Pos.CENTER_LEFT);
-        Label logo = UiFactory.label("◉", "nav-logo");
-        VBox brandText = new VBox(0,
-                UiFactory.label("SwiftBAT", "nav-brand-title"),
-                UiFactory.label("GRB EXPLORER", "nav-brand-subtitle"));
-        brand.getChildren().addAll(logo, brandText);
+        navigation.setPadding(new Insets(18, 12, 14, 12));
+        navigation.setPrefWidth(228);
+        navigation.setMinWidth(214);
 
         Button home = navButton("⌂", "Home", "home");
-        Button explorer = navButton("✦", "Esplora", "explorer");
-        Button sky = navButton("◎", "Mappa celeste", "sky");
+        Button explorer = navButton("⌕", "Esplora", "explorer");
+        Button sky = navButton("◇", "Mappa celeste", "sky");
+        Button spectroscopy = navButton("⌁", "Spettroscopia", "spectroscopy");
         Button population = navButton("≋", "Analisi di popolazione", "population");
         Button compare = navButton("⇄", "Confronta", "compare");
-        Button about = navButton("i", "Info", "about");
+        Button about = navButton("ⓘ", "Info", "about");
 
         Region spacer = new Region();
         VBox.setVgrow(spacer, Priority.ALWAYS);
 
         Separator separator = new Separator();
         separator.getStyleClass().add("soft-separator");
-        Label online = UiFactory.wrappedLabel("Dati scientifici online\nNASA/GSFC Swift/BAT", "nav-source");
+        VBox footer = new VBox(4,
+                UiFactory.label("◉  SwiftBAT Explorer", "nav-footer-title"),
+                UiFactory.label("v1.3.0", "nav-footer-version"),
+                UiFactory.label("INAF – OAS Bologna", "nav-footer-line"),
+                UiFactory.wrappedLabel("Un progetto per la scienza aperta", "nav-footer-line"));
+        footer.getStyleClass().add("nav-footer-card");
+        footer.setPadding(new Insets(11));
+
+        Label online = UiFactory.wrappedLabel("Dati scientifici NASA/GSFC Swift/BAT", "nav-source");
         Button source = UiFactory.button("Fonte ufficiale  ↗", "nav-source-button");
         source.setMaxWidth(Double.MAX_VALUE);
         source.setOnAction(event -> hostServices.showDocument(SwiftCatalogService.CATALOG_URL));
 
-        navigation.getChildren().addAll(brand, home, explorer, sky, population, compare, about,
-                spacer, separator, online, source);
+        navigation.getChildren().addAll(home, explorer, sky, spectroscopy, population, compare, about,
+                spacer, separator, footer, online, source);
         return navigation;
     }
 
@@ -190,22 +197,41 @@ public final class MainView {
     }
 
     private Node buildTopBar() {
-        HBox bar = new HBox(11);
+        HBox bar = new HBox(12);
         bar.getStyleClass().add("top-bar");
-        bar.setPadding(new Insets(11, 18, 11, 20));
+        bar.setPadding(new Insets(9, 16, 9, 16));
         bar.setAlignment(Pos.CENTER_LEFT);
 
-        Label product = UiFactory.label("SwiftBAT Explorer · 1.3 SPECTRAL", "top-product-title");
-        Label live = UiFactory.label("LIVE", "top-live-badge");
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
+        HBox brand = new HBox(9);
+        brand.getStyleClass().add("top-brand");
+        brand.setAlignment(Pos.CENTER_LEFT);
+        Label logo = UiFactory.label("◉", "top-orbit-logo");
+        VBox brandCopy = new VBox(0,
+                UiFactory.label("SwiftBAT Explorer", "top-brand-title"),
+                UiFactory.label("Esplora i lampi di raggi gamma", "top-brand-subtitle"));
+        brand.getChildren().addAll(logo, brandCopy);
+
+        TextField globalSearch = new TextField();
+        globalSearch.getStyleClass().add("global-search-field");
+        globalSearch.setPromptText("⌕   Cerca un GRB (es. GRB250605A, 231107A, …)");
+        globalSearch.setPrefWidth(560);
+        globalSearch.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(globalSearch, Priority.ALWAYS);
+        globalSearch.setOnAction(event -> runGlobalSearch(globalSearch));
+
+        Button dataset = topActionButton("▱", "Dataset");
+        dataset.setOnAction(event -> navigate("explorer"));
+        Button tools = topActionButton("⌁", "Strumenti");
+        tools.setOnAction(event -> navigate("compare"));
+        Button guide = topActionButton("?", "Guida");
+        guide.setOnAction(event -> navigate("about"));
 
         Button refresh = UiFactory.iconButton("↻", "Aggiorna il catalogo online");
         refresh.setOnAction(event -> {
             loadCatalog();
             loadSpectralCatalog(true);
         });
-        Button official = UiFactory.iconButton("↗", "Apri il catalogo ufficiale");
+        Button official = UiFactory.iconButton("⚙", "Apri il catalogo ufficiale");
         official.setOnAction(event -> hostServices.showDocument(SwiftCatalogService.CATALOG_URL));
 
         ToggleButton italian = new ToggleButton("IT");
@@ -225,14 +251,55 @@ public final class MainView {
             updateCacheStatus();
         }));
 
-        bar.getChildren().addAll(product, live, spacer, catalogStatus, sessionStatus, connectionStatus,
-                languageBox, refresh, official);
+        HBox telemetry = new HBox(5, catalogStatus, sessionStatus, connectionStatus);
+        telemetry.getStyleClass().add("top-telemetry");
+        telemetry.setAlignment(Pos.CENTER_RIGHT);
+
+        bar.getChildren().addAll(brand, globalSearch, dataset, tools, guide,
+                telemetry, languageBox, refresh, official);
         return bar;
+    }
+
+    private Button topActionButton(String glyph, String text) {
+        Button button = UiFactory.button(glyph + "  " + text, "top-nav-button");
+        button.setFocusTraversable(false);
+        return button;
+    }
+
+    private void runGlobalSearch(TextField field) {
+        String raw = field.getText() == null ? "" : field.getText().trim();
+        if (raw.isBlank()) {
+            navigate("explorer");
+            return;
+        }
+        String query = raw.toUpperCase(Locale.ROOT).replace(" ", "");
+        CatalogEntry match = currentCatalog.stream()
+                .filter(entry -> {
+                    String name = entry.grbName().toUpperCase(Locale.ROOT).replace(" ", "");
+                    return name.equals(query)
+                            || ("GRB" + name).equals(query)
+                            || name.contains(query.replaceFirst("^GRB", ""));
+                })
+                .findFirst()
+                .orElse(null);
+        if (match != null) {
+            loadGrb(match, false);
+            field.selectAll();
+        } else {
+            navigate("explorer");
+        }
     }
 
     private void navigate(String page) {
         Node node = switch (page) {
-            case "explorer" -> explorerPage;
+            case "explorer" -> {
+                explorerPage.showTab("Curva 2D");
+                yield explorerPage;
+            }
+            case "spectroscopy" -> {
+                explorerPage.showTab("Spettroscopia");
+                yield explorerPage;
+            }
             case "compare" -> comparePage;
             case "population" -> populationPage;
             case "sky" -> skyMapPage;
@@ -250,7 +317,6 @@ public final class MainView {
                 break;
             }
         }
-        // Il dizionario è una schermata secondaria aperta da Info: mantiene evidenziata Info.
         if (!foundVisibleButton && "glossary".equals(page)) {
             for (Node navNode : navigation.getChildren()) {
                 if (navNode instanceof Button button && "about".equals(button.getUserData())) {
@@ -273,6 +339,7 @@ public final class MainView {
         };
         task.setOnSucceeded(event -> {
             List<CatalogEntry> entries = task.getValue();
+            currentCatalog = List.copyOf(entries);
             explorerPage.setCatalog(entries, false);
             skyMapPage.setBaseCatalog(entries);
             populationPage.setCatalog(entries);
@@ -283,6 +350,7 @@ public final class MainView {
         });
         task.setOnFailed(event -> {
             List<CatalogEntry> fallback = catalogService.fallbackCatalog();
+            currentCatalog = List.copyOf(fallback);
             explorerPage.setCatalog(fallback, true);
             skyMapPage.setBaseCatalog(fallback);
             populationPage.setCatalog(fallback);
@@ -342,8 +410,6 @@ public final class MainView {
             }
         };
         task.setOnSucceeded(event -> explorerPage.setSpectralCatalog(task.getValue()));
-        // Senza rete o cache la mappa tempo-energia resta utilizzabile e la scheda
-        // segnala esplicitamente l'assenza dei fit ufficiali.
         task.setOnFailed(event -> explorerPage.setSpectralCatalog(Map.of()));
         BACKGROUND_EXECUTOR.execute(task);
     }
