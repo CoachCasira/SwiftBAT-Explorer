@@ -1,0 +1,39 @@
+package it.casiraghi.swiftbat.ui.components;
+
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+
+import java.io.ByteArrayInputStream;
+import java.util.Base64;
+
+/**
+ * Asset compatto derivato direttamente dal logo approvato dall'utente.
+ *
+ * <p>Il ritaglio contiene solo il buco nero e le orbite dell'artwork originale,
+ * così rimane leggibile sia nell'header sia come icona della finestra. L'immagine
+ * è incorporata nel jar per evitare file esterni mancanti durante il packaging.</p>
+ */
+public final class BrandLogoAsset {
+    private static final String JPEG_BASE64 =
+            "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAUEBAYFBQUGBgYHCQ4JCQgICRINDQoOFRIWFhUSFBQXGiEcFxgfGRQUHScdHyIjJSUlFhwpLCgkKyEkJST/2wBDAQYGBgkICREJCREkGBQYJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCT/wgARCABgAGADASIAAhEBAxEB/8QAGwAAAgIDAQAAAAAAAAAAAAAAAgMBBAAFBgf/xAAYAQADAQEAAAAAAAAAAAAAAAAAAQIDBP/aAAwDAQACEAMQAAAB8qycazCwAwiAMYADkwEzBBBAxhuYq0sTYhY2rFOgw1BUKTzEWqrAhkbG5rjutXQ4avZD5+l6Dzuy1l/YN6J4R82uG39BW9J6J8w4zrqfJfPXen3GsdjQ03nm+XRaSkvPTZbXTxpp2wcGzNdFowXCQ7GwXdEyQJZIiiNqBw5GJbEaOUrdaMQ0kqBhqxP/xAAmEAACAgIBBAEEAwAAAAAAAAABAgADBBEFEBITITEGFCAiI0BC/9oACAEBAAEFAv6GpqMhVtfgB1rUuzKtc9ma1H0X9iBQ8yMWzGM9dFEZ/EDrtRTP1EDVxQlksqNZNhshUg+M9EPYoMGzNaArZ4uBYY2NYkrfuQ0kxcVnU4YNcYzt3KKtyvGBS3ObaZ2TWeM5KrNfO4B64vH5lZrxLlbJauhdAw0GVYp8dWEWH1E3hs6Y1bPZjU5q1ZmbRTMnkrGLM9rd6KdW3HjeNsyHXHGDTyHH52RanB5RlPF4VRr5XEwJl8zbbi3ZL2EGFjuigEuPFZXztFS3fU9jSzmcqwW5jtHuseY9fkbMye4Ga/j/AM/dKGfLseG1ogZz+yqUVoKhDZ2hjK07jY+z8wqQ2/QOoDqfeO08oBuYrb3bgSM/qKsLEkqRBPib30Otg6hbfT4m5//EAB4RAAEEAQUAAAAAAAAAAAAAAAEAAhARMAMSISJR/9oACAEDAQE/AcpNIKlfqOpXEbC4w5y7OQZSqKgDB//EACARAAMBAAMAAQUAAAAAAAAAAAABAhEDEBIgITFBUWH/2gAIAQIBAT8B+S6w8mL8mdRLbwrES5PHojgWayZ01RP9KltkcL+7NUfWi+d0RyRM4VzemO6F+2XXpmmde2ab1//EADEQAAECBAQDBgUFAAAAAAAAAAEAAgMRITEQEkFRIjJhBBMgcXKBIzCRocFAQoKx0f/aAAgBAQAGPwL9EW7fIkBOarxH7L/MHFrconQbYbFARGkEifhyN5v3H8KeFaqxUswGHGfdSOJfrYeCgXKrFd2/Wx6qYCBpRZ25pjQDBo2wJNgnR4xyw2qUId23pdTbGiD+SEDtgaHGgiCn1WZgmOiOVpaDuuNt+oTpGh31VFOS46TsN0yEBV1fZQ+xs5YYmfUcQGgzUNzo2RuXiBTpfEd1WnlNTiOQytXeco3XDbVydFht76LKiEUwIhLhWi4w2H6ivjRzFO0MflZeywWB29z9U2RlOpKuVXAauO6yv5WWnqpd1XzopQ+D0rneqzPmqmirRupQYLDDN7YHIMqq6fmtFKambKit91TDpqdlTlFsLKy6KbSZKWmyAaAnAsyEHl2wnYLKKN/vGR8FcDKcvF//xAAmEAEAAgICAQMFAQEBAAAAAAABABEhMUFRYXGBkRChscHw0TDx/9oACAEBAAE/IfpX/Ez9KgRKglwXL9RAVaRpuKNkqMqBe4MxB1xgAR6l4xw9+YuK6OsCZCy/EN8VZbp1cqC1V+CCVQR6dfQQ5gRLotXFTTPAfw8fmXBOdEbo95UAEvZVahxw8iajNO8C4iINSwELuaqf+4nv+7lHE7EVuoY7lfWB3ebX3v8AYjZja2dGLOIb8TYDsLmoMxXOITcoOl92XFhiVtNudsQV8B5i0Li/Yy8k9UxQVbbofuAr/Au/E5QIMYEAXLGSN3rzeuPB3K2UT0JiANkr9yZATYPh8/qGy4bzs/z6pqJxUts5o2j4hVtuC9nxGlV70P8AkA7nK6JlSIbW8wxCr0BDtGrk6jwMqhz/AH4nP/u7tmjTsyBKZusfKehHPuL9TXZvjShnzTizb11FJvDCGhNdCNh7MD8pkUaYye0GqBWDCZjRHvvE4V6cRMpGWqYBXQaJvZDItuPnv+8zBR3Bvlt3dzRZ8LnuvjUJHNcVzDeFYmbdeGEch9YSp+nRLcc9x67AZTQ7hmFBo/3MVUZFiuGWe45l5sFbGM7bdNMaCR79essBZ134gzmRHnqZpZm+RhetPK7Y0wrylTtBNzMsSlYnUv6eaGLnAA+8RWuY5YIs6jnjBP/aAAwDAQACAAMAAAAQ1TzP1TY8HwErlndrpiV8/NPN8JOzxkQBr3nS/8QAHBEBAAIDAQEBAAAAAAAAAAAAAQAREDFBISBh/9oACAEDAQE/EMX8M9XBG7xUMXApcVxg9CGqFsWtxAeEGy4YUbg+A0fu4R8wRewHYpolWLMJKgSp/8QAHxEBAAICAgIDAAAAAAAAAAAAAQARITEQUUFhccHh/9oACAECAQE/EJUqVwcKAhbML6YgIMwXiDwoNsXhKjQVk9S+wkHELfUKpMsRfRcMmEnfnwH33N5rqU5uZCi/j9jChgbtiQYaag1wKWINSyf/xAAmEAEAAgICAgIBBQEBAAAAAAABABEhMUFRYXGBkaEQscHR8OHx/9oACAEBAAE/ENZlt/oqosqVKqWSkIXvUNs4iMvuYP0VCRdBcpQaK1nEL1V1ixppFE8mJug9ktuWuhxBf7iMzROyGmceI8DaAr0TEstbj0jb1R5ZrToKPgleci7VfiXOtCzdizLWrYYQtdOR+IAKbVbfGz9ofZMKUrXyMTv6hDPy/oKJogBat4PuCjtchfadOXl4C7rBjYZe2WuNS3l/yVQuzDWfzCMCjeaYVZFLZAa0mdws0IZNf1CzChFcf4lQBVI8S5UaVzLUr+OpSTV/OIz8DXkdQLrk4HqXQVR3mpU1bA8+zl8cQgWemKYDzkmTYHSvqDvLyCiG7dP9TPhCnFuL1K0MaKsdFbs/auoL1sK4XdvfQcylWxBNWv2P4r6iO4vXzzDMVYIbT/fb4lQLl7FdLlcHtYSZ4G472r6ogIg6ofYtTGfltFgBinoex3EFQy0D2DI9JfxFOwsApza1fEWSQsVVYtjevtjJaaBLxMLqwTs6lRa94z/5Cs1JsN9GPiMt4GyoxQ70SoeLIAe3KrX+EosD9qJ9AD5/QgwUAKty9n2oUpo9gPtZSZgFXm1Ol8cdwPTJSWD4a4YK1F0YGgH0aCYCQu0rloMSqjSFvoHFlaI0uItoLXa8HPzD89pcYUNceuhDkmaNRBt+n5jw8zonwK/iKWfahPOIldqDXdvIr0jlStlsvWHvVBEgAt5sr2zMYmytdmu4vk5G+YMicWrRl/7FoCmABN0GqXrFSryCxQvKgeQ50QMU0tj/AHmbHXdp7dH4lvC9si+jEwzhoYHohy0BXadHa8Eoxjk2f+4Zy1l4YRTmV7bXwUfCb4Lz8Q41Mj6M6/mYYkiGZRRfGJgLhpQqE9FKi/wjGyirvjiIWF/qmIkI2hUAEUNCvSd+Y10qm3tLtCcQdr+uWg3LtyJsLu3ybX34JzHMca1kNe5YpgZtuMDoQWfw+ZkCQFprVhs8mPUu3F2F3e3LHbn7XduzxHeBO5CHNXGs3FXqmdwSD6/fo2vr8SlPPYXA5P2NH2ooT7nErm5d0KVYWL3E+FxWtz4jcJEyJBpSfbh+yUPZnV3A6Cs1DV4usXLVudpb84ihT2W42RCy8g5ISs7MW3if/9k=";
+
+    private static final Image IMAGE = new Image(
+            new ByteArrayInputStream(Base64.getDecoder().decode(JPEG_BASE64)),
+            96, 96, true, true);
+
+    private BrandLogoAsset() { }
+
+    public static Image image() {
+        return IMAGE;
+    }
+
+    public static ImageView view(double size) {
+        ImageView view = new ImageView(IMAGE);
+        view.setFitWidth(size);
+        view.setFitHeight(size);
+        view.setPreserveRatio(true);
+        view.setSmooth(true);
+        view.setMouseTransparent(true);
+        return view;
+    }
+}
