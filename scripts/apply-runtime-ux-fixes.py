@@ -48,7 +48,6 @@ replace('src/main/java/it/casiraghi/swiftbat/ui/ComparePage.java',
             I18n.localizeTree(content);
         });''',
 '''        showComparisonLoading(aName, bName, false);
-        // Give JavaFX one pulse to paint the loading state before building the chart.
         PauseTransition pause = new PauseTransition(Duration.millis(140));
         pause.setOnFinished(event -> {
             if (version != comparisonVersion) return;
@@ -61,7 +60,7 @@ replace('src/main/java/it/casiraghi/swiftbat/ui/ComparePage.java',
         });
         pause.play();''')
 
-# 3) Population: compact FRACEXP and shorten English radio labels by using the existing localized values.
+# 3) Population: compact FRACEXP and keep all filters legible on one row.
 replace('src/main/java/it/casiraghi/swiftbat/ui/PopulationPage.java',
 '''        exposureBox.setMinWidth(270);
         exposureBox.setPrefWidth(285);
@@ -80,7 +79,7 @@ replace('src/main/java/it/casiraghi/swiftbat/ui/PopulationPage.java',
         VBox windowGroup = filterGroup("Finestra temporale", "", windowControl, 185);
         VBox limitGroup = filterGroup("Campione massimo", "", limit, 120);''')
 
-# 4) Fullscreen explanation: force a stable layout immediately when the panel is toggled.
+# 4) Fullscreen explanation: avoid the temporary collapsed panel in the time-energy view.
 replace('src/main/java/it/casiraghi/swiftbat/ui/InPlaceFullscreen.java',
 '''            help.selectedProperty().addListener((obs, oldValue, selected) -> {
                 help.setText(I18n.t(selected ? "Nascondi spiegazione" : "Mostra spiegazione"));
@@ -89,8 +88,6 @@ replace('src/main/java/it/casiraghi/swiftbat/ui/InPlaceFullscreen.java',
 '''            help.selectedProperty().addListener((obs, oldValue, selected) -> {
                 help.setText(I18n.t(selected ? "Nascondi spiegazione" : "Mostra spiegazione"));
                 relayout.run();
-                // The time-energy canvas and the reading ScrollPane both depend on their final bounds.
-                // Re-layout on the next JavaFX pulse to avoid the temporary tiny panel/text jump.
                 Platform.runLater(() -> {
                     relayout.run();
                     split.applyCss();
@@ -100,37 +97,23 @@ replace('src/main/java/it/casiraghi/swiftbat/ui/InPlaceFullscreen.java',
 replace('src/main/java/it/casiraghi/swiftbat/ui/InPlaceFullscreen.java',
 '''            readingScroll.viewportBoundsProperty().addListener((obs, oldBounds, bounds) ->
                     reading.setMinHeight(Math.max(0, bounds.getHeight())));''',
-'''            // Do not bind the reading card minimum height to transient viewport bounds: during the
-            // first fullscreen pulse those bounds can be tiny and cause the explanation to collapse.
-            reading.setMinHeight(Region.USE_PREF_SIZE);''')
+'''            reading.setMinHeight(Region.USE_PREF_SIZE);''')
 
-# 5) I18n: translations still surfaced by current runtime screenshots and shorter labels.
+# 5) I18n: additional runtime strings surfaced by EN screenshots.
 i18n = ROOT / 'src/main/java/it/casiraghi/swiftbat/ui/I18n.java'
 text = i18n.read_text(encoding='utf-8')
 anchor = '        put("Le curve sono divise per il proprio picco: il confronto riguarda la forma relativa, non la luminosità assoluta.",\n                "Curves are divided by their own peak: the comparison concerns relative shape, not absolute luminosity.");\n'
-extra = '''        // Runtime strings verified from EN screenshots (2026-09-09)\n        put("T90 duration", "T90 duration");\n        put("FRACEXP quality", "FRACEXP quality");\n        put("Maximum sample", "Maximum sample");\n        put("Population analysis", "Population analysis");\n        put("Temporal profile", "Temporal profile");\n        put("Sample distributions", "Sample distributions");\n        put("Included GRBs", "Included GRBs");\n        put("Peak time", "Peak time");\n        put("Peak / error", "Peak / error");\n        put("Hardness proxy", "Hardness proxy");\n        put("Full exposure", "Full exposure");\n        put("No z", "No z");\n        put("Numero di GRB", "Number of GRBs");\n        put("Tempo normalizzato (t / T90)", "Normalized time (t / T90)");\n        put("Rate normalizzato (picco = 1)", "Normalized rate (peak = 1)");\n        put("Finestra", "Window");\n        put("Zoom", "Zoom");\n        put("Bande energetiche", "Energy bands");\n        put("trigger  t = 0", "trigger  t = 0");\n'''
+extra = '''        // Runtime strings verified from EN screenshots (2026-09-09)\n        put("T90 duration", "T90 duration");\n        put("FRACEXP quality", "FRACEXP quality");\n        put("Maximum sample", "Maximum sample");\n        put("Population analysis", "Population analysis");\n        put("Temporal profile", "Temporal profile");\n        put("Sample distributions", "Sample distributions");\n        put("Included GRBs", "Included GRBs");\n        put("Peak time", "Peak time");\n        put("Peak / error", "Peak / error");\n        put("Hardness proxy", "Hardness proxy");\n        put("Full exposure", "Full exposure");\n        put("No z", "No z");\n        put("Numero di GRB", "Number of GRBs");\n        put("Tempo normalizzato (t / T90)", "Normalized time (t / T90)");\n        put("Finestra", "Window");\n        put("Zoom", "Zoom");\n        put("Bande energetiche", "Energy bands");\n'''
 if anchor not in text:
     raise SystemExit('I18n anchor not found')
 text = text.replace(anchor, anchor + extra)
 i18n.write_text(text, encoding='utf-8')
 
-# 6) CSS: JavaFX Modena derives chart-bar backgrounds from -fx-bar-fill and requires a Color.
-# Keep the visible gradient, but provide a real Color token so Modena never receives a String/gradient there.
+# 6) CSS: explicitly define -fx-bar-fill as a Color. Modena derives chart-bar paint from it;
+# gradients/strings there can trigger the ClassCastException shown in the runtime console.
 css = ROOT / 'src/main/resources/app.css'
 css_text = css.read_text(encoding='utf-8')
-needle = '''.bar-chart .chart-bar {
-    -fx-background-color: linear-gradient(to top, #7b56c9, #4fd5ef);
-    -fx-background-radius: 5px 5px 0 0;
-}'''
-replacement = '''.bar-chart .chart-bar {
-    -fx-bar-fill: #4fd5ef;
-    -fx-background-color: linear-gradient(to top, #7b56c9, #4fd5ef);
-    -fx-background-radius: 5px 5px 0 0;
-}'''
-if needle not in css_text:
-    raise SystemExit('bar-chart CSS block not found')
-css_text = css_text.replace(needle, replacement)
-css_text += '''\n\n/* Runtime polish 1.3.0 */\n.population-fracexp-inline { -fx-padding: 8px 9px; }\n.population-fracexp-inline .percentage-control { -fx-padding: 5px 6px; }\n.population-fracexp-inline .percentage-field { -fx-font-size: 12px; -fx-padding: 4px 5px; }\n.population-fracexp-inline .percentage-step-button { -fx-min-width: 28px; -fx-min-height: 28px; -fx-pref-width: 28px; -fx-pref-height: 28px; }\n.compare-combo, .compare-combo .text-field { -fx-background-color: rgba(255,255,255,0.045); -fx-text-fill: #e7eaf0; -fx-prompt-text-fill: #646d7d; }\n.compare-combo:focused, .compare-combo .text-field:focused { -fx-border-color: rgba(86,216,250,0.70); }\n'''
+css_text += '''\n\n/* Runtime polish 1.3.0 */\n.bar-chart .chart-bar { -fx-bar-fill: #4fd5ef; }\n.population-fracexp-inline { -fx-padding: 8px 9px; }\n.population-fracexp-inline .percentage-control { -fx-padding: 5px 6px; }\n.population-fracexp-inline .percentage-field { -fx-font-size: 12px; -fx-padding: 4px 5px; }\n.population-fracexp-inline .percentage-step-button { -fx-min-width: 28px; -fx-min-height: 28px; -fx-pref-width: 28px; -fx-pref-height: 28px; }\n.compare-combo, .compare-combo .text-field { -fx-background-color: rgba(255,255,255,0.045); -fx-text-fill: #e7eaf0; -fx-prompt-text-fill: #646d7d; }\n.compare-combo:focused, .compare-combo .text-field:focused { -fx-border-color: rgba(86,216,250,0.70); }\n'''
 css.write_text(css_text, encoding='utf-8')
 
 print('Runtime UX/localization patch applied.')
