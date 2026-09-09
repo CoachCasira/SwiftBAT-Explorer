@@ -24,10 +24,10 @@ import java.util.List;
 
 /** Vista interattiva 3D degli stessi elementi statistici mostrati nel profilo 2D. */
 public final class Population3DChartPane extends BorderPane {
-    // Exact colors used by the 2D population profile and its legend.
-    private static final Color SINGLE_COLOR = new Color(84, 215, 255);   // #54d7ff
-    private static final Color MEDIAN_COLOR = new Color(242, 71, 211);   // #f247d3
-    private static final Color QUARTILE_COLOR = new Color(139, 107, 255); // #8b6bff
+    // Exact colors used by PopulationPage.profileSeriesStyle(...) in the 2D view.
+    private static final Color SINGLE_COLOR = new Color(84, 215, 255);    // #54d7ff
+    private static final Color MEDIAN_COLOR = new Color(255, 174, 74);    // #ffae4a
+    private static final Color QUARTILE_COLOR = new Color(170, 120, 219); // #aa78db
 
     private final SwingNode swingNode = new SwingNode();
     private final Java2DWaterfallPanel renderer = new Java2DWaterfallPanel();
@@ -135,7 +135,7 @@ public final class Population3DChartPane extends BorderPane {
         HBox titleRow = new HBox(10, title, spacer, sampleLabel);
         titleRow.setAlignment(Pos.CENTER_LEFT);
         Label explanation = UiFactory.wrappedLabel(
-                "La vista 3D riproduce gli stessi elementi del grafico 2D: singoli GRB in azzurro, mediana in magenta e limiti 25°/75° in viola. "
+                "La vista 3D riproduce gli stessi elementi del grafico 2D: singoli GRB in azzurro, mediana in arancio e limiti 25°/75° in viola. "
                         + "La profondità serve solo a separare visivamente le curve e non rappresenta T90, distanza o posizione nello spazio.",
                 "overlay-caption");
         FlowPane legend = new FlowPane(14, 6,
