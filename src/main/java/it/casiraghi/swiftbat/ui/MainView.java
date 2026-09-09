@@ -11,8 +11,9 @@ import it.casiraghi.swiftbat.service.SkyCatalogService;
 import it.casiraghi.swiftbat.service.SpectralCatalogService;
 import it.casiraghi.swiftbat.service.SwiftCatalogService;
 import it.casiraghi.swiftbat.ui.components.BlackHoleBackdropPane;
+import it.casiraghi.swiftbat.ui.components.BrandLogoAsset;
 import it.casiraghi.swiftbat.ui.components.LanguageFlagIcon;
-import it.casiraghi.swiftbat.ui.components.OrbitLogoPane;
+import it.casiraghi.swiftbat.ui.components.UniBgMarkPane;
 import javafx.application.HostServices;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
@@ -156,9 +157,7 @@ public final class MainView {
         Separator separator = new Separator();
         separator.getStyleClass().add("soft-separator");
 
-        OrbitLogoPane footerLogo = new OrbitLogoPane();
-        footerLogo.setMinSize(27, 27);
-        footerLogo.setPrefSize(27, 27);
+        Node footerLogo = BrandLogoAsset.view(30);
         HBox footerBrand = new HBox(7, footerLogo,
                 UiFactory.label("SwiftBAT Explorer", "nav-footer-title"));
         footerBrand.setAlignment(Pos.CENTER_LEFT);
@@ -166,11 +165,19 @@ public final class MainView {
                 "Un progetto per la scienza aperta",
                 "A project for open science",
                 "nav-footer-line");
+        Label creditLabel = bilingualWrapped(
+                "Realizzato da Matteo Casiraghi · UniBG",
+                "Realized by Matteo Casiraghi · UniBG",
+                "nav-footer-line");
+        HBox credit = new HBox(6, new UniBgMarkPane(21), creditLabel);
+        credit.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(creditLabel, Priority.ALWAYS);
         VBox footer = new VBox(4,
                 footerBrand,
                 UiFactory.label("v1.3.0", "nav-footer-version"),
                 UiFactory.label("INAF – OAS Bologna", "nav-footer-line"),
-                footerTagline);
+                footerTagline,
+                credit);
         footer.getStyleClass().add("nav-footer-card");
         footer.setPadding(new Insets(11));
 
@@ -220,9 +227,7 @@ public final class MainView {
         HBox brand = new HBox(7);
         brand.getStyleClass().add("top-brand");
         brand.setAlignment(Pos.CENTER_LEFT);
-        OrbitLogoPane logo = new OrbitLogoPane();
-        logo.setMinSize(38, 38);
-        logo.setPrefSize(40, 40);
+        Node logo = BrandLogoAsset.view(42);
         Label brandSubtitle = bilingualLabel(
                 "Esplora i lampi di raggi gamma",
                 "Explore gamma-ray bursts",
