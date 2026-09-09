@@ -46,12 +46,14 @@ public final class HomePage extends ScrollPane {
         welcome.setAlignment(Pos.CENTER_LEFT);
         VBox welcomeCopy = new VBox(3,
                 gradientTitle("Benvenuto su ", "SwiftBAT Explorer"),
-                UiFactory.wrappedLabel(
+                bilingualWrapped(
                         "Esplora, analizza e interpreta i lampi di raggi gamma con i dati di Swift/BAT.",
+                        "Explore, analyze and interpret gamma-ray bursts with Swift/BAT data.",
                         "mockup-welcome-subtitle"));
         HBox.setHgrow(welcomeCopy, Priority.ALWAYS);
-        Label quote = UiFactory.wrappedLabel(
+        Label quote = bilingualWrapped(
                 "“Dove l'Universo diventa estremo, inizia la scoperta.”",
+                "“Where the Universe becomes extreme, discovery begins.”",
                 "mockup-welcome-quote");
         quote.setMaxWidth(310);
         welcome.getChildren().addAll(welcomeCopy, quote);
@@ -73,22 +75,29 @@ public final class HomePage extends ScrollPane {
         VBox heroCopy = new VBox(10);
         heroCopy.setAlignment(Pos.CENTER_LEFT);
         heroCopy.setMaxWidth(610);
-        Label kicker = UiFactory.label("AI CONFINI DELL'UNIVERSO PIÙ ESTREMO", "mockup-hero-kicker");
-        Label lineOne = UiFactory.label("I lampi di raggi gamma", "mockup-hero-title");
+        Label kicker = bilingualLabel(
+                "AI CONFINI DELL'UNIVERSO PIÙ ESTREMO",
+                "AT THE EDGE OF THE MOST EXTREME UNIVERSE",
+                "mockup-hero-kicker");
+        Label lineOne = bilingualLabel(
+                "I lampi di raggi gamma",
+                "Gamma-ray bursts",
+                "mockup-hero-title");
         Label lineTwo = UiFactory.label("illuminano l'Universo estremo", "mockup-hero-title-secondary");
-        Label subtitle = UiFactory.wrappedLabel(
+        Label subtitle = bilingualWrapped(
                 "Esplora il catalogo Swift/BAT, visualizza gli eventi sulla mappa celeste e analizza curve di luce, spettroscopia e proprietà di popolazione senza uscire dall'app.",
+                "Explore the Swift/BAT catalog, view events on the sky map and analyze light curves, spectroscopy and population properties without leaving the app.",
                 "mockup-hero-body");
         subtitle.setMaxWidth(590);
 
         HBox actions = new HBox(10);
-        Button explore = UiFactory.button("⌕   Apri Esplora", "primary-button");
+        Button explore = bilingualButton("⌕   Apri Esplora", "⌕   Open Explore", "primary-button");
         explore.getStyleClass().add("mockup-hero-action");
         explore.setOnAction(event -> openExplorer.run());
-        Button sky = UiFactory.button("⌾   Mappa celeste", "secondary-button");
+        Button sky = bilingualButton("⌾   Mappa celeste", "⌾   Sky map", "secondary-button");
         sky.getStyleClass().add("mockup-hero-action");
         sky.setOnAction(event -> openSky.run());
-        Button analysis = UiFactory.button("⌁   Nuova analisi", "secondary-button");
+        Button analysis = bilingualButton("⌁   Nuova analisi", "⌁   New analysis", "secondary-button");
         analysis.getStyleClass().addAll("mockup-hero-action", "mockup-hero-action-magenta");
         analysis.setOnAction(event -> openPopulation.run());
         actions.getChildren().addAll(explore, sky, analysis);
@@ -180,7 +189,7 @@ public final class HomePage extends ScrollPane {
         if (action != null) {
             Region spacer = new Region();
             VBox.setVgrow(spacer, Priority.ALWAYS);
-            Button button = UiFactory.button("Apri  →", "mockup-inline-link");
+            Button button = bilingualButton("Apri  →", "Open  →", "mockup-inline-link");
             button.setOnAction(event -> action.run());
             panel.getChildren().addAll(spacer, button);
             panel.setCursor(javafx.scene.Cursor.HAND);
@@ -213,6 +222,24 @@ public final class HomePage extends ScrollPane {
         button.setMaxWidth(Double.MAX_VALUE);
         button.setAlignment(Pos.CENTER_LEFT);
         button.setOnAction(event -> action.run());
+        return button;
+    }
+
+    private Label bilingualLabel(String italian, String english, String styleClass) {
+        Label label = UiFactory.label("", styleClass);
+        I18n.setText(label, italian, english);
+        return label;
+    }
+
+    private Label bilingualWrapped(String italian, String english, String styleClass) {
+        Label label = UiFactory.wrappedLabel("", styleClass);
+        I18n.setText(label, italian, english);
+        return label;
+    }
+
+    private Button bilingualButton(String italian, String english, String styleClass) {
+        Button button = UiFactory.button("", styleClass);
+        I18n.setText(button, italian, english);
         return button;
     }
 }

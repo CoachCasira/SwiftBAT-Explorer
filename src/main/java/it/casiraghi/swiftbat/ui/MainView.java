@@ -162,15 +162,22 @@ public final class MainView {
         HBox footerBrand = new HBox(7, footerLogo,
                 UiFactory.label("SwiftBAT Explorer", "nav-footer-title"));
         footerBrand.setAlignment(Pos.CENTER_LEFT);
+        Label footerTagline = bilingualWrapped(
+                "Un progetto per la scienza aperta",
+                "A project for open science",
+                "nav-footer-line");
         VBox footer = new VBox(4,
                 footerBrand,
                 UiFactory.label("v1.3.0", "nav-footer-version"),
                 UiFactory.label("INAF – OAS Bologna", "nav-footer-line"),
-                UiFactory.wrappedLabel("Un progetto per la scienza aperta", "nav-footer-line"));
+                footerTagline);
         footer.getStyleClass().add("nav-footer-card");
         footer.setPadding(new Insets(11));
 
-        Label online = UiFactory.wrappedLabel("Dati scientifici NASA/GSFC Swift/BAT", "nav-source");
+        Label online = bilingualWrapped(
+                "Dati scientifici NASA/GSFC Swift/BAT",
+                "NASA/GSFC Swift/BAT scientific data",
+                "nav-source");
         Button source = UiFactory.button("Fonte ufficiale  ↗", "nav-source-button");
         source.setMaxWidth(Double.MAX_VALUE);
         source.setOnAction(event -> hostServices.showDocument(SwiftCatalogService.CATALOG_URL));
@@ -216,25 +223,29 @@ public final class MainView {
         OrbitLogoPane logo = new OrbitLogoPane();
         logo.setMinSize(38, 38);
         logo.setPrefSize(40, 40);
+        Label brandSubtitle = bilingualLabel(
+                "Esplora i lampi di raggi gamma",
+                "Explore gamma-ray bursts",
+                "top-brand-subtitle");
         VBox brandCopy = new VBox(0,
                 UiFactory.label("SwiftBAT Explorer", "top-brand-title"),
-                UiFactory.label("Esplora i lampi di raggi gamma", "top-brand-subtitle"));
+                brandSubtitle);
         brand.getChildren().addAll(logo, brandCopy);
 
         TextField globalSearch = new TextField();
         globalSearch.getStyleClass().add("global-search-field");
-        globalSearch.setPromptText("⌕   Cerca un GRB (es. GRB250605A, 231107A, …)");
+        updateGlobalSearchPrompt(globalSearch);
         globalSearch.setMinWidth(245);
         globalSearch.setPrefWidth(410);
         globalSearch.setMaxWidth(520);
         HBox.setHgrow(globalSearch, Priority.ALWAYS);
         globalSearch.setOnAction(event -> runGlobalSearch(globalSearch));
 
-        Button dataset = topActionButton("▱", "Dataset", 78);
+        Button dataset = topActionButton("▱", "Dataset", "Dataset", 78);
         dataset.setOnAction(event -> navigate("explorer"));
-        Button tools = topActionButton("⌁", "Strumenti", 88);
+        Button tools = topActionButton("⌁", "Strumenti", "Tools", 88);
         tools.setOnAction(event -> navigate("compare"));
-        Button guide = topActionButton("?", "Guida", 68);
+        Button guide = topActionButton("?", "Guida", "Guide", 68);
         guide.setOnAction(event -> navigate("about"));
 
         Button refresh = UiFactory.iconButton("↻", "Aggiorna il catalogo online");
@@ -265,6 +276,7 @@ public final class MainView {
         languageBox.getStyleClass().add("language-switch");
         I18n.languageProperty().addListener((obs, oldValue, newValue) -> Platform.runLater(() -> {
             I18n.localizeTree(root);
+            updateGlobalSearchPrompt(globalSearch);
             updateCacheStatus();
         }));
 
@@ -285,12 +297,31 @@ public final class MainView {
         return box;
     }
 
-    private Button topActionButton(String glyph, String text, double minWidth) {
-        Button button = UiFactory.button(glyph + "  " + text, "top-nav-button");
+    private Button topActionButton(String glyph, String italian, String english, double minWidth) {
+        Button button = UiFactory.button("", "top-nav-button");
+        I18n.setText(button, glyph + "  " + italian, glyph + "  " + english);
         button.setFocusTraversable(false);
         button.setMinWidth(minWidth);
         button.setPrefWidth(minWidth);
         return button;
+    }
+
+    private void updateGlobalSearchPrompt(TextField field) {
+        field.setPromptText(I18n.dynamic(
+                "⌕   Cerca un GRB (es. GRB250605A, 231107A, …)",
+                "⌕   Search for a GRB (e.g. GRB250605A, 231107A, …)"));
+    }
+
+    private Label bilingualLabel(String italian, String english, String styleClass) {
+        Label label = UiFactory.label("", styleClass);
+        I18n.setText(label, italian, english);
+        return label;
+    }
+
+    private Label bilingualWrapped(String italian, String english, String styleClass) {
+        Label label = UiFactory.wrappedLabel("", styleClass);
+        I18n.setText(label, italian, english);
+        return label;
     }
 
     private void runGlobalSearch(TextField field) {
