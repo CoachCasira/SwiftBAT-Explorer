@@ -32,6 +32,9 @@ class TranslationCoverageTest {
 
     @Test
     void everyUiItalianLiteralMustHaveEnglishTranslation() throws Exception {
+        // Same dictionary configuration used by the real application startup.
+        LegacyI18nBridge.install();
+
         Path root = Path.of("src/main/java/it/casiraghi/swiftbat/ui");
         List<String> missing = new ArrayList<>();
 
@@ -39,6 +42,7 @@ class TranslationCoverageTest {
             files.filter(path -> path.toString().endsWith(".java"))
                     .filter(path -> !path.getFileName().toString().equals("I18n.java"))
                     .filter(path -> !path.getFileName().toString().equals("UiTranslations.java"))
+                    .filter(path -> !path.getFileName().toString().equals("UiTranslationExtras.java"))
                     .sorted(Comparator.comparing(Path::toString))
                     .forEach(path -> scan(path, missing));
         }
