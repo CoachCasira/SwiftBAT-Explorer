@@ -34,13 +34,16 @@ public final class Java2DGroupedBarPanel extends JPanel {
     private static final Color MUTED = new Color(137, 159, 198);
     private static final Color TOOLTIP_BG = new Color(9, 18, 38, 240);
 
-    // Exact palette used by the 2D spectroscopy bars.
+    // Exact cyan -> blue -> purple language used by the 2D bars.
     private static final Color SPECTRAL_CYAN = new Color(17, 207, 233);
     private static final Color SPECTRAL_BLUE = new Color(40, 127, 242);
     private static final Color SPECTRAL_PURPLE = new Color(174, 93, 244);
 
-    // Exact final color of the 2D Population Analysis histograms (#4fd5ef).
-    private static final Color POPULATION_CYAN = new Color(79, 213, 239);
+    // Population 3D uses the same 2D palette, but one anchor per depth band
+    // so short/long/n.d. (or with/without redshift) remain distinguishable.
+    private static final Color POPULATION_CYAN = SPECTRAL_CYAN;
+    private static final Color POPULATION_BLUE = SPECTRAL_BLUE;
+    private static final Color POPULATION_PURPLE = SPECTRAL_PURPLE;
 
     private Dataset dataset = Dataset.empty();
     private final List<BarHit> bars = new ArrayList<>();
@@ -264,6 +267,21 @@ public final class Java2DGroupedBarPanel extends JPanel {
             g.setColor(lighten(SPECTRAL_PURPLE, 0.18));
             g.fill(top);
             g.setColor(withAlpha(SPECTRAL_CYAN, 245));
+        } else if (isPopulationHistogram() && count != 0) {
+            // Same neon language as the 2D histogram, while the base hue keeps
+            // each depth band immediately recognisable.
+            float bottomY = (float) Math.max(frontBottomLeft.getY(), frontBottomRight.getY());
+            float topY = (float) Math.min(frontTopLeft.getY(), frontTopRight.getY());
+            if (Math.abs(bottomY - topY) < 1f) topY = bottomY - 1f;
+            g.setPaint(new LinearGradientPaint(0f, bottomY, 0f, topY,
+                    new float[]{0f, 0.58f, 1f},
+                    new Color[]{darken(color, 0.76), color, lighten(color, 0.30)}));
+            g.fill(front);
+            g.setColor(withAlpha(darken(color, 0.62), 215));
+            g.fill(side);
+            g.setColor(withAlpha(lighten(color, 0.34), 235));
+            g.fill(top);
+            g.setColor(withAlpha(color, 250));
         } else {
             g.setColor(withAlpha(color, count == 0 ? 35 : 205));
             g.fill(front);
@@ -339,8 +357,18 @@ public final class Java2DGroupedBarPanel extends JPanel {
     }
 
     private Color displayColor(int group) {
-        if (isPopulationHistogram()) return POPULATION_CYAN;
-        return dataset.colors()[group];
+        if (!isPopulationHistogram()) return dataset.colors()[group];
+        int groups = Math.max(1, dataset.groups().length);
+        if (groups == 1) return POPULATION_CYAN;
+        if (groups == 2) return group == 0 ? POPULATION_CYAN : POPULATION_PURPLE;
+        if (group <= 0) return POPULATION_CYAN;
+        if (group >= groups - 1) return POPULATION_PURPLE;
+        if (groups == 3) return POPULATION_BLUE;
+
+        double fraction = group / (double) (groups - 1);
+        return fraction <= 0.5
+                ? interpolate(POPULATION_CYAN, POPULATION_BLUE, fraction * 2.0)
+                : interpolate(POPULATION_BLUE, POPULATION_PURPLE, (fraction - 0.5) * 2.0);
     }
 
     private Color legendColor(int group) {
@@ -413,6 +441,14 @@ public final class Java2DGroupedBarPanel extends JPanel {
                 (int) (color.getRed() + (255 - color.getRed()) * fraction),
                 (int) (color.getGreen() + (255 - color.getGreen()) * fraction),
                 (int) (color.getBlue() + (255 - color.getBlue()) * fraction));
+    }
+
+    private static Color interpolate(Color start, Color end, double fraction) {
+        double f = clamp(fraction, 0, 1);
+        return new Color(
+                (int) Math.round(start.getRed() + (end.getRed() - start.getRed()) * f),
+                (int) Math.round(start.getGreen() + (end.getGreen() - start.getGreen()) * f),
+                (int) Math.round(start.getBlue() + (end.getBlue() - start.getBlue()) * f));
     }
 
     private static Color withAlpha(Color color, int alpha) {
