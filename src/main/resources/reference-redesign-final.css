@@ -184,13 +184,18 @@
     -fx-background-radius: 10px;
 }
 
+/* Reserve a real right-hand lane for the arrow button. The selected label/cell
+   never paints underneath it, even on narrow controls such as T90, redshift,
+   maximum sample and the Explorer extra filters. */
 .reference-redesign .choice-box > .label,
 .reference-redesign .choice-box-modern > .label {
     -fx-text-fill: #f1f6ff;
     -fx-font-weight: 600;
     -fx-background-color: linear-gradient(to right, rgba(203, 45, 218, 0.34), rgba(43, 105, 236, 0.34));
     -fx-background-radius: 9px 0 0 9px;
-    -fx-padding: 8px 12px;
+    -fx-padding: 8px 44px 8px 12px;
+    -fx-alignment: center-left;
+    -fx-text-overrun: ellipsis;
 }
 
 .reference-redesign .combo-box-base > .list-cell,
@@ -199,20 +204,38 @@
     -fx-font-weight: 600;
     -fx-background-color: linear-gradient(to right, rgba(203, 45, 218, 0.34), rgba(43, 105, 236, 0.34));
     -fx-background-radius: 9px 0 0 9px;
-    -fx-padding: 8px 12px;
+    -fx-padding: 8px 44px 8px 12px;
+    -fx-alignment: center-left;
+    -fx-text-overrun: ellipsis;
 }
 
 .reference-redesign .choice-box .open-button,
 .reference-redesign .choice-box-modern .open-button,
 .reference-redesign .combo-box-base .arrow-button {
-    -fx-background-color: rgba(3, 14, 33, 0.98);
+    -fx-background-color: rgba(3, 14, 33, 0.99);
     -fx-background-radius: 0 9px 9px 0;
+    -fx-min-width: 38px;
+    -fx-pref-width: 38px;
+    -fx-max-width: 38px;
+    -fx-padding: 0 11px 0 11px;
+    -fx-background-insets: 0;
 }
 
 .reference-redesign .choice-box .arrow,
 .reference-redesign .choice-box-modern .arrow,
 .reference-redesign .combo-box-base .arrow {
     -fx-background-color: #dceaff;
+    -fx-padding: 4px 5px 4px 5px;
+}
+
+/* Editable combo boxes use a TextField instead of a list cell. Give those the
+   same reserved arrow lane so search/filter controls stay aligned too. */
+.reference-redesign .combo-box-base:editable > .text-field,
+.reference-redesign .combo-box:editable > .text-field,
+.reference-redesign .compare-combo:editable > .text-field,
+.reference-redesign .metadata-search-combo:editable > .text-field {
+    -fx-padding: 8px 44px 8px 12px;
+    -fx-background-insets: 0 38px 0 0;
 }
 
 .reference-redesign .choice-box:disabled > .label,
