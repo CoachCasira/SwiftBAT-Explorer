@@ -23,6 +23,25 @@ jobs:
           cache: maven
       - name: Apply fixes
         run: python3 scripts/apply-i18n-layout-fixes.py
+      - name: Correct generated source references
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          pop = Path('src/main/java/it/casiraghi/swiftbat/ui/PopulationPage.java')
+          text = pop.read_text(encoding='utf-8')
+          text = text.replace(
+              '        setStatusStyle(result.accepted().isEmpty() ? "status-warning" : "status-online");',
+              '        status.getStyleClass().removeAll("status-neutral", "status-online", "status-warning");\n'
+              '        status.getStyleClass().add(result.accepted().isEmpty() ? "status-warning" : "status-online");')
+          pop.write_text(text, encoding='utf-8')
+
+          sky = Path('src/main/java/it/casiraghi/swiftbat/ui/SkyMapPage.java')
+          text = sky.read_text(encoding='utf-8')
+          text = re.sub(r'^\s*selectedCatalog\.setText\([^\n]*\);\n', '', text, flags=re.MULTILINE)
+          sky.write_text(text, encoding='utf-8')
+          PY
       - name: Maven verify
         run: mvn -B verify
       - name: Remove temporary files
