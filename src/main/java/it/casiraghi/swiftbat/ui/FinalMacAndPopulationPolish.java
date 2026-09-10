@@ -96,8 +96,10 @@ public final class FinalMacAndPopulationPolish {
         controls.setSpacing(9);
         controls.setAlignment(Pos.CENTER_LEFT);
 
-        List<ChoiceBox<?>> choices = controls.getChildren().stream()
-                .filter(ChoiceBox.class::isInstance).map(ChoiceBox.class::cast).toList();
+        List<ChoiceBox<?>> choices = new ArrayList<>();
+        for (Node child : controls.getChildren()) {
+            if (child instanceof ChoiceBox<?> choice) choices.add(choice);
+        }
         if (!choices.isEmpty()) setWidth(choices.get(0), 220, 236, 248);
         if (choices.size() > 1) setWidth(choices.get(1), 210, 226, 238);
 
