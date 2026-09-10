@@ -29,6 +29,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 
 /** Renderer scientifico 2.5D basato su Java2D. */
@@ -65,6 +66,7 @@ public final class Java2DWaterfallPanel extends JPanel {
     private boolean draggedSincePress;
     private HoverPoint hover;
     private DoubleConsumer zoomListener = value -> { };
+    private Consumer<Set<String>> focusListener = ignored -> { };
 
     public Java2DWaterfallPanel() {
         setOpaque(true);
@@ -115,9 +117,11 @@ public final class Java2DWaterfallPanel extends JPanel {
                     if (band < 0 && !focusedBands.isEmpty()) {
                         focusedBands.clear();
                         hover = null;
+                        notifyFocusChanged();
                         repaint();
                     } else {
                         focusedBands.clear();
+                        notifyFocusChanged();
                         resetView();
                     }
                     return;
@@ -125,6 +129,7 @@ public final class Java2DWaterfallPanel extends JPanel {
                 if (event.getClickCount() == 1 && band >= 0) {
                     if (!focusedBands.add(band)) focusedBands.remove(band);
                     hover = null;
+                    notifyFocusChanged();
                     repaint();
                 }
             }
@@ -153,6 +158,36 @@ public final class Java2DWaterfallPanel extends JPanel {
         repaint();
     }
 
+    /** Applies a focus selection by dataset label without emitting a user-change callback. */
+    public void setFocusedLabels(Set<String> labels) {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            Set<String> copy = labels == null ? Set.of() : Set.copyOf(labels);
+            SwingUtilities.invokeLater(() -> setFocusedLabels(copy));
+            return;
+        }
+        focusedBands.clear();
+        if (labels != null && !labels.isEmpty()) {
+            for (int band = 0; band < dataset.labels().length; band++) {
+                String label = dataset.labels()[band];
+                if (label != null && labels.contains(label)) focusedBands.add(band);
+            }
+        }
+        hover = null;
+        repaint();
+    }
+
+    public Set<String> focusedLabels() {
+        LinkedHashSet<String> labels = new LinkedHashSet<>();
+        for (Integer band : focusedBands) {
+            if (band != null && band >= 0 && band < dataset.labels().length) labels.add(dataset.labels()[band]);
+        }
+        return Set.copyOf(labels);
+    }
+
+    public void setFocusListener(Consumer<Set<String>> listener) {
+        focusListener = listener == null ? ignored -> { } : listener;
+    }
+
     public void setPresentation(Presentation newPresentation) {
         if (!SwingUtilities.isEventDispatchThread()) {
             SwingUtilities.invokeLater(() -> setPresentation(newPresentation));
@@ -177,6 +212,10 @@ public final class Java2DWaterfallPanel extends JPanel {
         hover = null;
         zoomListener.accept(zoom);
         repaint();
+    }
+
+    private void notifyFocusChanged() {
+        focusListener.accept(focusedLabels());
     }
 
     private void zoomAt(double mouseX, double mouseY, double wheelRotation) {
@@ -382,7 +421,9 @@ public final class Java2DWaterfallPanel extends JPanel {
     private String labelForBand(int band) {
         return band >= 0 && band < dataset.labels().length ? dataset.labels()[band] : null;
     }
-    private boolean isBandActive(int band) { return focusedBands.isEmpty() || focusedBands.contains(band); }
+    private boolean isBandActive(int band) {
+        return focusedBands.isEmpty() || focusedBands.contains(band) || (hover != null && hover.band() == band);
+    }
     private int focusAlpha(int band, int normalAlpha) {
         return isBandActive(band) ? normalAlpha : Math.max(7, (int) Math.round(normalAlpha * 0.11));
     }
@@ -471,7 +512,9 @@ public final class Java2DWaterfallPanel extends JPanel {
     }
 
     private void updateHover(Point mouse) {
-        ProjectedPoint nearest = nearestPoint(mouse, !focusedBands.isEmpty());
+        // Always hit-test every curve. A dimmed curve becomes active only for the
+        // duration of the hover, which makes dense focused views discoverable.
+        ProjectedPoint nearest = nearestPoint(mouse, false);
         if (nearest == null) {
             if (hover != null) { hover = null; repaint(); }
             return;
