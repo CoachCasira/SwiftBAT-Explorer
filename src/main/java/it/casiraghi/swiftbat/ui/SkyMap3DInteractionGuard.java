@@ -14,18 +14,12 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Last-mile interaction owner for the sky-map card when the 3D sphere is present.
+ * Owns fullscreen interaction for the sky-map card when the 3D sphere is present.
  *
- * The generic visualization enhancer used a capturing event filter on the whole
- * card. With a JavaFX SubScene this could schedule fullscreen before the embedded
- * 3D scene had a chance to consume a GRB-marker click. Re-parenting the view while
- * JavaFX was still recomputing mouse coordinates then produced Scene.getEffectiveCamera
- * NullPointerExceptions and could freeze the application.
- *
- * This class marks the sky card as already handled BEFORE InteractionPolishEnhancer
- * is installed and uses a normal bubbling handler instead. Marker clicks are consumed
- * inside CelestialSpherePane, therefore they select the GRB only. A click on unused
- * card / sky background reaches this handler and opens fullscreen.
+ * Important rule: the embedded SubScene is never detached while one of its mouse
+ * events is being dispatched. Marker interaction is completed inside
+ * CelestialSpherePane first; clicks inside the actual sphere surface stay in the
+ * embedded view. Only clicks on the surrounding sky-map card may request fullscreen.
  */
 public final class SkyMap3DInteractionGuard {
     private static final String WATCHED = SkyMap3DInteractionGuard.class.getName() + ".watched";
@@ -76,40 +70,66 @@ public final class SkyMap3DInteractionGuard {
 
         card.getProperties().put(CARD_DONE, Boolean.TRUE);
 
-        // Prevent InteractionPolishEnhancer from installing its capturing filter here.
+        // The sky card has dedicated SubScene-safe handling. Do not let the generic
+        // visualization enhancer install its capture-phase fullscreen filter here.
         card.getProperties().put(GENERIC_VISUAL_DONE, Boolean.TRUE);
-
         card.setPickOnBounds(true);
 
         if (!fullscreen.getStyleClass().contains("sky-fullscreen-stable")) {
             fullscreen.getStyleClass().add("sky-fullscreen-stable");
         }
 
-        /*
-         * Bubble phase is intentional.
-         * CelestialSpherePane consumes real marker clicks in its SubScene handler,
-         * so those clicks never reach us. Empty/background clicks do reach us and
-         * may safely request fullscreen after the embedded scene finished handling them.
-         */
         card.addEventHandler(MouseEvent.MOUSE_CLICKED, event -> {
-            if (event.isConsumed()
-                    || event.getButton() != MouseButton.PRIMARY
+            if (event.getButton() != MouseButton.PRIMARY
                     || event.getClickCount() != 1
                     || !event.isStillSincePress()) {
                 return;
             }
 
-            if (isControlTarget(event.getTarget(), card)) return;
+            /*
+             * A real GRB marker is selected on MOUSE_RELEASED inside
+             * CelestialSpherePane. The following MOUSE_CLICKED must never open
+             * fullscreen. Consuming it here also prevents any other card-level
+             * handler from interpreting the same gesture.
+             */
+            if (sphere.consumeMarkerInteractionGuard()) {
+                event.consume();
+                return;
+            }
+
+            /*
+             * Any click inside the actual 3D map is an interaction with the map,
+             * not a fullscreen command. This includes empty 3D space, rotation and
+             * marker picking. Fullscreen is intentionally reserved for the card area
+             * outside the graph, exactly like requested.
+             */
+            if (isInside(event.getTarget(), sphere)) {
+                event.consume();
+                return;
+            }
+
+            if (event.isConsumed() || isControlTarget(event.getTarget(), card)) return;
             if (fullscreen.isDisabled() || card.getScene() == null) return;
 
-            // Defer only after the complete mouse dispatch has finished; this avoids
-            // detaching/re-parenting a SubScene while JavaFX is still resolving its camera.
+            // Run only after the complete input dispatch has ended. At this point no
+            // SubScene mouse coordinates are being recomputed, so fullscreen cannot
+            // invalidate Scene.getEffectiveCamera() mid-event.
             Platform.runLater(() -> {
                 if (card.getScene() != null && !fullscreen.isDisabled()) {
                     fullscreen.fire();
                 }
             });
         });
+    }
+
+    private static boolean isInside(Object rawTarget, Node ancestor) {
+        if (!(rawTarget instanceof Node target) || ancestor == null) return false;
+        Node current = target;
+        while (current != null) {
+            if (current == ancestor) return true;
+            current = current.getParent();
+        }
+        return false;
     }
 
     private static boolean isControlTarget(Object rawTarget, Node boundary) {
