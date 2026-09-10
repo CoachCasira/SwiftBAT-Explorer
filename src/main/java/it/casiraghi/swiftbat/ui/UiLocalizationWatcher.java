@@ -65,14 +65,19 @@ public final class UiLocalizationWatcher {
                 if (labeled.getProperties().get(I18N_LOCALIZED_IT) instanceof String
                         && labeled.getProperties().get(I18N_LOCALIZED_EN) instanceof String) return;
 
-                if (I18n.language() == I18n.Language.IT) {
-                    rememberSource(labeled, newText);
-                    return;
-                }
+                /*
+                 * A runtime value is the new source value even when it has no
+                 * translation (numbers are the important case). Previously a
+                 * value such as the sky-map counter could remain associated
+                 * with its construction-time "0" while the interface was in
+                 * English; a later localization pass then restored that stale
+                 * zero although the map itself was already populated.
+                 */
+                rememberSource(labeled, newText);
+                if (I18n.language() == I18n.Language.IT) return;
 
                 String translated = UiTranslations.t(newText);
                 if (!translated.equals(newText)) {
-                    rememberSource(labeled, newText);
                     labeled.getProperties().put(LOCALIZING, Boolean.TRUE);
                     try {
                         labeled.setText(translated);
