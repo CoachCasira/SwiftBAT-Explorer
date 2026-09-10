@@ -51,6 +51,23 @@ public final class UiTranslationExtras {
         put("Solo con redshift", "With redshift only");
         put("Solo senza redshift", "Without redshift only");
 
+        // Sky map labels and controls.
+        put("Cielo", "Sky");
+        put("Mappa celeste", "Sky map");
+        put("Sfera 3D", "3D sphere");
+        put("Centra", "Center");
+        put("Esporta PNG", "Export PNG");
+        put("Schermo intero", "Fullscreen");
+        put("Piano galattico", "Galactic plane");
+        put("Nessun GRB selezionato", "No GRB selected");
+        put("GRB selezionato", "Selected GRB");
+        put("Classe descrittiva", "Descriptive class");
+        put("Apri curve di luce →", "Open light curves →");
+        put("Coordinate celesti non ancora caricate", "Sky coordinates not loaded yet");
+        put("Coordinate non disponibili", "Coordinates unavailable");
+        put("Caricamento coordinate…", "Loading coordinates…");
+        put("T90 non disponibile", "T90 unavailable");
+
         // Export dialogs and result tables.
         put("Esportazione PNG non riuscita", "PNG export failed");
         put("Nessuna colonna visibile", "No visible columns");
