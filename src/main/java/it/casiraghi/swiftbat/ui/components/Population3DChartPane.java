@@ -23,8 +23,6 @@ import javafx.scene.layout.VBox;
 import javax.swing.SwingUtilities;
 import java.awt.Color;
 import java.awt.Dimension;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -48,7 +46,9 @@ public final class Population3DChartPane extends BorderPane {
         getStyleClass().add("three-d-panel");
         setMinHeight(560);
         setPrefHeight(700);
+
         renderer.setFocusListener(CurveInteractionLinkEnhancer::setPopulationFocusedNames);
+        renderer.setSpotlightListener(CurveInteractionLinkEnhancer::setPopulationSpotlightName);
         CurveInteractionLinkEnhancer.bindPopulationLockToggle(focusLock);
         focusLock.selectedProperty().addListener((obs, oldValue, selected) -> refreshDataset());
 
@@ -86,13 +86,13 @@ public final class Population3DChartPane extends BorderPane {
         Java2DWaterfallPanel.Dataset dataset = toDataset(sourceCurves, sourceProfile, sourceHalfWindowSeconds);
         Set<String> focused = CurveInteractionLinkEnhancer.populationFocusedNames();
         boolean locked = CurveInteractionLinkEnhancer.populationFocusLocked() && !focused.isEmpty();
-        if (locked) dataset = keepOnlyLabels(dataset, focused);
+        String spotlight = locked ? CurveInteractionLinkEnhancer.populationSpotlightName() : null;
 
         int curveCount = sourceCurves.size();
         if (dataset.isEmpty()) {
             I18n.setText(sampleLabel, "Nessun campione", "No sample");
         } else if (locked) {
-            int selectedCount = dataset.bandCount();
+            int selectedCount = focused.size();
             I18n.setText(sampleLabel,
                     selectedCount + " curve bloccate",
                     selectedCount + " locked curves");
@@ -104,30 +104,15 @@ public final class Population3DChartPane extends BorderPane {
 
         Java2DWaterfallPanel.Dataset finalDataset = dataset;
         SwingUtilities.invokeLater(() -> {
+            // Keep the complete dataset in the renderer. Locking is an interaction
+            // state, not a data filter: the non-selected curves remain dimmed at
+            // their original depth, so a one-curve lock cannot collapse the view
+            // into a flat 2D plot.
             renderer.setDataset(finalDataset);
             renderer.setFocusedLabels(focused);
+            renderer.setInteractionLocked(locked);
+            renderer.setSpotlightLabel(spotlight);
         });
-    }
-
-    private Java2DWaterfallPanel.Dataset keepOnlyLabels(Java2DWaterfallPanel.Dataset source, Set<String> labelsToKeep) {
-        if (source == null || source.isEmpty() || labelsToKeep == null || labelsToKeep.isEmpty()) return source;
-        List<Integer> indices = new ArrayList<>();
-        for (int index = 0; index < source.labels().length; index++) {
-            if (labelsToKeep.contains(source.labels()[index])) indices.add(index);
-        }
-        if (indices.isEmpty()) return source;
-
-        double[][] rates = new double[indices.size()][];
-        String[] labels = new String[indices.size()];
-        Color[] colors = new Color[indices.size()];
-        for (int target = 0; target < indices.size(); target++) {
-            int sourceIndex = indices.get(target);
-            rates[target] = Arrays.copyOf(source.rates()[sourceIndex], source.rates()[sourceIndex].length);
-            labels[target] = source.labels()[sourceIndex];
-            colors[target] = source.colors()[sourceIndex];
-        }
-        return new Java2DWaterfallPanel.Dataset(
-                Arrays.copyOf(source.times(), source.times().length), rates, labels, colors);
     }
 
     private Java2DWaterfallPanel.Dataset toDataset(List<CumulativeAnalysisService.NormalizedCurve> curves,
