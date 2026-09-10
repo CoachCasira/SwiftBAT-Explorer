@@ -15,7 +15,6 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.layout.HBox;
 
-import java.net.URL;
 import java.util.List;
 
 /** Single owner for table alignment across the application. */
@@ -23,7 +22,8 @@ public final class FinalTableAlignmentFix {
     private static final String WATCHED = FinalTableAlignmentFix.class.getName() + ".watched";
     private static final String TABLE_DONE = FinalTableAlignmentFix.class.getName() + ".tableDone";
     private static final String TITLE_KEY = FinalTableAlignmentFix.class.getName() + ".title";
-    private static final String CSS = stylesheet();
+    private static final String TAB_DONE = FinalTableAlignmentFix.class.getName() + ".tabDone";
+    private static final String COLUMN_STYLE = "-fx-alignment: CENTER-LEFT;";
 
     private FinalTableAlignmentFix() { }
 
@@ -58,12 +58,12 @@ public final class FinalTableAlignmentFix {
             return;
         }
         if (node instanceof TabPane tabs) {
-            for (Tab tab : List.copyOf(tabs.getTabs())) watch(tab.getContent());
+            for (Tab tab : List.copyOf(tabs.getTabs())) watchTab(tab);
             if (!Boolean.TRUE.equals(tabs.getProperties().get(WATCHED))) {
                 tabs.getProperties().put(WATCHED, Boolean.TRUE);
                 tabs.getTabs().addListener((ListChangeListener<Tab>) change -> {
                     while (change.next()) if (change.wasAdded()) {
-                        for (Tab tab : List.copyOf(change.getAddedSubList())) watch(tab.getContent());
+                        for (Tab tab : List.copyOf(change.getAddedSubList())) watchTab(tab);
                     }
                 });
             }
@@ -81,12 +81,17 @@ public final class FinalTableAlignmentFix {
         }
     }
 
+    private static void watchTab(Tab tab) {
+        if (tab == null) return;
+        watch(tab.getContent());
+        if (Boolean.TRUE.equals(tab.getProperties().get(TAB_DONE))) return;
+        tab.getProperties().put(TAB_DONE, Boolean.TRUE);
+        tab.contentProperty().addListener((obs, oldContent, newContent) -> watch(newContent));
+    }
+
     private static void normalizeTable(TableView<?> table) {
         if (!table.getStyleClass().contains("final-aligned-table")) {
             table.getStyleClass().add("final-aligned-table");
-        }
-        if (CSS != null && !table.getStylesheets().contains(CSS)) {
-            table.getStylesheets().add(CSS);
         }
         table.setMinWidth(0);
         table.setMaxWidth(Double.MAX_VALUE);
@@ -97,14 +102,12 @@ public final class FinalTableAlignmentFix {
             table.requestLayout();
         };
         normalize.run();
-        Platform.runLater(normalize);
 
         if (!Boolean.TRUE.equals(table.getProperties().get(TABLE_DONE))) {
             table.getProperties().put(TABLE_DONE, Boolean.TRUE);
             table.getColumns().addListener((ListChangeListener<TableColumn<?, ?>>) change -> Platform.runLater(normalize));
-            table.skinProperty().addListener((obs, oldSkin, newSkin) -> Platform.runLater(normalize));
-            table.sceneProperty().addListener((obs, oldScene, newScene) -> {
-                if (newScene != null) Platform.runLater(normalize);
+            table.skinProperty().addListener((obs, oldSkin, newSkin) -> {
+                if (newSkin != null) Platform.runLater(normalize);
             });
             I18n.languageProperty().addListener((obs, oldLanguage, newLanguage) -> Platform.runLater(normalize));
         }
@@ -117,24 +120,24 @@ public final class FinalTableAlignmentFix {
         Object saved = column.getProperties().get(TITLE_KEY);
         String finalTitle = saved instanceof String value ? value : (title == null ? "" : title);
 
-        column.setGraphic(null);
-        column.setText(finalTitle);
-        column.setStyle("-fx-alignment: CENTER-LEFT;");
+        if (column.getGraphic() != null) column.setGraphic(null);
+        if (!finalTitle.equals(column.getText())) column.setText(finalTitle);
+        if (!COLUMN_STYLE.equals(column.getStyle())) column.setStyle(COLUMN_STYLE);
         for (TableColumn<?, ?> child : column.getColumns()) normalizeColumn(child);
     }
 
     private static void applyHeaderGeometry(TableView<?> table) {
-        if (table == null || table.getScene() == null) return;
+        if (table == null || table.getScene() == null || table.getSkin() == null) return;
         try {
-            table.applyCss();
+            // Do not call applyCss() here. The skin callback runs after CSS has
+            // already materialised the header nodes; forcing another CSS pass on
+            // every table/column update was expensive while scrolling Explorer.
             for (Node node : table.lookupAll(".column-header .label")) {
                 if (!(node instanceof Label label)) continue;
                 label.setAlignment(Pos.CENTER_LEFT);
                 label.setTextAlignment(javafx.scene.text.TextAlignment.LEFT);
-                // JavaFX's macOS header skin already contributes about 4 px on
-                // the left. Body cells use 9 px, so 5 px here produces the same
-                // final visual origin instead of shifting the header to the right.
-                label.setPadding(new Insets(0, 9, 0, 5));
+                Insets target = new Insets(0, 9, 0, 5);
+                if (!target.equals(label.getPadding())) label.setPadding(target);
             }
         } catch (RuntimeException ignored) {
             // The table may briefly be between skins while a tab is replaced.
@@ -157,14 +160,5 @@ public final class FinalTableAlignmentFix {
         }
         Object stored = column.getProperties().get(TITLE_KEY);
         return stored instanceof String value ? value : "";
-    }
-
-    private static String stylesheet() {
-        try {
-            URL url = FinalTableAlignmentFix.class.getResource("/final-table-alignment.css");
-            return url == null ? null : url.toExternalForm();
-        } catch (RuntimeException ignored) {
-            return null;
-        }
     }
 }
