@@ -4,6 +4,7 @@ import it.casiraghi.swiftbat.ui.AdaptiveChromeEnhancer;
 import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
+import it.casiraghi.swiftbat.ui.ExplorerCurveInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerVisualStabilityFixes;
 import it.casiraghi.swiftbat.ui.FinalRequestedUiFixes;
 import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
@@ -14,6 +15,7 @@ import it.casiraghi.swiftbat.ui.MainView;
 import it.casiraghi.swiftbat.ui.SkyMap3DInteractionGuard;
 import it.casiraghi.swiftbat.ui.SpectroscopyStartupLayoutFix;
 import it.casiraghi.swiftbat.ui.UiBugFixes;
+import it.casiraghi.swiftbat.ui.UiCrossPlatformPolishEnhancer;
 import it.casiraghi.swiftbat.ui.UiLastMileFixes;
 import it.casiraghi.swiftbat.ui.UiLocalizationWatcher;
 import it.casiraghi.swiftbat.ui.UiRefinements;
@@ -70,12 +72,12 @@ public final class SwiftBatExplorerApp extends Application {
         InteractionPolishEnhancer.install(mainView.getRoot());
 
         /*
-         * Population temporal-profile interaction must be installed before the
-         * generic chart enhancer. It owns selection, lock, spotlight and the
-         * continuous line hit-test, and marks those charts so the generic handler
-         * cannot install a second competing click/tooltip implementation.
+         * Specialized line interactions must be installed before the generic
+         * chart enhancer. Population owns lock/spotlight; Explorer owns the
+         * continuous segment hover, tooltip and synchronized 2D/fullscreen focus.
          */
         CurveInteractionLinkEnhancer.install(mainView.getRoot());
+        ExplorerCurveInteractionEnhancer.install(mainView.getRoot());
         ChartInteractionEnhancer.install(mainView.getRoot());
         UiBugFixes.install(mainView.getRoot());
 
@@ -95,10 +97,11 @@ public final class SwiftBatExplorerApp extends Application {
         FinalUiStabilityEnhancer.install(mainView.getRoot());
         UiLastMileFixes.install(mainView.getRoot());
 
-        // Deliberately last: normalizes skin-dependent scrollbar geometry and
-        // removes the legacy full-width Included-GRB export strip after every
-        // older UI pass has had a chance to create its dynamic controls.
+        // Deliberately last: normalize skin-dependent scrollbar geometry first,
+        // then apply the final cross-platform icon, translation and laptop-layout
+        // polish after every legacy pass has created its dynamic controls.
         FinalRequestedUiFixes.install(mainView.getRoot());
+        UiCrossPlatformPolishEnhancer.install(mainView.getRoot());
 
         mainView.initialize();
     }
