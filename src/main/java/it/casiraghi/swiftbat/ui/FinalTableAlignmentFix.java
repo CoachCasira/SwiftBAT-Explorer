@@ -1,14 +1,12 @@
 package it.casiraghi.swiftbat.ui;
 
 import javafx.application.Platform;
-import javafx.beans.binding.Bindings;
 import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.Label;
-import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
@@ -21,9 +19,14 @@ import java.net.URL;
 import java.util.List;
 
 /**
- * Final table geometry owner. Each header is one full-width Label with exactly
- * the same left inset as the body cells. This avoids platform-dependent header
- * offsets in the JavaFX table skin, especially on macOS.
+ * Single owner for table alignment across the application.
+ *
+ * <p>Headers stay native TableColumn headers. This avoids the previous race
+ * where TablePreferences restored a native header after this class had inserted
+ * a custom graphic header. On macOS the native header label has a small internal
+ * offset compared with body cells, so the label gets one explicit 13 px left
+ * inset while body cells keep 9 px. The geometry is applied when the skin is
+ * created, therefore it is correct from the first visible frame.</p>
  */
 public final class FinalTableAlignmentFix {
     private static final String WATCHED = FinalTableAlignmentFix.class.getName() + ".watched";
@@ -41,7 +44,7 @@ public final class FinalTableAlignmentFix {
         if (node == null) return;
         if (node instanceof TableView<?> table) {
             normalizeTable(table);
-            return; // never walk VirtualFlow rows/cells while scrolling
+            return; // never traverse VirtualFlow rows while scrolling
         }
         if (node instanceof ScrollPane scroll) {
             if (scroll.getContent() != null) watch(scroll.getContent());
@@ -88,15 +91,22 @@ public final class FinalTableAlignmentFix {
     }
 
     private static void normalizeTable(TableView<?> table) {
-        if (!table.getStyleClass().contains("final-aligned-table")) table.getStyleClass().add("final-aligned-table");
-        if (CSS != null && !table.getStylesheets().contains(CSS)) table.getStylesheets().add(CSS);
+        if (!table.getStyleClass().contains("final-aligned-table")) {
+            table.getStyleClass().add("final-aligned-table");
+        }
+        if (CSS != null && !table.getStylesheets().contains(CSS)) {
+            table.getStylesheets().add(CSS);
+        }
         table.setMinWidth(0);
         table.setMaxWidth(Double.MAX_VALUE);
 
         Runnable normalize = () -> {
             for (TableColumn<?, ?> column : List.copyOf(table.getColumns())) normalizeColumn(column);
+            applyHeaderGeometry(table);
             table.requestLayout();
         };
+
+        // Run immediately so column state is correct before the first pulse.
         normalize.run();
         Platform.runLater(normalize);
 
@@ -114,24 +124,30 @@ public final class FinalTableAlignmentFix {
         String title = extractTitle(column);
         if (title != null && !title.isBlank()) column.getProperties().put(TITLE_KEY, title);
         Object saved = column.getProperties().get(TITLE_KEY);
-        String finalTitle = saved instanceof String text ? text : (title == null ? "" : title);
+        String finalTitle = saved instanceof String value ? value : (title == null ? "" : title);
 
-        Label header = new Label(finalTitle);
-        header.getStyleClass().addAll("table-header-label", "final-table-header-label");
-        header.setAlignment(Pos.CENTER_LEFT);
-        header.setTextAlignment(javafx.scene.text.TextAlignment.LEFT);
-        header.setTextOverrun(OverrunStyle.ELLIPSIS);
-        header.setEllipsisString("…");
-        header.setPadding(new Insets(0, 9, 0, 9));
-        header.setMinWidth(0);
-        header.setMaxWidth(Double.MAX_VALUE);
-        header.prefWidthProperty().bind(Bindings.max(0.0, column.widthProperty().subtract(1.0)));
-
-        column.setText("");
-        column.setGraphic(header);
+        // Native header only: no HBox, no close-X graphic, no custom full-width
+        // label that can be measured independently from the actual column.
+        column.setGraphic(null);
+        column.setText(finalTitle);
         column.setStyle("-fx-alignment: CENTER-LEFT;");
 
         for (TableColumn<?, ?> child : column.getColumns()) normalizeColumn(child);
+    }
+
+    private static void applyHeaderGeometry(TableView<?> table) {
+        if (table == null || table.getScene() == null) return;
+        try {
+            table.applyCss();
+            for (Node node : table.lookupAll(".column-header .label")) {
+                if (!(node instanceof Label label)) continue;
+                label.setAlignment(Pos.CENTER_LEFT);
+                label.setTextAlignment(javafx.scene.text.TextAlignment.LEFT);
+                label.setPadding(new Insets(0, 9, 0, 13));
+            }
+        } catch (RuntimeException ignored) {
+            // The table may briefly be between skins while a tab is replaced.
+        }
     }
 
     private static String extractTitle(TableColumn<?, ?> column) {
