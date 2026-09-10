@@ -184,6 +184,15 @@ public final class TablePreferences {
     }
 
     public static void alignCell(TableCell<?, ?> cell, String value) {
+        // Nella tabella Population tutte le intestazioni sono allineate a sinistra.
+        // Mantenere anche i valori sulla stessa origine visiva evita l'effetto di
+        // colonne "sfalsate" (in particolare T90 e Copertura) e rende i separatori
+        // molto più facili da seguire con lo sguardo.
+        if (cell != null && cell.getTableView() != null
+                && cell.getTableView().getStyleClass().contains("population-result-table")) {
+            cell.setAlignment(Pos.CENTER_LEFT);
+            return;
+        }
         cell.setAlignment(isNumeric(value) ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
     }
 }
