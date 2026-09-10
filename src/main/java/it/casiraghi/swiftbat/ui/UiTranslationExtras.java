@@ -61,6 +61,17 @@ public final class UiTranslationExtras {
         put("GRB inclusi", "Included GRBs");
 
         // Interactive time-energy map.
+        put("Mappa tempo–energia dei rate", "Time–energy rate map");
+        put("Apri vista 3D dei rate", "Open 3D rate view");
+        put("Mappa non disponibile: servono i quattro canali ASCII.",
+                "Map unavailable: all four ASCII channels are required.");
+        put("Tempo dal trigger (s)", "Time from trigger (s)");
+        put("Banda", "Band");
+        put("Centro bin", "Bin center");
+        put("Larghezza banda", "Band width");
+        put("Fluttuazione negativa", "Negative fluctuation");
+        put("Rate circa zero", "Rate near zero");
+        put("Rate positivo", "Positive rate");
         put("Clic: fissa · trascina: aggiungi · clic in alto: seleziona l'istante · doppio clic: azzera",
                 "Click: pin · drag: add · click the top strip: select time · double-click: reset");
         put("Area selezionata", "Selected area");
