@@ -2,36 +2,36 @@ package it.casiraghi.swiftbat.ui;
 
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
-import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.ScrollBar;
+import javafx.scene.control.ListView;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TableView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
-import java.util.WeakHashMap;
 
-/** Incremental replacement for the old Explorer visual stability rescans. */
+/**
+ * Explorer-only incremental visual fixes.
+ *
+ * <p>This watcher deliberately stops at charts, selectors and virtualized
+ * controls. The old global version descended into TableView/ListView skins and
+ * chart internals, registering listeners on large numbers of transient JavaFX
+ * nodes. That work was unnecessary and made Explorer scrolling progressively
+ * heavier on macOS.</p>
+ */
 public final class ExplorerVisualFastFixes {
     private static final String WATCHED = ExplorerVisualFastFixes.class.getName() + ".watched";
     private static final String WINDOW_DONE = ExplorerVisualFastFixes.class.getName() + ".windowDone";
     private static final String CHART_DONE = ExplorerVisualFastFixes.class.getName() + ".chartDone";
-    private static final String SCROLL_DONE = ExplorerVisualFastFixes.class.getName() + ".scrollDone";
-    private static final Set<Scene> WATCHED_SCENES = Collections.newSetFromMap(new WeakHashMap<>());
-    private static final double SCROLLBAR_THICKNESS = 12.0;
-    private static final double THUMB_MIN_LENGTH = 46.0;
 
     private static Parent installedRoot;
 
@@ -41,27 +41,32 @@ public final class ExplorerVisualFastFixes {
         if (root == null) return;
         installedRoot = root;
         watch(root);
-        observeScene(root);
-    }
-
-    private static void observeScene(Parent root) {
-        if (root.getScene() != null) watchScene(root.getScene());
-        root.sceneProperty().addListener((obs, oldScene, newScene) -> {
-            if (newScene != null) watchScene(newScene);
-        });
-    }
-
-    private static void watchScene(Scene scene) {
-        if (scene == null || !WATCHED_SCENES.add(scene)) return;
-        scene.rootProperty().addListener((obs, oldRoot, newRoot) -> {
-            if (newRoot != null) Platform.runLater(() -> watch(newRoot));
-        });
-        if (scene.getRoot() != null) watch(scene.getRoot());
     }
 
     private static void watch(Node node) {
         if (node == null) return;
         enhance(node);
+
+        // Never watch JavaFX skin internals for these controls. Their transient
+        // children can be numerous (chart points / virtualized cells) and none
+        // of them is needed by this class.
+        if (node instanceof LineChart<?, ?>
+                || node instanceof ChoiceBox<?>
+                || node instanceof ComboBox<?>
+                || node instanceof ListView<?>
+                || node instanceof TableView<?>) {
+            return;
+        }
+
+        if (node instanceof ScrollPane scroll) {
+            if (scroll.getContent() != null) watch(scroll.getContent());
+            if (!Boolean.TRUE.equals(scroll.getProperties().get(WATCHED))) {
+                scroll.getProperties().put(WATCHED, Boolean.TRUE);
+                scroll.contentProperty().addListener((obs, oldContent, newContent) -> watch(newContent));
+            }
+            return;
+        }
+
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
@@ -76,9 +81,8 @@ public final class ExplorerVisualFastFixes {
 
     private static void enhance(Node node) {
         if (node instanceof ChoiceBox<?> choice) polishTimeWindowChoice(choice);
-        if (node instanceof ComboBox<?> combo) polishTimeWindowCombo(combo);
-        if (node instanceof LineChart<?, ?> chart && isExplorerLightCurve(chart)) prepareExplorerChart(chart);
-        if (node instanceof ScrollBar bar) polishScrollBar(bar);
+        else if (node instanceof ComboBox<?> combo) polishTimeWindowCombo(combo);
+        else if (node instanceof LineChart<?, ?> chart && isExplorerLightCurve(chart)) prepareExplorerChart(chart);
     }
 
     private static boolean containsTriggerWindow(Object value) {
@@ -172,6 +176,12 @@ public final class ExplorerVisualFastFixes {
             LineChart<Number, Number> candidate = (LineChart) raw;
             if (hasScientificSeries(candidate)) return candidate;
         }
+        if (node instanceof ScrollPane scroll) {
+            return findBestSourceCurve(scroll.getContent(), target);
+        }
+        if (node instanceof ListView<?> || node instanceof TableView<?> || node instanceof ChoiceBox<?> || node instanceof ComboBox<?>) {
+            return null;
+        }
         if (node instanceof Parent parent) {
             for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) {
                 LineChart<Number, Number> found = findBestSourceCurve(child, target);
@@ -200,46 +210,5 @@ public final class ExplorerVisualFastFixes {
             clone.getData().add(new XYChart.Data<>(point.getXValue(), point.getYValue()));
         }
         return clone;
-    }
-
-    private static void polishScrollBar(ScrollBar bar) {
-        if (bar == null) return;
-        if (!Boolean.TRUE.equals(bar.getProperties().get(SCROLL_DONE))) {
-            bar.getProperties().put(SCROLL_DONE, Boolean.TRUE);
-            if (bar.getOrientation() == Orientation.VERTICAL) {
-                bar.setMinWidth(SCROLLBAR_THICKNESS);
-                bar.setPrefWidth(SCROLLBAR_THICKNESS);
-                bar.setMaxWidth(SCROLLBAR_THICKNESS);
-            } else {
-                bar.setMinHeight(SCROLLBAR_THICKNESS);
-                bar.setPrefHeight(SCROLLBAR_THICKNESS);
-                bar.setMaxHeight(SCROLLBAR_THICKNESS);
-            }
-            bar.skinProperty().addListener((obs, oldSkin, newSkin) -> scheduleThumbPolish(bar));
-            bar.heightProperty().addListener((obs, oldHeight, newHeight) -> scheduleThumbPolish(bar));
-            bar.widthProperty().addListener((obs, oldWidth, newWidth) -> scheduleThumbPolish(bar));
-            bar.visibleAmountProperty().addListener((obs, oldValue, newValue) -> scheduleThumbPolish(bar));
-        }
-        scheduleThumbPolish(bar);
-    }
-
-    private static void scheduleThumbPolish(ScrollBar bar) {
-        Platform.runLater(() -> polishThumb(bar));
-    }
-
-    private static void polishThumb(ScrollBar bar) {
-        if (bar == null) return;
-        Node thumb = bar.lookup(".thumb");
-        if (!(thumb instanceof Region region)) return;
-        if (bar.getOrientation() == Orientation.VERTICAL) {
-            region.setMinHeight(THUMB_MIN_LENGTH);
-            region.setMinWidth(10);
-            region.setPrefWidth(10);
-        } else {
-            region.setMinWidth(THUMB_MIN_LENGTH);
-            region.setMinHeight(10);
-            region.setPrefHeight(10);
-        }
-        bar.requestLayout();
     }
 }
