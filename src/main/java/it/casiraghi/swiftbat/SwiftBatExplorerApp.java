@@ -6,6 +6,7 @@ import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
 import it.casiraghi.swiftbat.ui.FinalMacAndPopulationPolish;
 import it.casiraghi.swiftbat.ui.FinalRequestedUiFastFixes;
 import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
+import it.casiraghi.swiftbat.ui.GlobalSearchAssistEnhancer;
 import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
 import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
 import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
@@ -32,6 +33,7 @@ public final class SwiftBatExplorerApp extends Application {
         LegacyI18nBridge.install();
 
         MainView mainView = new MainView(getHostServices(), stage);
+        GlobalSearchAssistEnhancer.install(mainView);
         PopulationDurationMultiSelectEnhancer.install(mainView);
         Scene scene = new Scene(mainView.getRoot(), 1580, 960);
 
