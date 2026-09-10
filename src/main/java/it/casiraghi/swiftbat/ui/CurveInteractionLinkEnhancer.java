@@ -9,10 +9,12 @@ import javafx.scene.Scene;
 import javafx.scene.chart.Axis;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
+import javafx.scene.control.ButtonBase;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.HBox;
 import javafx.util.Duration;
 
 import java.text.DecimalFormat;
@@ -37,6 +39,7 @@ public final class CurveInteractionLinkEnhancer {
     private static final String HOVER = CurveInteractionLinkEnhancer.class.getName() + ".hover";
     private static final String LOCK_DONE = CurveInteractionLinkEnhancer.class.getName() + ".lockDone";
     private static final String LOCK_SYNC = CurveInteractionLinkEnhancer.class.getName() + ".lockSync";
+    private static final String LOCK_ADDED = CurveInteractionLinkEnhancer.class.getName() + ".lockAdded";
     private static final String CHART_FOCUS = ChartInteractionEnhancer.class.getName() + ".focus";
     private static final String CHART_LINE_DONE = ChartInteractionEnhancer.class.getName() + ".lineDone";
     private static final double HIT_RADIUS = 18.0;
@@ -119,6 +122,9 @@ public final class CurveInteractionLinkEnhancer {
             toggle.getStyleClass().addAll("ghost-button", "population-curve-lock");
         }
         toggle.setFocusTraversable(false);
+        toggle.setMinWidth(44);
+        toggle.setPrefWidth(44);
+        toggle.setMaxWidth(44);
         if (!Boolean.TRUE.equals(toggle.getProperties().get(LOCK_DONE))) {
             toggle.getProperties().put(LOCK_DONE, Boolean.TRUE);
             toggle.selectedProperty().addListener((obs, oldValue, selected) -> {
@@ -223,9 +229,14 @@ public final class CurveInteractionLinkEnhancer {
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static void installLineInteraction(LineChart<?, ?> rawChart) {
-        if (Boolean.TRUE.equals(rawChart.getProperties().get(LINE_DONE))) return;
+        if (Boolean.TRUE.equals(rawChart.getProperties().get(LINE_DONE))) {
+            if (isPopulationChart(rawChart)) Platform.runLater(() -> installPopulationLockControl(rawChart));
+            return;
+        }
         rawChart.getProperties().put(LINE_DONE, Boolean.TRUE);
         LineChart chart = rawChart;
+
+        if (isPopulationChart(chart)) Platform.runLater(() -> installPopulationLockControl(chart));
 
         Tooltip standaloneTooltip = Boolean.TRUE.equals(chart.getProperties().get(CHART_LINE_DONE)) ? null : new Tooltip();
         if (standaloneTooltip != null) {
@@ -268,11 +279,6 @@ public final class CurveInteractionLinkEnhancer {
             if (standaloneTooltip != null) standaloneTooltip.hide();
         });
 
-        /*
-         * Capture phase is intentional for the Population lock: it must stop the
-         * generic ChartInteractionEnhancer click before that handler can mutate the
-         * focused set. Other charts keep their previous interaction semantics.
-         */
         chart.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
             if (isPopulationChart(chart) && populationFocusLocked()
                     && event.getButton() == MouseButton.PRIMARY) {
@@ -291,12 +297,94 @@ public final class CurveInteractionLinkEnhancer {
         chart.getData().addListener((ListChangeListener<XYChart.Series>) change -> Platform.runLater(() -> {
             if (isPopulationChart(chart)) restorePopulationFocus(chart);
             applyVisualState(chart);
+            if (isPopulationChart(chart)) installPopulationLockControl(chart);
         }));
 
         Platform.runLater(() -> {
             if (isPopulationChart(chart)) restorePopulationFocus(chart);
             applyVisualState(chart);
         });
+    }
+
+    /**
+     * PopulationPage creates both the embedded and fullscreen 2D toolbars before
+     * this enhancer sees the chart. Injecting the same bound toggle here avoids
+     * duplicating state in the page and also covers dynamically-created fullscreen charts.
+     */
+    private static void installPopulationLockControl(LineChart<?, ?> chart) {
+        if (chart == null || !isPopulationChart(chart) || chart.getScene() == null) return;
+        Parent searchRoot = ancestorWithStyle(chart, "population-chart-card");
+        if (searchRoot == null) searchRoot = ancestorWithStyle(chart, "in-place-fullscreen");
+        if (searchRoot == null) return;
+        if (containsLockToggle(searchRoot)) return;
+
+        HBox toolbar = findPopulationToolbar(searchRoot);
+        if (toolbar == null) return;
+        ToggleButton lock = new ToggleButton();
+        bindPopulationLockToggle(lock);
+
+        int insertAt = 0;
+        for (int index = 0; index < toolbar.getChildren().size(); index++) {
+            Node child = toolbar.getChildren().get(index);
+            if (child instanceof ButtonBase button) {
+                String text = button.getText() == null ? "" : button.getText().toLowerCase(Locale.ROOT);
+                if (text.contains("3d") || text.contains("schermo intero") || text.contains("fullscreen")) {
+                    insertAt = index;
+                    break;
+                }
+                insertAt = index + 1;
+            }
+        }
+        toolbar.getChildren().add(Math.max(0, Math.min(insertAt, toolbar.getChildren().size())), lock);
+        chart.getProperties().put(LOCK_ADDED, Boolean.TRUE);
+    }
+
+    private static boolean containsLockToggle(Parent root) {
+        for (Node child : root.getChildrenUnmodifiable()) {
+            if (child instanceof ToggleButton toggle && toggle.getStyleClass().contains("population-curve-lock")) return true;
+            if (child instanceof Parent parent && containsLockToggle(parent)) return true;
+        }
+        return false;
+    }
+
+    private static HBox findPopulationToolbar(Parent root) {
+        HBox helpOnly = null;
+        for (Node child : root.getChildrenUnmodifiable()) {
+            if (child instanceof HBox row) {
+                boolean hasAction = false;
+                boolean hasHelp = false;
+                for (Node item : row.getChildren()) {
+                    if (!(item instanceof ButtonBase button)) continue;
+                    String text = button.getText() == null ? "" : button.getText().toLowerCase(Locale.ROOT);
+                    hasAction |= text.contains("3d") || text.contains("schermo intero") || text.contains("fullscreen");
+                    hasHelp |= text.contains("spiegazione") || text.contains("explanation");
+                }
+                if (hasAction) return row;
+                if (hasHelp) helpOnly = row;
+            }
+            if (child instanceof Parent parent) {
+                HBox nested = findPopulationToolbar(parent);
+                if (nested != null) {
+                    boolean nestedHasAction = nested.getChildren().stream().anyMatch(item -> {
+                        if (!(item instanceof ButtonBase button)) return false;
+                        String text = button.getText() == null ? "" : button.getText().toLowerCase(Locale.ROOT);
+                        return text.contains("3d") || text.contains("schermo intero") || text.contains("fullscreen");
+                    });
+                    if (nestedHasAction) return nested;
+                    if (helpOnly == null) helpOnly = nested;
+                }
+            }
+        }
+        return helpOnly;
+    }
+
+    private static Parent ancestorWithStyle(Node node, String styleClass) {
+        Node current = node;
+        while (current != null) {
+            if (current instanceof Parent parent && current.getStyleClass().contains(styleClass)) return parent;
+            current = current.getParent();
+        }
+        return null;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -427,6 +515,7 @@ public final class CurveInteractionLinkEnhancer {
             }
             chart.getProperties().remove(HOVER);
             applyVisualState(chart);
+            installPopulationLockControl(chart);
         }
         if (node instanceof Parent parent) {
             for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) refreshPopulationNode(child);
