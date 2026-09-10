@@ -11,6 +11,7 @@ import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
 import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
 import it.casiraghi.swiftbat.ui.MainView;
 import it.casiraghi.swiftbat.ui.PageScopedPolishRouter;
+import it.casiraghi.swiftbat.ui.PopulationDurationMultiSelectEnhancer;
 import it.casiraghi.swiftbat.ui.SkyMap3DInteractionGuard;
 import it.casiraghi.swiftbat.ui.SpectroscopyStartupLayoutFix;
 import it.casiraghi.swiftbat.ui.TargetedLayoutPolish;
@@ -31,6 +32,7 @@ public final class SwiftBatExplorerApp extends Application {
         LegacyI18nBridge.install();
 
         MainView mainView = new MainView(getHostServices(), stage);
+        PopulationDurationMultiSelectEnhancer.install(mainView);
         Scene scene = new Scene(mainView.getRoot(), 1580, 960);
 
         /*
