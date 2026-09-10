@@ -16,9 +16,9 @@ import java.util.List;
 
 /**
  * Makes the spectroscopy Time-Energy tab report its real preferred height from
- * the very first opening. Previously the outer ScrollPane cached the height of
- * the initially selected spectroscopy tab; the Time-Energy content then became
- * correct only after a fullscreen/window resize caused a second layout pass.
+ * the very first opening. The important part is that the geometry is applied
+ * synchronously when the Time-Energy tab becomes selected and then confirmed
+ * over the following JavaFX pulses, instead of relying on a later window resize.
  */
 public final class SpectroscopyStartupLayoutFix {
     private static final String WATCHED = SpectroscopyStartupLayoutFix.class.getName() + ".watched";
@@ -89,18 +89,15 @@ public final class SpectroscopyStartupLayoutFix {
         if (Boolean.TRUE.equals(heatmap.getProperties().get(HEATMAP_DONE))) return;
         heatmap.getProperties().put(HEATMAP_DONE, Boolean.TRUE);
 
-        // These values include the axis title, legend and interaction hint drawn
-        // inside the Canvas; they must not be inferred from a not-yet-laid-out tab.
-        heatmap.setMinHeight(430);
-        heatmap.setPrefHeight(455);
+        // The Canvas also draws X axis, legend and the short interaction hint;
+        // reserve their space intrinsically so the first layout cannot clip them.
+        heatmap.setMinHeight(500);
+        heatmap.setPrefHeight(520);
         heatmap.setMaxHeight(Double.MAX_VALUE);
         VBox.setVgrow(heatmap, Priority.NEVER);
 
         heatmap.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) requestStableLayout(heatmap);
-        });
-        heatmap.widthProperty().addListener((obs, oldWidth, newWidth) -> {
-            if (newWidth.doubleValue() > 1) requestStableLayout(heatmap);
         });
         requestStableLayout(heatmap);
     }
@@ -111,8 +108,16 @@ public final class SpectroscopyStartupLayoutFix {
 
         tabs.setMinWidth(0);
         tabs.setMaxWidth(Double.MAX_VALUE);
-        tabs.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) ->
-                requestStableLayout(tabs));
+
+        tabs.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
+            Parent spectroscopy = ancestorBySimpleName(tabs, "SpectroscopyPane");
+            if (spectroscopy != null) {
+                // Apply once immediately, before the skin performs the first
+                // layout for the newly-selected tab.
+                applyStableLayout(spectroscopy);
+            }
+            requestStableLayout(tabs);
+        });
         tabs.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) requestStableLayout(tabs);
         });
@@ -123,9 +128,19 @@ public final class SpectroscopyStartupLayoutFix {
         Parent spectroscopy = ancestorBySimpleName(source, "SpectroscopyPane");
         if (spectroscopy == null || Boolean.TRUE.equals(spectroscopy.getProperties().get(PENDING))) return;
         spectroscopy.getProperties().put(PENDING, Boolean.TRUE);
+
+        // A newly selected TabPane is laid out over more than one pulse. Apply
+        // the same stable geometry over the next three pulses so startup behaves
+        // exactly like the layout that previously happened only after fullscreen.
         Platform.runLater(() -> {
-            spectroscopy.getProperties().remove(PENDING);
             applyStableLayout(spectroscopy);
+            Platform.runLater(() -> {
+                applyStableLayout(spectroscopy);
+                Platform.runLater(() -> {
+                    spectroscopy.getProperties().remove(PENDING);
+                    applyStableLayout(spectroscopy);
+                });
+            });
         });
     }
 
@@ -139,39 +154,69 @@ public final class SpectroscopyStartupLayoutFix {
 
         if (heatmap != null) {
             prepareHeatmap(heatmap);
+
             Region card = ancestorWithStyle(heatmap, "time-energy-card");
             if (card != null) {
-                card.setMinHeight(515);
-                card.setPrefHeight(535);
+                card.setMinHeight(615);
+                card.setPrefHeight(635);
                 card.setMaxHeight(Double.MAX_VALUE);
             }
             if (selectedContent instanceof Region content) {
-                content.setMinHeight(610);
-                content.setPrefHeight(625);
+                content.setMinHeight(705);
+                content.setPrefHeight(725);
                 content.setMaxHeight(Double.MAX_VALUE);
             }
-            tabs.setMinHeight(665);
-            tabs.setPrefHeight(680);
+
+            // Deliberately reserve the complete Time-Energy tab height. The
+            // outer page ScrollPane must scroll the whole spectroscopy page;
+            // the TabPane itself must never clip the chart on first entry.
+            tabs.setMinHeight(770);
+            tabs.setPrefHeight(790);
             tabs.setMaxHeight(Double.MAX_VALUE);
         } else {
-            // Do not leave the Time-Energy minimum imposed on the other tabs.
             tabs.setMinHeight(Region.USE_PREF_SIZE);
             tabs.setPrefHeight(Region.USE_COMPUTED_SIZE);
             tabs.setMaxHeight(Double.MAX_VALUE);
         }
 
-        // Force the preferred-height chain to be recomputed while the tab is
-        // already selected, not after a later fullscreen/window resize.
         spectroscopy.applyCss();
+        spectroscopy.autosize();
         spectroscopy.layout();
+
+        if (selectedContent instanceof Parent selectedParent) {
+            selectedParent.applyCss();
+            selectedParent.autosize();
+            selectedParent.layout();
+        }
+        if (heatmap != null) {
+            heatmap.autosize();
+            heatmap.requestLayout();
+        }
+
+        tabs.applyCss();
+        tabs.autosize();
         tabs.requestLayout();
+
         Parent current = tabs.getParent();
         while (current != null && current != spectroscopy) {
+            current.autosize();
             current.requestLayout();
             current = current.getParent();
         }
+
         ScrollPane outer = findDescendant(spectroscopy, ScrollPane.class);
-        if (outer != null) outer.requestLayout();
+        if (outer != null) {
+            outer.setFitToHeight(false);
+            Node content = outer.getContent();
+            if (content instanceof Region region) {
+                region.setMinHeight(Region.USE_PREF_SIZE);
+                region.autosize();
+                region.requestLayout();
+            }
+            outer.applyCss();
+            outer.autosize();
+            outer.requestLayout();
+        }
     }
 
     private static TabPane findSpectroscopyTabs(Node node) {
