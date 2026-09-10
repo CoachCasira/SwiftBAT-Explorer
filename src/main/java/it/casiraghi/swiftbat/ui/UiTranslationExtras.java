@@ -61,7 +61,10 @@ public final class UiTranslationExtras {
         put("GRB inclusi", "Included GRBs");
 
         // Interactive time-energy map.
+        put("Mappa tempo–energia", "Time–energy map");
+        put("Mappa tempo-energia", "Time-energy map");
         put("Mappa tempo–energia dei rate", "Time–energy rate map");
+        put("Mappa tempo-energia dei rate", "Time-energy rate map");
         put("Apri vista 3D dei rate", "Open 3D rate view");
         put("Mappa non disponibile: servono i quattro canali ASCII.",
                 "Map unavailable: all four ASCII channels are required.");
