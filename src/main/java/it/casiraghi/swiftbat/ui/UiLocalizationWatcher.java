@@ -5,6 +5,8 @@ import javafx.collections.ListChangeListener;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.Labeled;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.TextInputControl;
 
 import java.util.List;
@@ -28,16 +30,37 @@ public final class UiLocalizationWatcher {
 
     public static void install(Parent root) {
         if (root == null) return;
+        // Prima aggancia tutti i watcher e fotografa i valori runtime correnti;
+        // solo dopo esegue la localizzazione dell'albero.
         watch(root);
-        Platform.runLater(() -> UiTranslations.localizeTree(root));
+        Platform.runLater(() -> localize(root));
         I18n.languageProperty().addListener((obs, oldValue, newValue) ->
-                Platform.runLater(() -> UiTranslations.localizeTree(root)));
+                Platform.runLater(() -> localize(root)));
     }
 
     private static void watch(Node node) {
         if (node == null) return;
         installDynamicTextWatcher(node);
-        localize(node);
+
+        // I contenuti dei Tab non selezionati possono non appartenere ancora
+        // alla gerarchia visuale: vanno osservati comunque, prima che vengano mostrati.
+        if (node instanceof TabPane tabs) {
+            for (Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) watch(tab.getContent());
+            }
+            tabs.getTabs().addListener((ListChangeListener<Tab>) change -> {
+                while (change.next()) {
+                    if (!change.wasAdded()) continue;
+                    for (Tab tab : change.getAddedSubList()) {
+                        if (tab.getContent() != null) {
+                            watch(tab.getContent());
+                            Platform.runLater(() -> localize(tab.getContent()));
+                        }
+                    }
+                }
+            });
+        }
+
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
@@ -57,6 +80,15 @@ public final class UiLocalizationWatcher {
         if (node instanceof Labeled labeled
                 && !Boolean.TRUE.equals(labeled.getProperties().get(TEXT_WATCHED))) {
             labeled.getProperties().put(TEXT_WATCHED, Boolean.TRUE);
+
+            boolean explicitI18n = labeled.getProperties().get(I18N_LOCALIZED_IT) instanceof String
+                    && labeled.getProperties().get(I18N_LOCALIZED_EN) instanceof String;
+            if (!explicitI18n && !labeled.textProperty().isBound() && labeled.getText() != null) {
+                // Fondamentale per pagine costruite fuori scena: il valore può
+                // essere già passato da "0" al conteggio reale prima della prima visita.
+                rememberSource(labeled, labeled.getText());
+            }
+
             labeled.textProperty().addListener((obs, oldText, newText) -> {
                 if (Boolean.TRUE.equals(labeled.getProperties().get(LOCALIZING))
                         || labeled.textProperty().isBound() || newText == null) return;
@@ -65,14 +97,7 @@ public final class UiLocalizationWatcher {
                 if (labeled.getProperties().get(I18N_LOCALIZED_IT) instanceof String
                         && labeled.getProperties().get(I18N_LOCALIZED_EN) instanceof String) return;
 
-                /*
-                 * A runtime value is the new source value even when it has no
-                 * translation (numbers are the important case). Previously a
-                 * value such as the sky-map counter could remain associated
-                 * with its construction-time "0" while the interface was in
-                 * English; a later localization pass then restored that stale
-                 * zero although the map itself was already populated.
-                 */
+                // Anche numeri e valori senza traduzione sono sorgenti runtime reali.
                 rememberSource(labeled, newText);
                 if (I18n.language() == I18n.Language.IT) return;
 
@@ -91,16 +116,17 @@ public final class UiLocalizationWatcher {
         if (node instanceof TextInputControl input
                 && !Boolean.TRUE.equals(input.getProperties().get(PROMPT_WATCHED))) {
             input.getProperties().put(PROMPT_WATCHED, Boolean.TRUE);
+            if (!input.promptTextProperty().isBound() && input.getPromptText() != null) {
+                input.getProperties().put(SUPPLEMENTAL_PROMPT, input.getPromptText());
+            }
             input.promptTextProperty().addListener((obs, oldText, newText) -> {
                 if (Boolean.TRUE.equals(input.getProperties().get(LOCALIZING))
                         || input.promptTextProperty().isBound() || newText == null) return;
-                if (I18n.language() == I18n.Language.IT) {
-                    input.getProperties().put(SUPPLEMENTAL_PROMPT, newText);
-                    return;
-                }
+                input.getProperties().put(SUPPLEMENTAL_PROMPT, newText);
+                if (I18n.language() == I18n.Language.IT) return;
+
                 String translated = UiTranslations.t(newText);
                 if (!translated.equals(newText)) {
-                    input.getProperties().put(SUPPLEMENTAL_PROMPT, newText);
                     input.getProperties().put(LOCALIZING, Boolean.TRUE);
                     try {
                         input.setPromptText(translated);
@@ -119,11 +145,28 @@ public final class UiLocalizationWatcher {
 
     private static void localize(Node node) {
         if (node == null) return;
-        node.getProperties().put(LOCALIZING, Boolean.TRUE);
+        setLocalizing(node, true);
         try {
             UiTranslations.localizeTree(node);
         } finally {
-            node.getProperties().remove(LOCALIZING);
+            setLocalizing(node, false);
+        }
+    }
+
+    private static void setLocalizing(Node node, boolean value) {
+        if (node == null) return;
+        if (value) node.getProperties().put(LOCALIZING, Boolean.TRUE);
+        else node.getProperties().remove(LOCALIZING);
+
+        if (node instanceof TabPane tabs) {
+            for (Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) setLocalizing(tab.getContent(), value);
+            }
+        }
+        if (node instanceof Parent parent) {
+            for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) {
+                setLocalizing(child, value);
+            }
         }
     }
 }
