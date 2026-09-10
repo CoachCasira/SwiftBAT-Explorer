@@ -61,10 +61,12 @@ public final class PageScopedPolishRouter {
         if (workspace == null) return;
         page.getProperties().put(EXPLORER_BRIDGE, Boolean.TRUE);
 
-        // Both are Explorer-scoped and installed once. Neither descends into
-        // virtualized table/list skins or chart point internals anymore.
+        // All Explorer-only watchers live here, once per ExplorerPage. They now
+        // follow logical content only and stop before chart/virtualized skins.
         ExplorerScrollbarFix.install(page);
         ExplorerVisualFastFixes.install(page);
+        ExplorerBandSelectionEnhancer.install(page);
+        ExplorerCurveInteractionFastEnhancer.install(page);
 
         for (Node child : List.copyOf(workspace.getChildren())) polishExplorerWorkspaceChild(page, child);
         workspace.getChildren().addListener((ListChangeListener<Node>) change -> {
