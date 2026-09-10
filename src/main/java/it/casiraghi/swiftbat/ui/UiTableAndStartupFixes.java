@@ -8,9 +8,11 @@ import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.geometry.VPos;
+import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.ScrollBar;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -28,14 +30,9 @@ import javafx.scene.layout.VBox;
 import java.util.List;
 
 /**
- * Owns two last-mile behaviours that must be stable from the first JavaFX pulse:
- * external TableView vertical scrollbars and the initial spectroscopy time-energy layout.
- *
- * <p>The preparatory pass marks tables before the older compatibility enhancers see
- * them. This prevents two different pieces of code from resizing/reparenting the
- * same TableView. The visible scrollbar is then placed in a dedicated gutter next
- * to the table while the native VirtualFlow scrollbar remains only as the bound
- * scrolling engine at zero width.</p>
+ * Final owner for three behaviours that must not be split across enhancers:
+ * external TableView scrollbars, first-layout sizing of the spectroscopy
+ * time-energy map, and sky-map point selection versus card fullscreen.
  */
 public final class UiTableAndStartupFixes {
     private static final String PREPARED = UiTableAndStartupFixes.class.getName() + ".prepared";
@@ -44,21 +41,28 @@ public final class UiTableAndStartupFixes {
     private static final String HEATMAP_INSTALLED = UiTableAndStartupFixes.class.getName() + ".heatmapInstalled";
     private static final String SPECTRO_TABS_INSTALLED = UiTableAndStartupFixes.class.getName() + ".spectroTabsInstalled";
     private static final String INTERNAL_BAR = UiTableAndStartupFixes.class.getName() + ".internalBar";
+    private static final String SKY_GUARD = UiTableAndStartupFixes.class.getName() + ".skyGuard";
+    private static final String SKY_BUTTON_OLD_DISABLE = UiTableAndStartupFixes.class.getName() + ".skyButtonOldDisable";
 
-    // Private flags used by the older passes. Reusing the exact property keys lets
-    // this class take ownership without changing their public API.
+    /* Exact keys used by the two legacy table passes. Setting them before those
+       passes see a TableView makes this class the sole table geometry owner. */
     private static final String FINAL_TABLE_DONE = FinalUiStabilityEnhancer.class.getName() + ".tableDone";
     private static final String LAST_MILE_TABLE_WRAPPED = UiLastMileFixes.class.getName() + ".tableWrapped";
 
     private UiTableAndStartupFixes() {
     }
 
-    /** Must run before FinalUiStabilityEnhancer and UiLastMileFixes.install. */
+    /**
+     * Registers ownership markers before the legacy stability enhancers are installed.
+     */
     public static void prepare(Parent root) {
         if (root != null) prepareNode(root);
     }
 
-    /** Runs after the compatibility enhancers and becomes the sole table wrapper. */
+    /**
+     * Must be installed before FinalUiStabilityEnhancer and UiLastMileFixes so
+     * future dynamically-created tables are marked before either legacy watcher.
+     */
     public static void install(Parent root) {
         if (root == null) return;
         watch(root);
@@ -68,26 +72,35 @@ public final class UiTableAndStartupFixes {
         });
     }
 
+    private static void markTableOwned(TableView<?> table) {
+        if (table == null) return;
+        table.getProperties().put(FINAL_TABLE_DONE, Boolean.TRUE);
+        table.getProperties().put(LAST_MILE_TABLE_WRAPPED, Boolean.TRUE);
+    }
+
     private static void prepareNode(Node node) {
         if (node == null) return;
-        if (node instanceof TableView<?> table) {
-            table.getProperties().put(FINAL_TABLE_DONE, Boolean.TRUE);
-            table.getProperties().put(LAST_MILE_TABLE_WRAPPED, Boolean.TRUE);
-        }
+        if (node instanceof TableView<?> table) markTableOwned(table);
+
         if (node instanceof TabPane tabs) {
-            for (Tab tab : tabs.getTabs()) if (tab.getContent() != null) prepareNode(tab.getContent());
+            for (Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) prepareNode(tab.getContent());
+            }
             String key = PREPARED + ".tabs";
             if (!Boolean.TRUE.equals(tabs.getProperties().get(key))) {
                 tabs.getProperties().put(key, Boolean.TRUE);
                 tabs.getTabs().addListener((ListChangeListener<Tab>) change -> {
                     while (change.next()) {
                         if (change.wasAdded()) {
-                            for (Tab tab : change.getAddedSubList()) if (tab.getContent() != null) prepareNode(tab.getContent());
+                            for (Tab tab : change.getAddedSubList()) {
+                                if (tab.getContent() != null) prepareNode(tab.getContent());
+                            }
                         }
                     }
                 });
             }
         }
+
         if (!(node instanceof Parent parent)) return;
         if (!Boolean.TRUE.equals(parent.getProperties().get(PREPARED))) {
             parent.getProperties().put(PREPARED, Boolean.TRUE);
@@ -104,21 +117,32 @@ public final class UiTableAndStartupFixes {
 
     private static void watch(Node node) {
         if (node == null) return;
-        if (node instanceof TableView<?> table) scheduleTableInstall(table);
+
+        if (node instanceof TableView<?> table) {
+            /* Mark synchronously, before any runLater/reparenting. This is what
+               prevents the legacy HBox wrapper from ever seeing an unowned table. */
+            markTableOwned(table);
+            scheduleTableInstall(table);
+        }
         if (node instanceof TimeEnergyHeatmapPane heatmap) installHeatmapFix(heatmap);
         if (node instanceof TabPane tabs && tabs.getStyleClass().contains("spectroscopy-tabs")) {
             installSpectroscopyTabsFix(tabs);
         }
+        if (node instanceof Region region && isSkySurface(region)) installSkySelectionGuard(region);
 
         if (node instanceof TabPane tabs) {
-            for (Tab tab : tabs.getTabs()) if (tab.getContent() != null) watch(tab.getContent());
+            for (Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) watch(tab.getContent());
+            }
             String key = WATCHED + ".tabs";
             if (!Boolean.TRUE.equals(tabs.getProperties().get(key))) {
                 tabs.getProperties().put(key, Boolean.TRUE);
                 tabs.getTabs().addListener((ListChangeListener<Tab>) change -> {
                     while (change.next()) {
                         if (change.wasAdded()) {
-                            for (Tab tab : change.getAddedSubList()) if (tab.getContent() != null) watch(tab.getContent());
+                            for (Tab tab : change.getAddedSubList()) {
+                                if (tab.getContent() != null) watch(tab.getContent());
+                            }
                         }
                     }
                 });
@@ -138,7 +162,7 @@ public final class UiTableAndStartupFixes {
         for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) watch(child);
     }
 
-    /* ---------------- Stable external TableView scrollbar ---------------- */
+    /* ---------------- Tables: one wrapper, scrollbar genuinely outside ---------------- */
 
     private static void scheduleTableInstall(TableView<?> table) {
         if (table == null || Boolean.TRUE.equals(table.getProperties().get(TABLE_INSTALLED))) return;
@@ -147,8 +171,18 @@ public final class UiTableAndStartupFixes {
     }
 
     private static void installExternalScrollbar(TableView<?> table) {
+        markTableOwned(table);
         if (table.getParent() == null) {
             table.getProperties().remove(TABLE_INSTALLED);
+            return;
+        }
+
+        /* If a wrapper already exists, never wrap again. This also makes the code
+           safe if a page is temporarily detached/re-attached by a fullscreen view. */
+        Parent currentParent = table.getParent();
+        if (currentParent.getStyleClass().contains("external-table-scroll-shell")) {
+            ScrollBar existing = findExternalScrollbar(currentParent);
+            if (existing != null) scheduleWire(table, existing);
             return;
         }
 
@@ -161,26 +195,25 @@ public final class UiTableAndStartupFixes {
         external.setMaxWidth(7);
         external.setMaxHeight(Double.MAX_VALUE);
 
-        StackPane shell = new StackPane();
-        shell.getStyleClass().add("external-table-scroll-shell");
+        /* Important: create an EMPTY shell. Adding the table in the HBox
+           constructor would re-parent it immediately and then make replacement
+           try to insert the shell into itself (JavaFX "Children: cycle detected"). */
+        HBox shell = new HBox(4);
+        shell.getStyleClass().addAll("stable-table-scroll", "external-table-scroll-shell");
+        shell.setAlignment(Pos.TOP_LEFT);
+        shell.setFillHeight(true);
         shell.setMinSize(0, 0);
         shell.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
-        // Replace first, then re-parent the table. Constructing a new parent with
-        // the table before this step can detach it from its original container and
-        // is the reason some tables vanished in the previous implementation.
         if (!replaceInParent(table, shell)) {
             table.getProperties().remove(TABLE_INSTALLED);
             return;
         }
 
         shell.getChildren().addAll(table, external);
-        StackPane.setAlignment(table, Pos.CENTER_LEFT);
-        StackPane.setMargin(table, new Insets(0, 11, 0, 0));
-        StackPane.setAlignment(external, Pos.CENTER_RIGHT);
-        StackPane.setMargin(external, new Insets(1, 1, 1, 0));
         table.setMinSize(0, 0);
         table.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        HBox.setHgrow(table, Priority.ALWAYS);
 
         table.skinProperty().addListener((obs, oldSkin, newSkin) -> scheduleWire(table, external));
         table.sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -190,9 +223,18 @@ public final class UiTableAndStartupFixes {
         scheduleWire(table, external);
     }
 
-    private static boolean replaceInParent(TableView<?> table, StackPane shell) {
+    private static ScrollBar findExternalScrollbar(Parent parent) {
+        for (Node child : parent.getChildrenUnmodifiable()) {
+            if (child instanceof ScrollBar bar && bar.getStyleClass().contains("table-external-scrollbar")) {
+                return bar;
+            }
+        }
+        return null;
+    }
+
+    private static boolean replaceInParent(TableView<?> table, HBox shell) {
         Parent parent = table.getParent();
-        if (parent == null) return false;
+        if (parent == null || parent == shell) return false;
 
         if (parent instanceof VBox box) {
             int index = box.getChildren().indexOf(table);
@@ -301,8 +343,10 @@ public final class UiTableAndStartupFixes {
     }
 
     private static boolean wire(TableView<?> table, ScrollBar external) {
+        markTableOwned(table);
         if (table.getSkin() == null) return false;
         table.applyCss();
+
         ScrollBar internal = null;
         for (Node node : table.lookupAll(".scroll-bar")) {
             if (node instanceof ScrollBar bar && bar.getOrientation() == Orientation.VERTICAL) {
@@ -325,7 +369,9 @@ public final class UiTableAndStartupFixes {
             external.visibleProperty().bind(internal.visibleProperty());
             external.managedProperty().bind(internal.visibleProperty());
         }
+
         collapseNativeBar(internal);
+        table.requestLayout();
         return true;
     }
 
@@ -340,7 +386,7 @@ public final class UiTableAndStartupFixes {
             external.visibleProperty().unbind();
             external.managedProperty().unbind();
         } catch (RuntimeException ignored) {
-            // A skin can disappear between two JavaFX pulses.
+            // A skin may disappear between two JavaFX pulses.
         }
     }
 
@@ -353,13 +399,13 @@ public final class UiTableAndStartupFixes {
         internal.setStyle("-fx-opacity: 0; -fx-min-width: 0; -fx-pref-width: 0; -fx-max-width: 0; -fx-padding: 0;");
     }
 
-    /* ---------------- Spectroscopy first-layout repair ---------------- */
+    /* ---------------- Spectroscopy: correct size from the first opening ---------------- */
 
     private static void installHeatmapFix(TimeEnergyHeatmapPane heatmap) {
         if (Boolean.TRUE.equals(heatmap.getProperties().get(HEATMAP_INSTALLED))) return;
         heatmap.getProperties().put(HEATMAP_INSTALLED, Boolean.TRUE);
-        heatmap.setMinHeight(410);
-        heatmap.setPrefHeight(455);
+        heatmap.setMinHeight(430);
+        heatmap.setPrefHeight(470);
         heatmap.setMaxHeight(Double.MAX_VALUE);
         heatmap.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) requestHeatmapLayout(heatmap);
@@ -371,11 +417,14 @@ public final class UiTableAndStartupFixes {
         if (Boolean.TRUE.equals(tabs.getProperties().get(SPECTRO_TABS_INSTALLED))) return;
         tabs.getProperties().put(SPECTRO_TABS_INSTALLED, Boolean.TRUE);
         tabs.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) -> {
-            if (newTab != null && newTab.getContent() != null) {
-                TimeEnergyHeatmapPane heatmap = findDescendant(newTab.getContent(), TimeEnergyHeatmapPane.class);
-                if (heatmap != null) requestHeatmapLayout(heatmap);
-            }
+            if (newTab == null || newTab.getContent() == null) return;
+            TimeEnergyHeatmapPane heatmap = findDescendant(newTab.getContent(), TimeEnergyHeatmapPane.class);
+            if (heatmap != null) requestHeatmapLayout(heatmap);
         });
+        tabs.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) Platform.runLater(() -> fitSelectedTimeEnergyTab(tabs));
+        });
+        Platform.runLater(() -> fitSelectedTimeEnergyTab(tabs));
     }
 
     private static void requestHeatmapLayout(TimeEnergyHeatmapPane heatmap) {
@@ -384,33 +433,133 @@ public final class UiTableAndStartupFixes {
 
     private static void forceVisibleSpectroscopyLayout(Node node) {
         if (node == null) return;
-        if (node instanceof TimeEnergyHeatmapPane heatmap && heatmap.isVisible()) forceHeatmapLayout(heatmap);
+        if (node instanceof TabPane tabs && tabs.getStyleClass().contains("spectroscopy-tabs")) {
+            fitSelectedTimeEnergyTab(tabs);
+        }
         if (node instanceof TabPane tabs) {
-            for (Tab tab : tabs.getTabs()) if (tab.getContent() != null) forceVisibleSpectroscopyLayout(tab.getContent());
+            for (Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) forceVisibleSpectroscopyLayout(tab.getContent());
+            }
         }
         if (node instanceof Parent parent) {
             for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) forceVisibleSpectroscopyLayout(child);
         }
     }
 
+    private static void fitSelectedTimeEnergyTab(TabPane tabs) {
+        if (tabs == null || tabs.getScene() == null) return;
+        Tab selected = tabs.getSelectionModel().getSelectedItem();
+        if (selected == null || selected.getContent() == null) return;
+        TimeEnergyHeatmapPane heatmap = findDescendant(selected.getContent(), TimeEnergyHeatmapPane.class);
+        if (heatmap != null) forceHeatmapLayout(heatmap);
+    }
+
     private static void forceHeatmapLayout(TimeEnergyHeatmapPane heatmap) {
         if (heatmap == null || heatmap.getScene() == null) return;
+
+        heatmap.setMinHeight(430);
+        heatmap.setPrefHeight(470);
+        heatmap.setMaxHeight(Double.MAX_VALUE);
+
+        TabPane spectroscopyTabs = null;
         Node current = heatmap;
         while (current != null) {
             if (current instanceof VBox box && box.getStyleClass().contains("time-energy-card")) {
-                box.setMinHeight(500);
-                box.setPrefHeight(525);
+                box.setMinHeight(540);
+                box.setPrefHeight(560);
                 box.setMaxHeight(Double.MAX_VALUE);
                 VBox.setVgrow(heatmap, Priority.ALWAYS);
+            }
+            if (current instanceof TabPane tabs && tabs.getStyleClass().contains("spectroscopy-tabs")) {
+                spectroscopyTabs = tabs;
             }
             if (current instanceof Region region) region.requestLayout();
             current = current.getParent();
         }
-        Scene scene = heatmap.getScene();
-        if (scene != null && scene.getRoot() != null) {
-            scene.getRoot().applyCss();
-            scene.getRoot().requestLayout();
+
+        /* The old sizing pass used 690 px because it ran before the heatmap's
+           final preferred height was known. 760 px is the deterministic minimum
+           for this tab; on smaller windows the outer page ScrollPane scrolls,
+           rather than clipping the legend/instruction line. */
+        if (spectroscopyTabs != null) {
+            spectroscopyTabs.setMinHeight(760);
+            spectroscopyTabs.setPrefHeight(Math.max(760, spectroscopyTabs.getPrefHeight()));
+            spectroscopyTabs.setMaxHeight(Double.MAX_VALUE);
+            if (spectroscopyTabs.getParent() != null) spectroscopyTabs.getParent().requestLayout();
         }
+
+        Scene scene = heatmap.getScene();
+        if (scene != null && scene.getRoot() != null) scene.getRoot().requestLayout();
+        heatmap.requestLayout();
+    }
+
+    /* ---------------- Sky map: point selection wins over card fullscreen ---------------- */
+
+    private static boolean isSkySurface(Region region) {
+        String name = region.getClass().getSimpleName();
+        return "MollweideSkyPane".equals(name) || "CelestialSpherePane".equals(name);
+    }
+
+    private static void installSkySelectionGuard(Region surface) {
+        if (Boolean.TRUE.equals(surface.getProperties().get(SKY_GUARD))) return;
+        surface.getProperties().put(SKY_GUARD, Boolean.TRUE);
+
+        Button fullscreen = findFullscreenButtonAbove(surface);
+        if (fullscreen == null) return;
+
+        /* Both sky renderers deliberately use CROSSHAIR while the pointer is on
+           a GRB marker. The visualization-card fullscreen action is queued with
+           runLater; disabling its button while CROSSHAIR is active therefore lets
+           the marker click complete normally and prevents the queued fullscreen. */
+        surface.cursorProperty().addListener((obs, oldCursor, newCursor) ->
+                setSkySelectionGuard(fullscreen, newCursor == Cursor.CROSSHAIR));
+        surface.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene == null) setSkySelectionGuard(fullscreen, false);
+        });
+        setSkySelectionGuard(fullscreen, surface.getCursor() == Cursor.CROSSHAIR);
+    }
+
+    private static void setSkySelectionGuard(Button fullscreen, boolean active) {
+        if (fullscreen == null) return;
+        if (active) {
+            if (!fullscreen.getProperties().containsKey(SKY_BUTTON_OLD_DISABLE)) {
+                fullscreen.getProperties().put(SKY_BUTTON_OLD_DISABLE, fullscreen.isDisable());
+            }
+            fullscreen.setDisable(true);
+            return;
+        }
+        Object previous = fullscreen.getProperties().remove(SKY_BUTTON_OLD_DISABLE);
+        if (previous instanceof Boolean disabled) fullscreen.setDisable(disabled);
+    }
+
+    private static Button findFullscreenButtonAbove(Node node) {
+        Node current = node == null ? null : node.getParent();
+        while (current != null) {
+            if (current instanceof Parent parent) {
+                Button found = findFullscreenButton(parent);
+                if (found != null) return found;
+            }
+            current = current.getParent();
+        }
+        return null;
+    }
+
+    private static Button findFullscreenButton(Parent root) {
+        if (root == null) return null;
+        for (Node child : root.getChildrenUnmodifiable()) {
+            if (child instanceof Button button && button.isVisible() && button.isManaged()) {
+                String text = button.getText() == null ? "" : button.getText().toLowerCase();
+                String compact = text.replace(" ", "");
+                if (text.contains("schermo intero") || text.contains("full screen") || compact.contains("fullscreen")) {
+                    return button;
+                }
+            }
+            if (child instanceof Parent parent) {
+                Button nested = findFullscreenButton(parent);
+                if (nested != null) return nested;
+            }
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")
