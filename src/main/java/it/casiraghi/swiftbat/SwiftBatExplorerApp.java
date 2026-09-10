@@ -8,8 +8,8 @@ import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
 import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
 import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
 import it.casiraghi.swiftbat.ui.MainView;
-import it.casiraghi.swiftbat.ui.ResponsiveLayoutEnhancer;
 import it.casiraghi.swiftbat.ui.UiBugFixes;
+import it.casiraghi.swiftbat.ui.UiLastMileFixes;
 import it.casiraghi.swiftbat.ui.UiLocalizationWatcher;
 import it.casiraghi.swiftbat.ui.UiRefinements;
 import it.casiraghi.swiftbat.ui.components.BrandLogoAsset;
@@ -63,11 +63,13 @@ public final class SwiftBatExplorerApp extends Application {
         ChartInteractionEnhancer.install(mainView.getRoot());
         UiBugFixes.install(mainView.getRoot());
 
-        ResponsiveLayoutEnhancer.install(mainView.getRoot());
         AdaptiveChromeEnhancer.install(mainView.getRoot());
-        // Va installato per ultimo: neutralizza soltanto i relayout tardivi e
-        // rifinisce i controlli già creati, senza toccare la logica scientifica.
+
+        // Dynamic Population geometry now has one Java controller only. Mark the
+        // old stability hooks before installing their non-layout safety passes.
+        UiLastMileFixes.prepare(mainView.getRoot());
         FinalUiStabilityEnhancer.install(mainView.getRoot());
+        UiLastMileFixes.install(mainView.getRoot());
         mainView.initialize();
     }
 
