@@ -57,6 +57,12 @@ public final class PageScopedPolishRouter {
         if (workspace == null) return;
         page.getProperties().put(EXPLORER_BRIDGE, Boolean.TRUE);
 
+        // Important: install on the whole ExplorerPage immediately. The GRB
+        // catalog ListView lives in the left sidebar, outside `workspace`; older
+        // versions only polished workspace children and therefore never saw the
+        // scrollbar shown in the catalog on first macOS launch.
+        ExplorerScrollbarFix.install(page);
+
         for (Node child : List.copyOf(workspace.getChildren())) polishExplorerWorkspaceChild(page, child);
         workspace.getChildren().addListener((ListChangeListener<Node>) change -> {
             while (change.next()) {
@@ -65,6 +71,7 @@ public final class PageScopedPolishRouter {
             }
         });
         Platform.runLater(() -> {
+            ExplorerScrollbarFix.install(page);
             for (Node child : List.copyOf(workspace.getChildren())) polishExplorerWorkspaceChild(page, child);
         });
     }
@@ -86,7 +93,7 @@ public final class PageScopedPolishRouter {
             Platform.runLater(() -> {
                 FinalExpertUiPolish.polishExplorer(content);
                 ExplorerOverflowFix.apply(content);
-                ExplorerScrollbarFix.install(node);
+                ExplorerScrollbarFix.install(page);
             });
             return;
         }
@@ -109,13 +116,13 @@ public final class PageScopedPolishRouter {
         FinalExpertUiPolish.polishExplorer(content);
         ExplorerOverflowFix.apply(content);
         FinalTableAlignmentFix.install(content);
-        ExplorerScrollbarFix.install(content);
+        ExplorerScrollbarFix.install(page);
 
         Platform.runLater(() -> {
             installMetadataWorkspace(page, tabs);
             FinalExpertUiPolish.polishExplorer(content);
             ExplorerOverflowFix.apply(content);
-            ExplorerScrollbarFix.install(node);
+            ExplorerScrollbarFix.install(page);
         });
     }
 
