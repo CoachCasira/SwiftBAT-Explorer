@@ -1,8 +1,10 @@
 package it.casiraghi.swiftbat;
 
+import it.casiraghi.swiftbat.ui.AdaptiveChromeEnhancer;
 import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
 import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
+import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
 import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
 import it.casiraghi.swiftbat.ui.MainView;
 import it.casiraghi.swiftbat.ui.ResponsiveLayoutEnhancer;
@@ -36,9 +38,13 @@ public final class SwiftBatExplorerApp extends Application {
         // Geometria semplice e coerente per tutti i menu a tendina.
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/dropdown-clean.css").toExternalForm());
-        // Ultimo layer: passa automaticamente dalla geometria laptop a quella desktop.
+        // Layout responsive di base per Population e shell.
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/responsive-layout.css").toExternalForm());
+        // Ultimo override visuale: interazioni coerenti e desktop 'roomy' anche
+        // prima del fullscreen del sistema operativo.
+        scene.getStylesheets().add(
+                SwiftBatExplorerApp.class.getResource("/interactive-layout-final.css").toExternalForm());
 
         stage.setTitle("SwiftBAT Explorer 1.3.0 — Reference UI Preview");
         stage.getIcons().setAll(BrandLogoAsset.image());
@@ -50,12 +56,18 @@ public final class SwiftBatExplorerApp extends Application {
         UiLocalizationWatcher.install(mainView.getRoot());
         UiRefinements.install(mainView.getRoot());
         ExplorerBandSelectionEnhancer.install(mainView.getRoot());
+
+        // Installato prima degli enhancer storici: riserva il plot all'interazione
+        // scientifica e sincronizza lo stato tra vista embedded e fullscreen.
+        InteractiveViewSyncEnhancer.install(mainView.getRoot());
         InteractionPolishEnhancer.install(mainView.getRoot());
         ChartInteractionEnhancer.install(mainView.getRoot());
         UiBugFixes.install(mainView.getRoot());
-        // Deve essere l'ultimo enhancer: rilassa i vincoli fissati dai layer precedenti
-        // e usa la dimensione effettiva della finestra per il layout finale.
+
         ResponsiveLayoutEnhancer.install(mainView.getRoot());
+        // Ultimo passaggio runtime: sfrutta anche una normale finestra desktop
+        // (es. 1580 px) senza penalizzare la geometria compatta del portatile.
+        AdaptiveChromeEnhancer.install(mainView.getRoot());
         mainView.initialize();
     }
 
