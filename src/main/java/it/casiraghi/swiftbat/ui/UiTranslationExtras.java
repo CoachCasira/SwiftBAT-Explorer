@@ -39,10 +39,17 @@ public final class UiTranslationExtras {
         put("Finestra temporale", "Time window");
         put("Campione massimo", "Maximum sample");
         put("Ripristina filtri", "Reset filters");
+        put("ripristina filtri", "reset filters");
         put("Analizza il gruppo", "Analyze group");
         put("Annulla", "Cancel");
         put("Blocca le curve selezionate", "Lock selected curves");
         put("Sblocca la selezione delle curve", "Unlock curve selection");
+        put("Gruppo GRB manuale", "Manual GRB group");
+        put("Scrivi il nome e seleziona uno o più GRB", "Type a name and select one or more GRBs");
+        put("Il prefisso GRB viene mantenuto automaticamente. Invio seleziona il primo risultato.",
+                "The GRB prefix is kept automatically. Enter selects the first result.");
+        put("Analyze Group userà esattamente i GRB salvati; FRACEXP e finestra temporale restano applicati.",
+                "Analyze Group will use exactly the saved GRBs; FRACEXP and the time window still apply.");
 
         // Compact radio labels used in Population Analysis.
         put("Con z", "With z");
