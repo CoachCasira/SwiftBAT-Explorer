@@ -1,7 +1,6 @@
 package it.casiraghi.swiftbat.ui;
 
 import javafx.application.Platform;
-import javafx.beans.value.ChangeListener;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -16,9 +15,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
-import java.net.URL;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -55,7 +52,6 @@ public final class MetadataFieldSelector extends VBox {
         setSpacing(7);
         setMinWidth(0);
         setMaxWidth(Double.MAX_VALUE);
-        loadStylesheet();
 
         search.getStyleClass().add("metadata-field-search-v2");
         search.setPromptText(I18n.dynamic("Cerca un campo metadata…", "Search a metadata field…"));
@@ -230,11 +226,6 @@ public final class MetadataFieldSelector extends VBox {
             }
         }
         return List.copyOf(unique);
-    }
-
-    private void loadStylesheet() {
-        URL css = MetadataFieldSelector.class.getResource("/metadata-field-selector.css");
-        if (css != null) getStylesheets().add(css.toExternalForm());
     }
 
     private record Entry(String value, boolean header) { }
