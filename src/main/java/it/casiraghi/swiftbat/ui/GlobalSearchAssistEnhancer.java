@@ -193,8 +193,8 @@ public final class GlobalSearchAssistEnhancer {
         }
 
         private void refreshCompletion(boolean keepRandom) {
-            String typed = normalizeName(search.getText());
-            if (typed == null || typed.isBlank()) typed = "GRB";
+            String normalized = normalizeName(search.getText());
+            final String typed = normalized == null || normalized.isBlank() ? "GRB" : normalized;
             List<String> names = catalogNames();
 
             if ("GRB".equals(typed)) {
@@ -217,7 +217,6 @@ public final class GlobalSearchAssistEnhancer {
         }
 
         private void updateGhost() {
-            if (ghost == null) return;
             String typed = normalizeName(search.getText());
             String target = completion;
             if (typed == null || target == null || target.length() <= typed.length()
