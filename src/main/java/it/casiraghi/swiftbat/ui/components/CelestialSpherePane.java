@@ -60,6 +60,7 @@ public final class CelestialSpherePane extends Pane {
     private SkyBurst selectedBurst;
     private Consumer<SkyBurst> onSelect = burst -> { };
     private boolean showGalacticPlane = true;
+    private boolean markerInteractionPending;
     private double lastMouseX;
     private double lastMouseY;
 
@@ -91,11 +92,6 @@ public final class CelestialSpherePane extends Pane {
         subScene.setManaged(false);
         subScene.setFill(Color.web("#07101f"));
 
-        /*
-         * Con PerspectiveCamera(true) il centro di proiezione è già il centro del viewport.
-         * Il mondo deve quindi restare attorno all'origine (0,0,0). La precedente traslazione
-         * di width/2 e height/2 spostava la sfera realmente in basso a destra.
-         */
         camera.setNearClip(0.1);
         camera.setFarClip(5000.0);
         camera.setFieldOfView(36.0);
@@ -125,6 +121,19 @@ public final class CelestialSpherePane extends Pane {
     public void setShowGalacticPlane(boolean show) {
         this.showGalacticPlane = show;
         galacticGroup.setVisible(show);
+    }
+
+    /**
+     * Used by the outer Sky Map card to suppress its fullscreen action for the
+     * mouse click that belongs to a real 3D GRB marker. The marker is selected
+     * on mouse release, before the subsequent MOUSE_CLICKED capture reaches the
+     * card, so the SubScene never has to be detached while JavaFX is recomputing
+     * coordinates for that same input event.
+     */
+    public boolean consumeMarkerInteractionGuard() {
+        boolean pending = markerInteractionPending;
+        markerInteractionPending = false;
+        return pending;
     }
 
     public void select(SkyBurst burst) {
@@ -184,11 +193,21 @@ public final class CelestialSpherePane extends Pane {
             Tooltip.install(marker, new Tooltip(tooltipText(burst)));
             marker.setOnMouseEntered(event -> setCursor(Cursor.CROSSHAIR));
             marker.setOnMouseExited(event -> setCursor(Cursor.HAND));
-            marker.setOnMouseClicked(event -> {
+            marker.setOnMousePressed(event -> {
                 if (event.getButton() == MouseButton.PRIMARY) {
-                    onSelect.accept(burst);
-                    event.consume();
+                    markerInteractionPending = true;
                 }
+            });
+            marker.setOnMouseReleased(event -> {
+                if (event.getButton() != MouseButton.PRIMARY) {
+                    return;
+                }
+                if (!event.isStillSincePress()) {
+                    markerInteractionPending = false;
+                    return;
+                }
+                select(burst);
+                onSelect.accept(burst);
             });
             markerGroup.getChildren().add(marker);
             markerNodes.put(burst.grbName(), marker);
@@ -205,7 +224,6 @@ public final class CelestialSpherePane extends Pane {
     private void rebuildGrid() {
         gridGroup.getChildren().clear();
 
-        // Equatore celeste.
         SkyPoint3D previous = null;
         for (int ra = 0; ra <= 360; ra += 5) {
             SkyPoint3D current = SkyCoordinates.onSphere(ra % 360, 0, RADIUS + 0.5);
@@ -215,7 +233,6 @@ public final class CelestialSpherePane extends Pane {
             previous = current;
         }
 
-        // Due paralleli di declinazione per aiutare l'orientamento senza appesantire la vista.
         for (double dec : new double[]{-45.0, 45.0}) {
             previous = null;
             for (int ra = 0; ra <= 360; ra += 8) {
@@ -280,6 +297,7 @@ public final class CelestialSpherePane extends Pane {
         });
         subScene.setOnMouseReleased(event -> setCursor(Cursor.HAND));
         subScene.setOnMouseDragged(event -> {
+            markerInteractionPending = false;
             if (!event.isPrimaryButtonDown()) {
                 return;
             }
@@ -292,28 +310,14 @@ public final class CelestialSpherePane extends Pane {
             event.consume();
         });
         subScene.setOnScroll(event -> {
-            // Delta positivo = avvicinamento, negativo = allontanamento.
             double next = camera.getTranslateZ() + event.getDeltaY() * 0.85;
             camera.setTranslateZ(clamp(next, -1550.0, -470.0));
             updateZoomLabel();
             event.consume();
         });
         subScene.setOnMouseClicked(event -> {
-            if (event.getButton() != MouseButton.PRIMARY) {
-                return;
-            }
-
-            // Robust selection guard for the embedded 3D scene. A click on a GRB
-            // is a data-selection action, never a request to open the parent card
-            // fullscreen. Consume it here before it can bubble to the card handler.
-            Node picked = event.getPickResult() == null ? null : event.getPickResult().getIntersectedNode();
-            if (picked != null && picked.getUserData() instanceof SkyBurst burst) {
-                onSelect.accept(burst);
-                event.consume();
-                return;
-            }
-
-            if (event.getClickCount() == 2) {
+            if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2) {
+                markerInteractionPending = false;
                 resetView();
                 event.consume();
             }
