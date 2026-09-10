@@ -7,6 +7,7 @@ import javafx.geometry.Point3D;
 import javafx.scene.AmbientLight;
 import javafx.scene.Cursor;
 import javafx.scene.Group;
+import javafx.scene.Node;
 import javafx.scene.PerspectiveCamera;
 import javafx.scene.PointLight;
 import javafx.scene.SceneAntialiasing;
@@ -298,7 +299,21 @@ public final class CelestialSpherePane extends Pane {
             event.consume();
         });
         subScene.setOnMouseClicked(event -> {
-            if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2) {
+            if (event.getButton() != MouseButton.PRIMARY) {
+                return;
+            }
+
+            // Robust selection guard for the embedded 3D scene. A click on a GRB
+            // is a data-selection action, never a request to open the parent card
+            // fullscreen. Consume it here before it can bubble to the card handler.
+            Node picked = event.getPickResult() == null ? null : event.getPickResult().getIntersectedNode();
+            if (picked != null && picked.getUserData() instanceof SkyBurst burst) {
+                onSelect.accept(burst);
+                event.consume();
+                return;
+            }
+
+            if (event.getClickCount() == 2) {
                 resetView();
                 event.consume();
             }
