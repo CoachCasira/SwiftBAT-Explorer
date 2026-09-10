@@ -43,6 +43,8 @@ public final class UiTableAndStartupFixes {
     private static final String INTERNAL_BAR = UiTableAndStartupFixes.class.getName() + ".internalBar";
     private static final String SKY_GUARD = UiTableAndStartupFixes.class.getName() + ".skyGuard";
     private static final String SKY_BUTTON_OLD_DISABLE = UiTableAndStartupFixes.class.getName() + ".skyButtonOldDisable";
+    private static final double TABLE_SCROLLBAR_WIDTH = 12.0;
+    private static final double TABLE_THUMB_MIN_LENGTH = 46.0;
 
     /* Exact keys used by the two legacy table passes. Setting them before those
        passes see a TableView makes this class the sole table geometry owner. */
@@ -52,9 +54,7 @@ public final class UiTableAndStartupFixes {
     private UiTableAndStartupFixes() {
     }
 
-    /**
-     * Registers ownership markers before the legacy stability enhancers are installed.
-     */
+    /** Registers ownership markers before the legacy stability enhancers are installed. */
     public static void prepare(Parent root) {
         if (root != null) prepareNode(root);
     }
@@ -119,8 +119,6 @@ public final class UiTableAndStartupFixes {
         if (node == null) return;
 
         if (node instanceof TableView<?> table) {
-            /* Mark synchronously, before any runLater/reparenting. This is what
-               prevents the legacy HBox wrapper from ever seeing an unowned table. */
             markTableOwned(table);
             scheduleTableInstall(table);
         }
@@ -177,12 +175,13 @@ public final class UiTableAndStartupFixes {
             return;
         }
 
-        /* If a wrapper already exists, never wrap again. This also makes the code
-           safe if a page is temporarily detached/re-attached by a fullscreen view. */
         Parent currentParent = table.getParent();
         if (currentParent.getStyleClass().contains("external-table-scroll-shell")) {
             ScrollBar existing = findExternalScrollbar(currentParent);
-            if (existing != null) scheduleWire(table, existing);
+            if (existing != null) {
+                polishExternalScrollbar(existing);
+                scheduleWire(table, existing);
+            }
             return;
         }
 
@@ -190,15 +189,12 @@ public final class UiTableAndStartupFixes {
         external.setOrientation(Orientation.VERTICAL);
         external.setFocusTraversable(false);
         external.getStyleClass().add("table-external-scrollbar");
-        external.setMinWidth(7);
-        external.setPrefWidth(7);
-        external.setMaxWidth(7);
+        external.setMinWidth(TABLE_SCROLLBAR_WIDTH);
+        external.setPrefWidth(TABLE_SCROLLBAR_WIDTH);
+        external.setMaxWidth(TABLE_SCROLLBAR_WIDTH);
         external.setMaxHeight(Double.MAX_VALUE);
 
-        /* Important: create an EMPTY shell. Adding the table in the HBox
-           constructor would re-parent it immediately and then make replacement
-           try to insert the shell into itself (JavaFX "Children: cycle detected"). */
-        HBox shell = new HBox(4);
+        HBox shell = new HBox(3);
         shell.getStyleClass().addAll("stable-table-scroll", "external-table-scroll-shell");
         shell.setAlignment(Pos.TOP_LEFT);
         shell.setFillHeight(true);
@@ -215,19 +211,47 @@ public final class UiTableAndStartupFixes {
         table.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         HBox.setHgrow(table, Priority.ALWAYS);
 
+        external.skinProperty().addListener((obs, oldSkin, newSkin) -> scheduleExternalPolish(external));
+        external.heightProperty().addListener((obs, oldHeight, newHeight) -> scheduleExternalPolish(external));
+        external.visibleAmountProperty().addListener((obs, oldValue, newValue) -> scheduleExternalPolish(external));
         table.skinProperty().addListener((obs, oldSkin, newSkin) -> scheduleWire(table, external));
         table.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) scheduleWire(table, external);
         });
         table.heightProperty().addListener((obs, oldHeight, newHeight) -> scheduleWire(table, external));
+        scheduleExternalPolish(external);
         scheduleWire(table, external);
+    }
+
+    private static void scheduleExternalPolish(ScrollBar external) {
+        Platform.runLater(() -> {
+            polishExternalScrollbar(external);
+            Platform.runLater(() -> polishExternalScrollbar(external));
+        });
+    }
+
+    private static void polishExternalScrollbar(ScrollBar external) {
+        if (external == null) return;
+        external.setMinWidth(TABLE_SCROLLBAR_WIDTH);
+        external.setPrefWidth(TABLE_SCROLLBAR_WIDTH);
+        external.setMaxWidth(TABLE_SCROLLBAR_WIDTH);
+        try {
+            external.applyCss();
+        } catch (RuntimeException ignored) {
+            return;
+        }
+        Node thumb = external.lookup(".thumb");
+        if (thumb instanceof Region region) {
+            region.setMinHeight(TABLE_THUMB_MIN_LENGTH);
+            region.setPrefWidth(10);
+            region.setMinWidth(10);
+        }
+        external.requestLayout();
     }
 
     private static ScrollBar findExternalScrollbar(Parent parent) {
         for (Node child : parent.getChildrenUnmodifiable()) {
-            if (child instanceof ScrollBar bar && bar.getStyleClass().contains("table-external-scrollbar")) {
-                return bar;
-            }
+            if (child instanceof ScrollBar bar && bar.getStyleClass().contains("table-external-scrollbar")) return bar;
         }
         return null;
     }
@@ -371,6 +395,8 @@ public final class UiTableAndStartupFixes {
         }
 
         collapseNativeBar(internal);
+        polishExternalScrollbar(external);
+        scheduleExternalPolish(external);
         table.requestLayout();
         return true;
     }
@@ -470,17 +496,11 @@ public final class UiTableAndStartupFixes {
                 box.setMaxHeight(Double.MAX_VALUE);
                 VBox.setVgrow(heatmap, Priority.ALWAYS);
             }
-            if (current instanceof TabPane tabs && tabs.getStyleClass().contains("spectroscopy-tabs")) {
-                spectroscopyTabs = tabs;
-            }
+            if (current instanceof TabPane tabs && tabs.getStyleClass().contains("spectroscopy-tabs")) spectroscopyTabs = tabs;
             if (current instanceof Region region) region.requestLayout();
             current = current.getParent();
         }
 
-        /* The old sizing pass used 690 px because it ran before the heatmap's
-           final preferred height was known. 760 px is the deterministic minimum
-           for this tab; on smaller windows the outer page ScrollPane scrolls,
-           rather than clipping the legend/instruction line. */
         if (spectroscopyTabs != null) {
             spectroscopyTabs.setMinHeight(760);
             spectroscopyTabs.setPrefHeight(Math.max(760, spectroscopyTabs.getPrefHeight()));
@@ -507,10 +527,6 @@ public final class UiTableAndStartupFixes {
         Button fullscreen = findFullscreenButtonAbove(surface);
         if (fullscreen == null) return;
 
-        /* Both sky renderers deliberately use CROSSHAIR while the pointer is on
-           a GRB marker. The visualization-card fullscreen action is queued with
-           runLater; disabling its button while CROSSHAIR is active therefore lets
-           the marker click complete normally and prevents the queued fullscreen. */
         surface.cursorProperty().addListener((obs, oldCursor, newCursor) ->
                 setSkySelectionGuard(fullscreen, newCursor == Cursor.CROSSHAIR));
         surface.sceneProperty().addListener((obs, oldScene, newScene) -> {
@@ -550,9 +566,7 @@ public final class UiTableAndStartupFixes {
             if (child instanceof Button button && button.isVisible() && button.isManaged()) {
                 String text = button.getText() == null ? "" : button.getText().toLowerCase();
                 String compact = text.replace(" ", "");
-                if (text.contains("schermo intero") || text.contains("full screen") || compact.contains("fullscreen")) {
-                    return button;
-                }
+                if (text.contains("schermo intero") || text.contains("full screen") || compact.contains("fullscreen")) return button;
             }
             if (child instanceof Parent parent) {
                 Button nested = findFullscreenButton(parent);
