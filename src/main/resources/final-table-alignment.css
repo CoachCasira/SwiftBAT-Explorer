@@ -1,0 +1,36 @@
+.final-aligned-table .column-header,
+.final-aligned-table .filler {
+    -fx-padding: 0;
+}
+
+.final-aligned-table .column-header .label {
+    -fx-alignment: CENTER-LEFT;
+    -fx-text-alignment: left;
+    -fx-padding: 0;
+}
+
+.final-aligned-table .closable-column-header {
+    -fx-alignment: CENTER-LEFT;
+    -fx-padding: 0 2 0 9;
+}
+
+.final-aligned-table .table-header-label {
+    -fx-alignment: CENTER-LEFT;
+    -fx-text-alignment: left;
+    -fx-padding: 0;
+}
+
+.final-aligned-table .column-close-button {
+    -fx-padding: 0;
+    -fx-alignment: CENTER;
+}
+
+.final-aligned-table .table-cell {
+    -fx-alignment: CENTER-LEFT;
+    -fx-text-alignment: left;
+    -fx-padding: 7 9 7 9;
+}
+
+.final-aligned-table .table-row-cell {
+    -fx-cell-size: 34px;
+}
