@@ -6,6 +6,7 @@ import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerCurveInteractionFastEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerVisualFastFixes;
+import it.casiraghi.swiftbat.ui.FinalMacAndPopulationPolish;
 import it.casiraghi.swiftbat.ui.FinalRequestedUiFastFixes;
 import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
 import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
@@ -106,6 +107,11 @@ public final class SwiftBatExplorerApp extends Application {
         TargetedLayoutPolish.install(mainView.getRoot());
 
         mainView.initialize();
+
+        // One page-scoped finalizer after initialization. It fixes the very first
+        // Explorer layout before the first visible pulse and adds the manual GRB
+        // selector without introducing another global scene-graph watcher.
+        FinalMacAndPopulationPolish.install(mainView.getRoot());
     }
 
     @Override
