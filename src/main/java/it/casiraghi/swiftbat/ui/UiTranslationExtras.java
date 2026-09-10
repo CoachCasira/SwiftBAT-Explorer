@@ -85,6 +85,12 @@ public final class UiTranslationExtras {
         put("Mappa tempo–energia dei rate", "Time–energy rate map");
         put("Mappa tempo-energia dei rate", "Time-energy rate map");
         put("Apri vista 3D dei rate", "Open 3D rate view");
+        // Runtime leftovers produced by the historical composed translator. They
+        // are normalized by UiCrossPlatformPolishEnhancer, but remain registered
+        // here too so the strict source-level translation audit stays exhaustive.
+        put("Mappa time–energy dei rate", "Time–energy rate map");
+        put("Open 3D view dei rate", "Open 3D rate view");
+        put("Mappa time–energy", "Time–energy map");
         put("Mappa non disponibile: servono i quattro canali ASCII.",
                 "Map unavailable: all four ASCII channels are required.");
         put("Tempo dal trigger (s)", "Time from trigger (s)");
