@@ -9,7 +9,6 @@ import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.chart.BarChart;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
@@ -18,11 +17,9 @@ import javafx.scene.control.Labeled;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollBar;
-import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TableView;
-import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -37,10 +34,9 @@ import java.util.function.Predicate;
 /**
  * Final low-cost UI pass for real-use stability issues.
  *
- * <p>Important layout rule: this class never listens to min/pref/max height
- * properties and then writes those same properties back. Population histogram
- * geometry is applied once per relevant UI event, after the older responsive
- * layer has run. This avoids resize feedback loops and visible oscillation.</p>
+ * <p>Population histogram geometry is intentionally applied only after relevant
+ * layout events. No listener observes min/pref/max sizes and writes them back,
+ * so there is no resize feedback loop.</p>
  */
 public final class FinalUiStabilityEnhancer {
     private static final String WATCHED = FinalUiStabilityEnhancer.class.getName() + ".watched";
@@ -77,34 +73,13 @@ public final class FinalUiStabilityEnhancer {
     public static void install(Parent root) {
         if (root == null) return;
         watch(root, root);
-        installScenePolish(root);
         I18n.languageProperty().addListener((obs, oldValue, newValue) ->
                 Platform.runLater(() -> repairTree(root)));
         Platform.runLater(() -> {
             repairTree(root);
             stopDelayedPopulationRelayout(root);
             stabilizePopulationHistograms(root);
-            polishFullscreenReading(root.getScene() == null ? null : root.getScene().getRoot());
         });
-    }
-
-    private static void installScenePolish(Parent appRoot) {
-        Scene scene = appRoot.getScene();
-        if (scene == null) {
-            appRoot.sceneProperty().addListener((obs, oldScene, newScene) -> {
-                if (newScene != null) installSceneRootListener(newScene);
-            });
-        } else {
-            installSceneRootListener(scene);
-        }
-    }
-
-    private static void installSceneRootListener(Scene scene) {
-        String key = FinalUiStabilityEnhancer.class.getName() + ".sceneRootListener";
-        if (Boolean.TRUE.equals(scene.getProperties().get(key))) return;
-        scene.getProperties().put(key, Boolean.TRUE);
-        scene.rootProperty().addListener((obs, oldRoot, newRoot) ->
-                Platform.runLater(() -> polishFullscreenReading(newRoot)));
     }
 
     private static void watch(Node node, Parent appRoot) {
@@ -364,10 +339,19 @@ public final class FinalUiStabilityEnhancer {
     private static void requestPopulationStability(Parent appRoot) {
         if (appRoot == null || Boolean.TRUE.equals(appRoot.getProperties().get(POPULATION_STABILITY_PENDING))) return;
         appRoot.getProperties().put(POPULATION_STABILITY_PENDING, Boolean.TRUE);
+
+        // First pulse coalesces the several visible/managed notifications produced
+        // by a single hide/show action and cancels the historical delayed relayout.
         Platform.runLater(() -> {
-            appRoot.getProperties().remove(POPULATION_STABILITY_PENDING);
             stopDelayedPopulationRelayout(appRoot);
-            stabilizePopulationHistograms(appRoot);
+
+            // The older responsive listeners may already have queued their own
+            // runLater calls. Finalize geometry on the following pulse, after them.
+            Platform.runLater(() -> {
+                appRoot.getProperties().remove(POPULATION_STABILITY_PENDING);
+                stopDelayedPopulationRelayout(appRoot);
+                stabilizePopulationHistograms(appRoot);
+            });
         });
     }
 
@@ -456,35 +440,6 @@ public final class FinalUiStabilityEnhancer {
         if (appRoot == null) return;
         Object value = appRoot.getProperties().get(RESPONSIVE_POPULATION_REFRESH);
         if (value instanceof PauseTransition pause) pause.stop();
-    }
-
-    /* ---------------- Fullscreen reading panels ---------------- */
-
-    private static void polishFullscreenReading(Node node) {
-        if (node == null) return;
-        if (node instanceof ScrollPane scroll
-                && scroll.getContent() instanceof VBox reading
-                && reading.getStyleClass().contains("spectroscopy-assistant")) {
-            boolean sidePanel = scroll.getParent() instanceof BorderPane split && split.getRight() == scroll;
-            if (sidePanel) {
-                scroll.setFitToHeight(true);
-                scroll.setMinHeight(0);
-                scroll.setMaxHeight(Double.MAX_VALUE);
-                reading.setMinHeight(0);
-                reading.setMaxHeight(Double.MAX_VALUE);
-                for (Node child : reading.getChildren()) {
-                    if (child instanceof VBox section) {
-                        section.setMaxHeight(Double.MAX_VALUE);
-                        VBox.setVgrow(section, Priority.ALWAYS);
-                    }
-                }
-            }
-            polishFullscreenReading(scroll.getContent());
-            return;
-        }
-        if (node instanceof Parent parent) {
-            for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) polishFullscreenReading(child);
-        }
     }
 
     private static void polishNearby(Parent parent) {
