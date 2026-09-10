@@ -131,9 +131,11 @@ public final class PageScopedPolishRouter {
 
         invokeDefinitive("alignPopulationFilters", new Class<?>[]{VBox.class}, filterCard);
         invokeDefinitive("installManualSelector", new Class<?>[]{PopulationPage.class, VBox.class}, page, filterCard);
+        PopulationResetStabilityFix.install(page, filterCard);
         FinalExpertUiPolish.polishPopulation(filterCard);
         Platform.runLater(() -> {
             invokeDefinitive("alignPopulationFilters", new Class<?>[]{VBox.class}, filterCard);
+            PopulationResetStabilityFix.install(page, filterCard);
             FinalExpertUiPolish.polishPopulation(filterCard);
             filterCard.requestLayout();
         });
