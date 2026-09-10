@@ -53,11 +53,25 @@
     -fx-shape: "";
 }
 
-/* Use the same explicit right-edge separator for header and body. Previously
-   the header used a CSS border while the body used -fx-table-cell-border-color;
-   JavaFX can rasterise those two mechanisms one pixel apart on Windows. */
+/*
+ * Header/body geometry fix.
+ *
+ * JavaFX's TableHeaderRow keeps a small horizontal skin offset after the native
+ * vertical VirtualFlow scrollbar has been collapsed and mirrored outside the
+ * TableView.  The body cells are already using the full content width, while
+ * the nested header remains a few logical pixels to the right.  That is why the
+ * separator visible in the header did not continue vertically into the rows.
+ *
+ * Keep a single separator implementation and compensate only the header skin
+ * offset.  Four logical pixels corresponds to the native skin gap introduced
+ * by the external-scroll wrapper and scales correctly with Windows HiDPI.
+ */
 .reference-redesign .data-table {
     -fx-table-cell-border-color: transparent;
+}
+
+.reference-redesign .data-table .nested-column-header {
+    -fx-translate-x: -4px;
 }
 
 .reference-redesign .data-table .column-header {
