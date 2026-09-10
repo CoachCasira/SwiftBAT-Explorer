@@ -7,6 +7,7 @@ import javafx.animation.Timeline;
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.geometry.Point2D;
+import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.chart.Axis;
@@ -105,7 +106,8 @@ public final class ChartInteractionEnhancer {
         tooltip.setHideDelay(Duration.ZERO);
 
         chart.addEventHandler(MouseEvent.MOUSE_MOVED, event -> {
-            SampleHit hit = nearest(chart, event.getX(), event.getY());
+            boolean focusedOnly = isPopulationChart(chart) && CurveInteractionLinkEnhancer.populationFocusLocked();
+            SampleHit hit = nearest(chart, event.getX(), event.getY(), focusedOnly);
             if (hit == null) { tooltip.hide(); return; }
             String xLabel = chart.getXAxis().getLabel();
             String yLabel = chart.getYAxis().getLabel();
@@ -118,7 +120,12 @@ public final class ChartInteractionEnhancer {
         });
         chart.addEventHandler(MouseEvent.MOUSE_EXITED, event -> tooltip.hide());
         chart.addEventHandler(MouseEvent.MOUSE_CLICKED, event -> {
-            SampleHit hit = nearest(chart, event.getX(), event.getY());
+            if (isPopulationChart(chart) && CurveInteractionLinkEnhancer.populationFocusLocked()) {
+                tooltip.hide();
+                event.consume();
+                return;
+            }
+            SampleHit hit = nearest(chart, event.getX(), event.getY(), false);
             if (event.getClickCount() >= 2) {
                 tooltip.hide();
                 if (hit == null && !focusedSeries(chart).isEmpty()) {
@@ -155,12 +162,14 @@ public final class ChartInteractionEnhancer {
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private static SampleHit nearest(LineChart chart, double mouseX, double mouseY) {
+    private static SampleHit nearest(LineChart chart, double mouseX, double mouseY, boolean focusedOnly) {
         if (chart.getScene() == null) return null;
         Axis xAxis = chart.getXAxis(); Axis yAxis = chart.getYAxis();
+        Set<XYChart.Series> focus = focusedOnly ? focusedSeries(chart) : Set.of();
         double best = HIT_RADIUS * HIT_RADIUS; SampleHit result = null;
         for (Object rawSeries : chart.getData()) {
             XYChart.Series series = (XYChart.Series) rawSeries;
+            if (focusedOnly && !focus.contains(series)) continue;
             if (series.getData() == null || series.getData().isEmpty()) continue;
             for (Object rawData : series.getData()) {
                 XYChart.Data data = (XYChart.Data) rawData;
@@ -178,6 +187,10 @@ public final class ChartInteractionEnhancer {
             }
         }
         return result;
+    }
+
+    private static boolean isPopulationChart(LineChart<?, ?> chart) {
+        return chart != null && chart.getStyleClass().contains("population-chart");
     }
 
     @SuppressWarnings("rawtypes") private static boolean selectable(XYChart.Series series) {
@@ -287,12 +300,13 @@ public final class ChartInteractionEnhancer {
         export.setOnAction(event -> ExportSupport.exportTableExcel(
                 export, table, "population_included_grbs.xlsx", "GRB inclusi"));
 
-        Node first = box.getChildren().get(0);
-        box.getChildren().remove(first);
-        Region spacer = new Region();
-        HBox.setHgrow(first, Priority.ALWAYS);
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        HBox toolbar = new HBox(8, first, spacer, export);
+        // The old column-preference strip became a wide blue outlined box with the
+        // export action pushed to the far right. The Included GRBs tab now keeps only
+        // the actual export action, aligned with the table content on the left.
+        box.getChildren().remove(0);
+        HBox toolbar = new HBox(8, export);
+        toolbar.setAlignment(Pos.CENTER_LEFT);
+        toolbar.setMinWidth(0);
         toolbar.setMaxWidth(Double.MAX_VALUE);
         box.getChildren().add(0, toolbar);
     }
