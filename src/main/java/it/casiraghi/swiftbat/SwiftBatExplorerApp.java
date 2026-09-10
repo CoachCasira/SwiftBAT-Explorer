@@ -8,6 +8,7 @@ import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
 import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
 import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
 import it.casiraghi.swiftbat.ui.MainView;
+import it.casiraghi.swiftbat.ui.SkyMap3DInteractionGuard;
 import it.casiraghi.swiftbat.ui.SpectroscopyStartupLayoutFix;
 import it.casiraghi.swiftbat.ui.UiBugFixes;
 import it.casiraghi.swiftbat.ui.UiLastMileFixes;
@@ -59,6 +60,9 @@ public final class SwiftBatExplorerApp extends Application {
         ExplorerBandSelectionEnhancer.install(mainView.getRoot());
 
         InteractiveViewSyncEnhancer.install(mainView.getRoot());
+        // Must be registered before InteractionPolishEnhancer: an actual 3D GRB
+        // marker click is selection, not a request to open the whole sky card.
+        SkyMap3DInteractionGuard.install(mainView.getRoot());
         InteractionPolishEnhancer.install(mainView.getRoot());
         ChartInteractionEnhancer.install(mainView.getRoot());
         UiBugFixes.install(mainView.getRoot());
