@@ -64,14 +64,18 @@ public final class SwiftBatExplorerApp extends Application {
 
         AdaptiveChromeEnhancer.install(mainView.getRoot());
 
-        // Register the table owner first. Future Explorer/Population pages are
-        // marked before the legacy passes see them, so only one component is
-        // allowed to re-parent a TableView or size its vertical scrollbar.
+        /*
+         * Table/first-layout ownership must be registered BEFORE the two legacy
+         * stability passes. This order is intentional: dynamically-created tables
+         * are marked and wrapped by UiTableAndStartupFixes first, so the older
+         * UiLastMileFixes wrapper can never re-parent the same TableView.
+         */
         UiTableAndStartupFixes.prepare(mainView.getRoot());
+        UiTableAndStartupFixes.install(mainView.getRoot());
+
         UiLastMileFixes.prepare(mainView.getRoot());
         FinalUiStabilityEnhancer.install(mainView.getRoot());
         UiLastMileFixes.install(mainView.getRoot());
-        UiTableAndStartupFixes.install(mainView.getRoot());
 
         mainView.initialize();
     }
