@@ -17,8 +17,9 @@ import java.lang.reflect.Method;
 import java.util.List;
 
 /**
- * Routes the lightweight page-specific polish when MainView swaps a page into
- * the page host. Only that direct children list is observed: no global scans.
+ * Routes lightweight page-specific polish exactly when a page becomes active.
+ * Expensive CSS/table/scrollbar walkers are installed once per page; later
+ * workspace children are handled incrementally instead of rescanning Explorer.
  */
 public final class PageScopedPolishRouter {
     private static final String DONE = PageScopedPolishRouter.class.getName() + ".done";
@@ -28,8 +29,6 @@ public final class PageScopedPolishRouter {
     private PageScopedPolishRouter() { }
 
     public static void install(Parent root) {
-        // Installed before page-host discovery so scroll restoration is active
-        // from the first application layout and for every in-place fullscreen.
         FullscreenScrollPositionFix.install(root);
 
         StackPane pageHost = findPageHost(root);
@@ -62,6 +61,9 @@ public final class PageScopedPolishRouter {
         if (workspace == null) return;
         page.getProperties().put(EXPLORER_BRIDGE, Boolean.TRUE);
 
+        // One initial pass covers the sidebar/catalog and all already materialised
+        // controls. The workspace listener below only processes genuinely new
+        // detail children; it never rescans the whole Explorer after that.
         ExplorerScrollbarFix.install(page);
 
         for (Node child : List.copyOf(workspace.getChildren())) polishExplorerWorkspaceChild(page, child);
@@ -71,13 +73,11 @@ public final class PageScopedPolishRouter {
                 for (Node added : List.copyOf(change.getAddedSubList())) polishExplorerWorkspaceChild(page, added);
             }
         });
-        Platform.runLater(() -> {
-            ExplorerScrollbarFix.install(page);
-            for (Node child : List.copyOf(workspace.getChildren())) polishExplorerWorkspaceChild(page, child);
-        });
     }
 
     private static void polishExplorerWorkspaceChild(ExplorerPage page, Node node) {
+        // New workspace child only. This subtree-scoped install is cheap and also
+        // catches lazily-created ScrollPane/ListView/TableView skins.
         ExplorerScrollbarFix.install(node);
 
         Node content = node instanceof ScrollPane scroll && scroll.getContent() != null
@@ -88,13 +88,12 @@ public final class PageScopedPolishRouter {
             FinalExpertUiPolish.polishExplorer(content);
             ExplorerOverflowFix.apply(content);
             ExplorerChoiceBoxEllipsisFix.install(content);
-            FinalTableAlignmentFix.install(content);
-            ExplorerScrollbarFix.install(content);
+
+            // One post-layout geometry correction is enough; installers above
+            // own their listeners/skins and must not be reinstalled each pulse.
             Platform.runLater(() -> {
                 FinalExpertUiPolish.polishExplorer(content);
                 ExplorerOverflowFix.apply(content);
-                ExplorerChoiceBoxEllipsisFix.install(content);
-                ExplorerScrollbarFix.install(page);
             });
             return;
         }
@@ -114,15 +113,11 @@ public final class PageScopedPolishRouter {
         FinalExpertUiPolish.polishExplorer(content);
         ExplorerOverflowFix.apply(content);
         ExplorerChoiceBoxEllipsisFix.install(content);
-        FinalTableAlignmentFix.install(content);
-        ExplorerScrollbarFix.install(page);
 
         Platform.runLater(() -> {
             installMetadataWorkspace(page, tabs);
             FinalExpertUiPolish.polishExplorer(content);
             ExplorerOverflowFix.apply(content);
-            ExplorerChoiceBoxEllipsisFix.install(content);
-            ExplorerScrollbarFix.install(page);
         });
     }
 
@@ -145,7 +140,6 @@ public final class PageScopedPolishRouter {
         }
         page.getProperties().put(POPULATION_BRIDGE, Boolean.TRUE);
 
-        FinalTableAlignmentFix.install(page);
         invokeDefinitive("alignPopulationFilters", new Class<?>[]{VBox.class}, filterCard);
         invokeDefinitive("installManualSelector", new Class<?>[]{PopulationPage.class, VBox.class}, page, filterCard);
         PopulationResetStabilityFix.install(page, filterCard);
