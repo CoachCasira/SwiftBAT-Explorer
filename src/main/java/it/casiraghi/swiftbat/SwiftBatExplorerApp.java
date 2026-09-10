@@ -3,8 +3,6 @@ package it.casiraghi.swiftbat;
 import it.casiraghi.swiftbat.ui.AdaptiveChromeEnhancer;
 import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
-import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
-import it.casiraghi.swiftbat.ui.ExplorerCurveInteractionFastEnhancer;
 import it.casiraghi.swiftbat.ui.FinalMacAndPopulationPolish;
 import it.casiraghi.swiftbat.ui.FinalRequestedUiFastFixes;
 import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
@@ -60,16 +58,16 @@ public final class SwiftBatExplorerApp extends Application {
 
         UiLocalizationWatcher.install(mainView.getRoot());
         UiRefinements.install(mainView.getRoot());
-        ExplorerBandSelectionEnhancer.install(mainView.getRoot());
-        // ExplorerVisualFastFixes is intentionally NOT global anymore. It is
-        // installed by PageScopedPolishRouter only when Explorer becomes active.
 
         InteractiveViewSyncEnhancer.install(mainView.getRoot());
         SkyMap3DInteractionGuard.install(mainView.getRoot());
         InteractionPolishEnhancer.install(mainView.getRoot());
 
+        /* Explorer-specific band/curve/scroll visual watchers are deliberately
+           NOT installed on the whole application anymore. PageScopedPolishRouter
+           activates them only when Explorer exists, so Home/Population/etc. do
+           not carry Explorer scene-graph listeners. */
         CurveInteractionLinkEnhancer.install(mainView.getRoot());
-        ExplorerCurveInteractionFastEnhancer.install(mainView.getRoot());
         ChartInteractionEnhancer.install(mainView.getRoot());
         UiBugFixes.install(mainView.getRoot());
 
