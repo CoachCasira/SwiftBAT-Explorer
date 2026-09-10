@@ -28,6 +28,10 @@ public final class PageScopedPolishRouter {
     private PageScopedPolishRouter() { }
 
     public static void install(Parent root) {
+        // Installed before page-host discovery so scroll restoration is active
+        // from the first application layout and for every in-place fullscreen.
+        FullscreenScrollPositionFix.install(root);
+
         StackPane pageHost = findPageHost(root);
         if (pageHost == null || Boolean.TRUE.equals(pageHost.getProperties().get(DONE))) return;
         pageHost.getProperties().put(DONE, Boolean.TRUE);
@@ -43,6 +47,7 @@ public final class PageScopedPolishRouter {
 
     private static void route(Node node) {
         if (!(node instanceof Parent parent)) return;
+        FullscreenScrollPositionFix.install(parent);
         FinalMacAndPopulationPolish.install(parent);
         DefinitiveLayoutAndManualSelectionFix.install(parent);
         FinalTableAlignmentFix.install(parent);
@@ -57,10 +62,6 @@ public final class PageScopedPolishRouter {
         if (workspace == null) return;
         page.getProperties().put(EXPLORER_BRIDGE, Boolean.TRUE);
 
-        // Important: install on the whole ExplorerPage immediately. The GRB
-        // catalog ListView lives in the left sidebar, outside `workspace`; older
-        // versions only polished workspace children and therefore never saw the
-        // scrollbar shown in the catalog on first macOS launch.
         ExplorerScrollbarFix.install(page);
 
         for (Node child : List.copyOf(workspace.getChildren())) polishExplorerWorkspaceChild(page, child);
@@ -77,8 +78,6 @@ public final class PageScopedPolishRouter {
     }
 
     private static void polishExplorerWorkspaceChild(ExplorerPage page, Node node) {
-        // Keep the outer ScrollPane in scope: its skin owns the main Explorer
-        // scrollbar shown on the right edge of the page.
         ExplorerScrollbarFix.install(node);
 
         Node content = node instanceof ScrollPane scroll && scroll.getContent() != null
@@ -100,9 +99,6 @@ public final class PageScopedPolishRouter {
             return;
         }
 
-        // Replace the fifth Explorer tab (Metadata) with the rebuilt workspace.
-        // This is index-based on purpose: it does not depend on IT/EN labels and
-        // the legacy ChoiceBox never reaches the visible scene graph.
         installMetadataWorkspace(page, tabs);
 
         for (Tab tab : tabs.getTabs()) {
