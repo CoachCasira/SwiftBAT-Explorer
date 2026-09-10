@@ -25,7 +25,7 @@ public final class UiTranslationExtras {
         put("Altri filtri ▾", "More filters ▾");
         put("Nascondi filtri ▴", "Hide filters ▴");
 
-        // Population filters and dynamic toggle captions.
+        // Population filters, focus lock and dynamic toggle captions.
         put("Filtri avanzati: z e area di cielo", "Advanced filters: z and sky area");
         put("Nascondi filtri avanzati", "Hide advanced filters");
         put("Mostra filtri", "Show filters");
@@ -41,6 +41,8 @@ public final class UiTranslationExtras {
         put("Ripristina filtri", "Reset filters");
         put("Analizza il gruppo", "Analyze group");
         put("Annulla", "Cancel");
+        put("Blocca le curve selezionate", "Lock selected curves");
+        put("Sblocca la selezione delle curve", "Unlock curve selection");
 
         // Compact radio labels used in Population Analysis.
         put("Con z", "With z");
