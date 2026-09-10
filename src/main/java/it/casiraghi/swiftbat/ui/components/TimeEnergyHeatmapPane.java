@@ -184,7 +184,7 @@ public final class TimeEnergyHeatmapPane extends Region {
                 Bounds bounds = cellBounds(rowIndex, bandIndex, bandHeight);
                 Color color = colorFor(row.rates()[bandIndex], scale);
                 if (!selectedCells.isEmpty() && !selectedCells.contains(new Cell(rowIndex, bandIndex))) {
-                    color = color.interpolate(DIM_TARGET, 0.64);
+                    color = color.interpolate(DIM_TARGET, 0.82);
                 }
                 graphics.setFill(color);
                 graphics.fillRect(bounds.x(), bounds.y(), bounds.width(), bounds.height());
@@ -285,7 +285,8 @@ public final class TimeEnergyHeatmapPane extends Region {
     }
 
     private void drawHoverHighlight(GraphicsContext graphics, double bandHeight) {
-        if (hoveredHeaderRowIndex >= 0 && hoveredHeaderRowIndex < visibleRows.size()) {
+        if (hoveredHeaderRowIndex >= 0 && hoveredHeaderRowIndex < visibleRows.size()
+                && (selectedCells.isEmpty() || columnHasSelection(hoveredHeaderRowIndex))) {
             Bounds bounds = columnBounds(hoveredHeaderRowIndex);
             graphics.setStroke(Color.web("#d9efff"));
             graphics.setLineWidth(1.3);
@@ -294,6 +295,8 @@ public final class TimeEnergyHeatmapPane extends Region {
         }
         if (hoveredRowIndex < 0 || hoveredRowIndex >= visibleRows.size()
                 || hoveredBandIndex < 0 || hoveredBandIndex >= BANDS.size()) return;
+        Cell hovered = new Cell(hoveredRowIndex, hoveredBandIndex);
+        if (!selectedCells.isEmpty() && !selectedCells.contains(hovered)) return;
 
         Bounds bounds = cellBounds(hoveredRowIndex, hoveredBandIndex, bandHeight);
         graphics.setFill(Color.color(1.0, 0.84, 0.62, 0.08));
@@ -358,16 +361,25 @@ public final class TimeEnergyHeatmapPane extends Region {
         }
         int headerRow = headerColumnAt(x, y);
         if (headerRow >= 0) {
+            if (!selectedCells.isEmpty() && !columnHasSelection(headerRow)) {
+                clearHover();
+                return;
+            }
             hoveredHeaderRowIndex = headerRow;
             hoveredRowIndex = -1;
             hoveredBandIndex = -1;
             draw();
-            showHoverCard(x, y, columnSummary(headerRow));
+            showHoverCard(x, y, selectedCells.isEmpty() || wholeColumnSelected(headerRow)
+                    ? columnSummary(headerRow) : selectedColumnSummary(headerRow));
             return;
         }
 
         Cell cell = cellAt(x, y);
         if (cell == null) {
+            clearHover();
+            return;
+        }
+        if (!selectedCells.isEmpty() && !selectedCells.contains(cell)) {
             clearHover();
             return;
         }
@@ -409,6 +421,17 @@ public final class TimeEnergyHeatmapPane extends Region {
         return I18n.t("Istante") + ": " + String.format(Locale.ROOT, "%.3f s", visibleRows.get(rowIndex).time())
                 + "\n" + I18n.t("Rate medio") + ": " + String.format(Locale.ROOT, "%.5g count/s", stats.mean())
                 + "\n" + I18n.t("Banda dominante") + ": " + BANDS.get(dominantBand).label();
+    }
+
+    private String selectedColumnSummary(int rowIndex) {
+        Set<Cell> selectedColumn = new LinkedHashSet<>();
+        for (Cell cell : selectedCells) {
+            if (cell.rowIndex() == rowIndex) selectedColumn.add(cell);
+        }
+        Stats stats = stats(selectedColumn);
+        return I18n.t("Istante") + ": " + String.format(Locale.ROOT, "%.3f s", visibleRows.get(rowIndex).time())
+                + "\n" + I18n.t("Celle selezionate") + ": " + stats.count()
+                + "\n" + I18n.t("Rate medio") + ": " + String.format(Locale.ROOT, "%.5g count/s", stats.mean());
     }
 
     private Stats stats(Set<Cell> cells) {
