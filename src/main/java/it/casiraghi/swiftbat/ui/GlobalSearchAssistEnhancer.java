@@ -71,9 +71,6 @@ public final class GlobalSearchAssistEnhancer {
 
             search.setPromptText("");
             setEditor("GRB");
-            search.setTooltip(UiFactory.quickTooltip(I18n.dynamic(
-                    "Il prefisso GRB è già inserito. TAB completa il suggerimento; INVIO apre il GRB.",
-                    "The GRB prefix is already inserted. TAB completes the suggestion; ENTER opens the GRB.")));
 
             search.textProperty().addListener((obs, oldValue, newValue) -> {
                 normalizePrefix(newValue);
