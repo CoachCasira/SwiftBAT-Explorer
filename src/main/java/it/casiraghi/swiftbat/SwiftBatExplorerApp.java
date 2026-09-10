@@ -37,6 +37,14 @@ public final class SwiftBatExplorerApp extends Application {
 
         MainView mainView = new MainView(getHostServices(), stage);
         Scene scene = new Scene(mainView.getRoot(), 1580, 960);
+
+        /*
+         * CSS performance: keep only the four base/theme sheets plus one
+         * consolidated final layer. The previous startup registered nine
+         * scene-wide stylesheets, so every CSS pulse in Explorer had to walk
+         * five extra stylesheet objects containing late overrides. Their exact
+         * cascade is now preserved inside stability-final.css.
+         */
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/app.css").toExternalForm());
         scene.getStylesheets().add(
@@ -45,14 +53,6 @@ public final class SwiftBatExplorerApp extends Application {
                 SwiftBatExplorerApp.class.getResource("/black-hole-theme.css").toExternalForm());
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/reference-redesign.css").toExternalForm());
-        scene.getStylesheets().add(
-                SwiftBatExplorerApp.class.getResource("/reference-redesign-final.css").toExternalForm());
-        scene.getStylesheets().add(
-                SwiftBatExplorerApp.class.getResource("/dropdown-clean.css").toExternalForm());
-        scene.getStylesheets().add(
-                SwiftBatExplorerApp.class.getResource("/responsive-layout.css").toExternalForm());
-        scene.getStylesheets().add(
-                SwiftBatExplorerApp.class.getResource("/interactive-layout-final.css").toExternalForm());
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/stability-final.css").toExternalForm());
 
