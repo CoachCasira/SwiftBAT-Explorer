@@ -1,12 +1,9 @@
 package it.casiraghi.swiftbat.ui;
 
 import javafx.application.Platform;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.FlowPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,12 +15,19 @@ public final class TablePreferences {
     private static final Preferences PREFS = Preferences.userNodeForPackage(TablePreferences.class);
     private static final String NAME_KEY = TablePreferences.class.getName() + ".columnName";
     private static final String INSTALLED_KEY = TablePreferences.class.getName() + ".installed";
+    private static final String COLUMN_MENU_KEY = TablePreferences.class.getName() + ".columnMenu";
+    private static final String RESET_ITEM_KEY = TablePreferences.class.getName() + ".resetItem";
 
     private TablePreferences() {}
 
     /**
-     * Installa intestazioni con X e restituisce la barra dei campi nascosti.
-     * Il chiamante puo ignorare il valore di ritorno per mantenere compatibilita.
+     * Installa intestazioni native e una gestione colonne nel menu contestuale.
+     *
+     * <p>Le vecchie intestazioni erano composte da HBox + testo + pulsante X.
+     * Su macOS il graphic della TableColumn veniva misurato con una larghezza
+     * diversa dalla colonna e il risultato visivo era uno sfalsamento continuo
+     * tra X, titolo e contenuto. Le intestazioni ora tornano native: un solo testo,
+     * stesso padding delle celle e nessun nodo interno che possa spostarsi.</p>
      */
     public static FlowPane install(TableView<?> table, String tableKey) {
         FlowPane hiddenBar = new FlowPane(6, 6);
@@ -33,26 +37,40 @@ public final class TablePreferences {
         if (table == null || tableKey == null) return hiddenBar;
 
         table.setTableMenuButtonVisible(false);
+
+        ContextMenu menu = table.getContextMenu();
+        if (menu == null) menu = new ContextMenu();
+
+        Menu columnsMenu = new Menu(I18n.dynamic("Colonne", "Columns"));
+        MenuItem reset = new MenuItem(I18n.t("Ripristina colonne"));
+        table.getProperties().put(COLUMN_MENU_KEY, columnsMenu);
+        table.getProperties().put(RESET_ITEM_KEY, reset);
+
+        reset.setOnAction(event -> {
+            try { PREFS.node(tableKey).clear(); } catch (Exception ignored) { }
+            for (TableColumn<?, ?> column : table.getColumns()) resetColumn(column);
+            refreshHiddenBar(table, hiddenBar);
+            refreshColumnsMenu(table);
+        });
+
+        menu.getItems().addAll(columnsMenu, new SeparatorMenuItem(), reset);
+        table.setContextMenu(menu);
+
         Runnable apply = () -> {
             for (TableColumn<?, ?> column : table.getColumns()) installColumn(column, tableKey, table, hiddenBar);
             refreshHiddenBar(table, hiddenBar);
+            refreshColumnsMenu(table);
+            table.requestLayout();
         };
         table.getColumns().addListener((javafx.collections.ListChangeListener<TableColumn<?, ?>>) change -> apply.run());
         Platform.runLater(apply);
 
-        MenuItem reset = new MenuItem(I18n.t("Ripristina colonne"));
-        reset.setOnAction(event -> {
-            try { PREFS.node(tableKey).clear(); } catch (Exception ignored) {}
-            for (TableColumn<?, ?> column : table.getColumns()) resetColumn(column);
-            refreshHiddenBar(table, hiddenBar);
-        });
-        ContextMenu menu = table.getContextMenu();
-        if (menu == null) menu = new ContextMenu();
-        menu.getItems().add(reset);
-        table.setContextMenu(menu);
         I18n.languageProperty().addListener((obs, oldValue, newValue) -> {
+            columnsMenu.setText(I18n.dynamic("Colonne", "Columns"));
             reset.setText(I18n.t("Ripristina colonne"));
+            refreshColumnTitles(table);
             refreshHiddenBar(table, hiddenBar);
+            refreshColumnsMenu(table);
         });
         return hiddenBar;
     }
@@ -62,59 +80,72 @@ public final class TablePreferences {
         String name = columnName(column);
         String id = columnId(name);
         String installToken = tableKey + "|" + id;
+
+        // Important: do this even when the column was already seen. A legacy
+        // layout pass may have restored a graphic header after the first pulse.
+        column.getProperties().put(NAME_KEY, name);
+        makeNativeHeader(column, name);
+
         if (installToken.equals(column.getProperties().get(INSTALLED_KEY))) return;
         column.getProperties().put(INSTALLED_KEY, installToken);
-        column.getProperties().put(NAME_KEY, name);
 
         Preferences node = PREFS.node(tableKey);
         column.setVisible(node.getBoolean(id + ".visible", true));
         double savedWidth = node.getDouble(id + ".width", -1);
         if (savedWidth > 40) column.setPrefWidth(savedWidth);
 
-        Tooltip inheritedTooltip = null;
-        if (column.getGraphic() instanceof Label oldLabel) inheritedTooltip = oldLabel.getTooltip();
-        Label label = new Label(I18n.t(name));
-        label.getStyleClass().add("table-header-label");
-        label.setAlignment(Pos.CENTER_LEFT);
-        label.setPadding(Insets.EMPTY);
-        label.setMinWidth(0);
-        label.setMaxWidth(Double.MAX_VALUE);
-        label.setTextOverrun(OverrunStyle.ELLIPSIS);
-        label.setEllipsisString("…");
-        if (inheritedTooltip != null) label.setTooltip(inheritedTooltip);
-        HBox.setHgrow(label, Priority.ALWAYS);
-
-        Button close = new Button("×");
-        close.getStyleClass().add("column-close-button");
-        close.setFocusTraversable(false);
-        close.setMinWidth(18);
-        close.setPrefWidth(18);
-        close.setMaxWidth(18);
-        close.setOnAction(event -> column.setVisible(false));
-        Tooltip.install(close, UiFactory.quickTooltip(I18n.t("Nascondi colonna")));
-
-        HBox header = new HBox(4, label, close);
-        header.getStyleClass().add("closable-column-header");
-        header.setAlignment(Pos.CENTER_LEFT);
-        header.setPadding(new Insets(0, 2, 0, 9));
-        header.setMinWidth(0);
-        header.setMaxWidth(Double.MAX_VALUE);
-        Runnable fitHeader = () -> header.setPrefWidth(Math.max(0, column.getWidth() - 10));
-        fitHeader.run();
-        column.widthProperty().addListener((obs, oldValue, newValue) -> fitHeader.run());
-
-        column.setText("");
-        column.setGraphic(header);
-        I18n.languageProperty().addListener((obs, oldLanguage, newLanguage) -> label.setText(I18n.t(name)));
-
         column.visibleProperty().addListener((obs, oldValue, newValue) -> {
             node.putBoolean(id + ".visible", newValue);
             refreshHiddenBar(table, hiddenBar);
+            refreshColumnsMenu(table);
         });
         column.widthProperty().addListener((obs, oldValue, newValue) -> {
             if (newValue.doubleValue() > 40) node.putDouble(id + ".width", newValue.doubleValue());
         });
-        for (TableColumn<?, ?> child : column.getColumns()) installColumn(child, tableKey + "." + id, table, hiddenBar);
+        for (TableColumn<?, ?> child : column.getColumns()) {
+            installColumn(child, tableKey + "." + id, table, hiddenBar);
+        }
+    }
+
+    private static void makeNativeHeader(TableColumn<?, ?> column, String name) {
+        if (column == null) return;
+        column.setGraphic(null);
+        column.setText(I18n.t(name));
+        if (!column.getStyleClass().contains("native-aligned-column")) {
+            column.getStyleClass().add("native-aligned-column");
+        }
+    }
+
+    private static void refreshColumnTitles(TableView<?> table) {
+        if (table == null) return;
+        for (TableColumn<?, ?> column : table.getColumns()) refreshColumnTitle(column);
+        table.requestLayout();
+    }
+
+    private static void refreshColumnTitle(TableColumn<?, ?> column) {
+        if (column == null) return;
+        String name = columnName(column);
+        makeNativeHeader(column, name);
+        for (TableColumn<?, ?> child : column.getColumns()) refreshColumnTitle(child);
+    }
+
+    private static void refreshColumnsMenu(TableView<?> table) {
+        if (table == null) return;
+        Object raw = table.getProperties().get(COLUMN_MENU_KEY);
+        if (!(raw instanceof Menu columnsMenu)) return;
+
+        List<TableColumn<?, ?>> leaves = new ArrayList<>();
+        for (TableColumn<?, ?> column : table.getColumns()) collectLeaves(column, leaves);
+        columnsMenu.getItems().clear();
+
+        for (TableColumn<?, ?> column : leaves) {
+            String name = columnName(column);
+            CheckMenuItem item = new CheckMenuItem(I18n.t(name));
+            item.setSelected(column.isVisible());
+            item.setOnAction(event -> column.setVisible(item.isSelected()));
+            columnsMenu.getItems().add(item);
+        }
+        columnsMenu.setDisable(columnsMenu.getItems().isEmpty());
     }
 
     private static void refreshHiddenBar(TableView<?> table, FlowPane hiddenBar) {
@@ -199,9 +230,6 @@ public final class TablePreferences {
     }
 
     public static void alignCell(TableCell<?, ?> cell, String value) {
-        // One visual origin for every table. Numeric values used to be right
-        // aligned while headers were left aligned; on macOS this made virtually
-        // every column look shifted. Keep header and cell text on the same axis.
         if (cell != null) cell.setAlignment(Pos.CENTER_LEFT);
     }
 }
