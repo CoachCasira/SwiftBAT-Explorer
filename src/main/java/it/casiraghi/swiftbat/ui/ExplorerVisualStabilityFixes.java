@@ -13,7 +13,6 @@ import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.ScrollBar;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.control.Skin;
 import javafx.scene.control.TableView;
 import javafx.scene.control.ListView;
 import javafx.scene.layout.HBox;
@@ -39,6 +38,8 @@ public final class ExplorerVisualStabilityFixes {
     private static final String CHART_DONE = ExplorerVisualStabilityFixes.class.getName() + ".chartDone";
     private static final String SCROLL_DONE = ExplorerVisualStabilityFixes.class.getName() + ".scrollDone";
     private static final Set<Scene> WATCHED_SCENES = Collections.newSetFromMap(new WeakHashMap<>());
+    private static final double SCROLLBAR_THICKNESS = 12.0;
+    private static final double THUMB_MIN_LENGTH = 46.0;
 
     private static Parent installedRoot;
 
@@ -66,9 +67,6 @@ public final class ExplorerVisualStabilityFixes {
         if (scene == null || !WATCHED_SCENES.add(scene)) return;
         scene.rootProperty().addListener((obs, oldRoot, newRoot) -> {
             if (newRoot == null) return;
-            // InPlaceFullscreen swaps the Scene root. The old implementation only
-            // watched descendants of the application root, so the fullscreen chart
-            // was never repaired after InteractiveViewSyncEnhancer had synchronized it.
             Platform.runLater(() -> repairDynamicRoot(newRoot));
         });
         Parent current = scene.getRoot();
@@ -80,9 +78,10 @@ public final class ExplorerVisualStabilityFixes {
         scan(root);
         repairExplorerCharts(root);
         polishAllScrollbars(root);
-        // A second pulse covers JavaFX series nodes and axis layout that are created
-        // after the first CSS/layout pass of the new fullscreen root.
-        Platform.runLater(() -> repairExplorerCharts(root));
+        Platform.runLater(() -> {
+            repairExplorerCharts(root);
+            polishAllScrollbars(root);
+        });
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -126,9 +125,7 @@ public final class ExplorerVisualStabilityFixes {
     private static void enhance(Node node) {
         if (node instanceof ChoiceBox<?> choice) polishTimeWindowChoice(choice);
         if (node instanceof ComboBox<?> combo) polishTimeWindowCombo(combo);
-        if (node instanceof LineChart<?, ?> chart && isExplorerLightCurve(chart)) {
-            prepareExplorerChart(chart);
-        }
+        if (node instanceof LineChart<?, ?> chart && isExplorerLightCurve(chart)) prepareExplorerChart(chart);
         if (node instanceof ScrollBar bar) polishScrollBar(bar);
         if (node instanceof ScrollPane || node instanceof TableView<?> || node instanceof ListView<?>) {
             Platform.runLater(() -> polishAllScrollbars(node));
@@ -144,9 +141,7 @@ public final class ExplorerVisualStabilityFixes {
     private static boolean looksLikeTriggerWindowItems(List<?> items) {
         if (items == null || items.isEmpty()) return false;
         int matches = 0;
-        for (Object item : items) {
-            if (containsTriggerWindow(item)) matches++;
-        }
+        for (Object item : items) if (containsTriggerWindow(item)) matches++;
         return matches >= 2;
     }
 
@@ -196,7 +191,6 @@ public final class ExplorerVisualStabilityFixes {
         if (Boolean.TRUE.equals(rawChart.getProperties().get(CHART_DONE))) return;
         rawChart.getProperties().put(CHART_DONE, Boolean.TRUE);
         LineChart<Number, Number> chart = (LineChart) rawChart;
-
         Platform.runLater(() -> ensureScientificSeries(chart));
         chart.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) Platform.runLater(() -> ensureScientificSeries(chart));
@@ -204,9 +198,7 @@ public final class ExplorerVisualStabilityFixes {
     }
 
     private static void ensureScientificSeries(LineChart<Number, Number> target) {
-        if (target == null || target.getScene() == null) return;
-        if (hasScientificSeries(target)) return;
-
+        if (target == null || target.getScene() == null || hasScientificSeries(target)) return;
         LineChart<Number, Number> source = findBestSourceCurve(installedRoot, target);
         if (source == null) return;
 
@@ -281,29 +273,42 @@ public final class ExplorerVisualStabilityFixes {
         if (!Boolean.TRUE.equals(bar.getProperties().get(SCROLL_DONE))) {
             bar.getProperties().put(SCROLL_DONE, Boolean.TRUE);
             if (bar.getOrientation() == Orientation.VERTICAL) {
-                bar.setMinWidth(14);
-                bar.setPrefWidth(14);
-                bar.setMaxWidth(14);
+                bar.setMinWidth(SCROLLBAR_THICKNESS);
+                bar.setPrefWidth(SCROLLBAR_THICKNESS);
+                bar.setMaxWidth(SCROLLBAR_THICKNESS);
             } else {
-                bar.setMinHeight(14);
-                bar.setPrefHeight(14);
-                bar.setMaxHeight(14);
+                bar.setMinHeight(SCROLLBAR_THICKNESS);
+                bar.setPrefHeight(SCROLLBAR_THICKNESS);
+                bar.setMaxHeight(SCROLLBAR_THICKNESS);
             }
-            bar.skinProperty().addListener((obs, oldSkin, newSkin) ->
-                    Platform.runLater(() -> polishThumb(bar)));
+            bar.skinProperty().addListener((obs, oldSkin, newSkin) -> scheduleThumbPolish(bar));
+            bar.heightProperty().addListener((obs, oldHeight, newHeight) -> scheduleThumbPolish(bar));
+            bar.widthProperty().addListener((obs, oldWidth, newWidth) -> scheduleThumbPolish(bar));
+            bar.visibleAmountProperty().addListener((obs, oldValue, newValue) -> scheduleThumbPolish(bar));
         }
-        Platform.runLater(() -> polishThumb(bar));
+        scheduleThumbPolish(bar);
+    }
+
+    private static void scheduleThumbPolish(ScrollBar bar) {
+        Platform.runLater(() -> {
+            polishThumb(bar);
+            Platform.runLater(() -> polishThumb(bar));
+        });
     }
 
     private static void polishThumb(ScrollBar bar) {
+        if (bar == null) return;
         Node thumb = bar.lookup(".thumb");
         if (!(thumb instanceof Region region)) return;
         if (bar.getOrientation() == Orientation.VERTICAL) {
-            region.setMinHeight(30);
-            region.setPrefWidth(12);
+            region.setMinHeight(THUMB_MIN_LENGTH);
+            region.setMinWidth(10);
+            region.setPrefWidth(10);
         } else {
-            region.setMinWidth(30);
-            region.setPrefHeight(12);
+            region.setMinWidth(THUMB_MIN_LENGTH);
+            region.setMinHeight(10);
+            region.setPrefHeight(10);
         }
+        bar.requestLayout();
     }
 }
