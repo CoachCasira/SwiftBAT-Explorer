@@ -24,6 +24,8 @@ public final class UiTranslationExtras {
         put("Cache locale", "Local cache");
         put("Altri filtri ▾", "More filters ▾");
         put("Nascondi filtri ▴", "Hide filters ▴");
+        put("Media mobile su 5 bin", "5-bin moving average");
+        put("t = 0 indica il trigger", "t = 0 marks the trigger");
 
         // Population filters, focus lock and dynamic toggle captions.
         put("Filtri avanzati: z e area di cielo", "Advanced filters: z and sky area");
@@ -46,10 +48,15 @@ public final class UiTranslationExtras {
         put("Sblocca la selezione delle curve", "Unlock curve selection");
         put("Gruppo GRB manuale", "Manual GRB group");
         put("Scrivi il nome e seleziona uno o più GRB", "Type a name and select one or more GRBs");
+        put("Cerca e salva uno o più GRB", "Search and save one or more GRBs");
         put("Il prefisso GRB viene mantenuto automaticamente. Invio seleziona il primo risultato.",
                 "The GRB prefix is kept automatically. Enter selects the first result.");
+        put("Il prefisso GRB è già inserito. Digita i numeri e scegli dal menu.",
+                "The GRB prefix is already inserted. Type the digits and choose from the menu.");
         put("Analyze Group userà esattamente i GRB salvati; FRACEXP e finestra temporale restano applicati.",
                 "Analyze Group will use exactly the saved GRBs; FRACEXP and the time window still apply.");
+        put("Analyze Group userà il gruppo GRB salvato; FRACEXP e finestra temporale restano applicati.",
+                "Analyze Group will use the saved GRB group; FRACEXP and the time window still apply.");
 
         // Compact radio labels used in Population Analysis.
         put("Con z", "With z");
