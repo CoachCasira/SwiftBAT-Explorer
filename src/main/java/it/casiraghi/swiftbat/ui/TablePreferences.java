@@ -1,6 +1,7 @@
 package it.casiraghi.swiftbat.ui;
 
 import javafx.application.Platform;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
 import javafx.scene.layout.FlowPane;
@@ -74,20 +75,34 @@ public final class TablePreferences {
         if (column.getGraphic() instanceof Label oldLabel) inheritedTooltip = oldLabel.getTooltip();
         Label label = new Label(I18n.t(name));
         label.getStyleClass().add("table-header-label");
+        label.setAlignment(Pos.CENTER_LEFT);
+        label.setPadding(Insets.EMPTY);
+        label.setMinWidth(0);
         label.setMaxWidth(Double.MAX_VALUE);
+        label.setTextOverrun(OverrunStyle.ELLIPSIS);
+        label.setEllipsisString("…");
         if (inheritedTooltip != null) label.setTooltip(inheritedTooltip);
         HBox.setHgrow(label, Priority.ALWAYS);
 
         Button close = new Button("×");
         close.getStyleClass().add("column-close-button");
         close.setFocusTraversable(false);
+        close.setMinWidth(18);
+        close.setPrefWidth(18);
+        close.setMaxWidth(18);
         close.setOnAction(event -> column.setVisible(false));
         Tooltip.install(close, UiFactory.quickTooltip(I18n.t("Nascondi colonna")));
 
-        HBox header = new HBox(5, label, close);
+        HBox header = new HBox(4, label, close);
         header.getStyleClass().add("closable-column-header");
         header.setAlignment(Pos.CENTER_LEFT);
+        header.setPadding(new Insets(0, 2, 0, 9));
+        header.setMinWidth(0);
         header.setMaxWidth(Double.MAX_VALUE);
+        Runnable fitHeader = () -> header.setPrefWidth(Math.max(0, column.getWidth() - 10));
+        fitHeader.run();
+        column.widthProperty().addListener((obs, oldValue, newValue) -> fitHeader.run());
+
         column.setText("");
         column.setGraphic(header);
         I18n.languageProperty().addListener((obs, oldLanguage, newLanguage) -> label.setText(I18n.t(name)));
@@ -184,15 +199,9 @@ public final class TablePreferences {
     }
 
     public static void alignCell(TableCell<?, ?> cell, String value) {
-        // Nella tabella Population tutte le intestazioni sono allineate a sinistra.
-        // Mantenere anche i valori sulla stessa origine visiva evita l'effetto di
-        // colonne "sfalsate" (in particolare T90 e Copertura) e rende i separatori
-        // molto più facili da seguire con lo sguardo.
-        if (cell != null && cell.getTableView() != null
-                && cell.getTableView().getStyleClass().contains("population-result-table")) {
-            cell.setAlignment(Pos.CENTER_LEFT);
-            return;
-        }
-        cell.setAlignment(isNumeric(value) ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
+        // One visual origin for every table. Numeric values used to be right
+        // aligned while headers were left aligned; on macOS this made virtually
+        // every column look shifted. Keep header and cell text on the same axis.
+        if (cell != null) cell.setAlignment(Pos.CENTER_LEFT);
     }
 }
