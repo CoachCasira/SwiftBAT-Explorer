@@ -24,6 +24,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import javafx.scene.shape.Rectangle;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -37,6 +38,8 @@ import java.util.Locale;
 public final class FinalExpertUiPolish {
     private static final String MANUAL_TAB = FinalExpertUiPolish.class.getName() + ".manualTab";
     private static final String CHIP_WATCH = FinalExpertUiPolish.class.getName() + ".chipWatch";
+    private static final String MANUAL_SCROLL = FinalExpertUiPolish.class.getName() + ".manualScroll";
+    private static final String EXPLORER_CLIP = FinalExpertUiPolish.class.getName() + ".explorerClip";
 
     private FinalExpertUiPolish() { }
 
@@ -60,9 +63,9 @@ public final class FinalExpertUiPolish {
         BorderPane overview = nearestBorderPane(chartCard);
         VBox right = overview != null && overview.getRight() instanceof VBox box ? box : null;
         if (right != null) {
-            right.setMinWidth(208);
-            right.setPrefWidth(216);
-            right.setMaxWidth(224);
+            right.setMinWidth(204);
+            right.setPrefWidth(212);
+            right.setMaxWidth(220);
             BorderPane.setMargin(right, new Insets(0, 0, 0, 8));
 
             VBox actionCard = findLogical(right, VBox.class, "overview-action-card");
@@ -75,9 +78,9 @@ public final class FinalExpertUiPolish {
                         if (!(child instanceof Button button)) continue;
                         String text = safe(button.getText()).toLowerCase(Locale.ROOT);
                         if (text.contains("export") || text.contains("esporta")) {
-                            setWidth(button, 78, 82, 86);
+                            setWidth(button, 76, 80, 84);
                         } else if (text.contains("fullscreen") || text.contains("schermo")) {
-                            setWidth(button, 88, 94, 100);
+                            setWidth(button, 86, 92, 98);
                         }
                     }
                 }
@@ -86,22 +89,35 @@ public final class FinalExpertUiPolish {
 
         HBox controls = directHBoxWithCheckBox(chartCard);
         if (controls == null) return;
-        controls.setSpacing(7);
+        controls.setSpacing(6);
         controls.setAlignment(Pos.CENTER_LEFT);
+        controls.setMaxWidth(Double.MAX_VALUE);
+
+        // Hard safety boundary: even if a JavaFX skin temporarily computes a
+        // wider text node, nothing from the chart toolbar can paint over the
+        // right-side cards.
+        if (!Boolean.TRUE.equals(controls.getProperties().get(EXPLORER_CLIP))) {
+            Rectangle clip = new Rectangle();
+            clip.widthProperty().bind(controls.widthProperty());
+            clip.heightProperty().bind(controls.heightProperty());
+            controls.setClip(clip);
+            controls.getProperties().put(EXPLORER_CLIP, Boolean.TRUE);
+        }
 
         List<javafx.scene.control.ChoiceBox<?>> choices = new ArrayList<>();
         for (Node child : controls.getChildren()) {
             if (child instanceof javafx.scene.control.ChoiceBox<?> choice) choices.add(choice);
         }
-        if (!choices.isEmpty()) setWidth(choices.get(0), 150, 162, 172);
-        if (choices.size() > 1) setWidth(choices.get(1), 146, 158, 168);
+        if (!choices.isEmpty()) setWidth(choices.get(0), 144, 156, 166);
+        if (choices.size() > 1) setWidth(choices.get(1), 140, 152, 162);
 
         CheckBox smooth = controls.getChildren().stream()
                 .filter(CheckBox.class::isInstance)
                 .map(CheckBox.class::cast)
                 .findFirst().orElse(null);
         if (smooth != null) {
-            setWidth(smooth, 118, 132, 142);
+            I18n.setText(smooth, "Media mobile 5 bin…", "5-bin moving…");
+            setWidth(smooth, 106, 116, 124);
             smooth.setWrapText(false);
             smooth.setTextOverrun(OverrunStyle.ELLIPSIS);
             smooth.setEllipsisString("…");
@@ -119,8 +135,8 @@ public final class FinalExpertUiPolish {
                 })
                 .findFirst().orElse(null);
         if (trigger != null) {
-            trigger.setText("t = 0 · trigger");
-            setWidth(trigger, 48, 60, 70);
+            I18n.setText(trigger, "t = 0…", "t = 0…");
+            setWidth(trigger, 42, 46, 50);
             trigger.setWrapText(false);
             trigger.setTextOverrun(OverrunStyle.ELLIPSIS);
             trigger.setEllipsisString("…");
@@ -166,11 +182,15 @@ public final class FinalExpertUiPolish {
         for (int index : centered) {
             Node node = row.getChildren().get(index);
             if (!(node instanceof VBox group)) continue;
-            group.setAlignment(Pos.TOP_CENTER);
+
+            // Keep the dimensions chosen by the current responsive layout, but
+            // center the whole filter content both horizontally and vertically.
+            group.setAlignment(Pos.CENTER);
             group.setFillWidth(false);
             for (Node child : group.getChildren()) {
                 if (child instanceof HBox childRow) childRow.setAlignment(Pos.CENTER);
             }
+
             HBox radios = findLogical(group, HBox.class, "compact-radio-group");
             if (radios != null) {
                 radios.setAlignment(Pos.CENTER);
@@ -196,7 +216,10 @@ public final class FinalExpertUiPolish {
         for (Node child : advanced.getChildren()) {
             if (!(child instanceof VBox group)) continue;
             if (countStyled(group, "sky-range-field") < 2) continue;
-            group.setAlignment(Pos.TOP_CENTER);
+
+            // Do not resize the boxes: only move their existing content to the
+            // visual center requested for z, RA and DEC.
+            group.setAlignment(Pos.CENTER);
             group.setFillWidth(false);
             for (Node nested : group.getChildren()) {
                 if (nested instanceof HBox row) row.setAlignment(Pos.CENTER);
@@ -207,22 +230,24 @@ public final class FinalExpertUiPolish {
     private static void polishManualSelector(VBox card) {
         VBox manual = findLogical(card, VBox.class, "population-manual-grb-v2");
         if (manual == null) return;
-        manual.setMinHeight(Region.USE_PREF_SIZE);
-        manual.setPrefHeight(Region.USE_COMPUTED_SIZE);
-        manual.setMaxHeight(Double.MAX_VALUE);
 
-        HBox advanced = manual.getParent() instanceof HBox row ? row : findAdvancedRow(card);
-        if (advanced != null) {
-            advanced.setMinHeight(Region.USE_PREF_SIZE);
-            advanced.setPrefHeight(Region.USE_COMPUTED_SIZE);
-            advanced.setMaxHeight(Double.MAX_VALUE);
-        }
+        // The manual selector must stay the same height even with many saved
+        // bursts. Only the chip viewport scrolls vertically.
+        manual.setMinHeight(205);
+        manual.setPrefHeight(225);
+        manual.setMaxHeight(225);
+        manual.setFillWidth(true);
+        manual.setAlignment(Pos.TOP_LEFT);
 
         FlowPane chips = findFirst(manual, FlowPane.class);
         if (chips != null) {
-            chips.setMinHeight(38);
+            chips.setAlignment(Pos.TOP_LEFT);
+            chips.setPrefWrapLength(300);
+            chips.setMinHeight(Region.USE_PREF_SIZE);
             chips.setPrefHeight(Region.USE_COMPUTED_SIZE);
             chips.setMaxHeight(Double.MAX_VALUE);
+            chips.setPadding(new Insets(3, 4, 3, 2));
+
             for (Node child : List.copyOf(chips.getChildren())) polishChip(child);
             if (!Boolean.TRUE.equals(chips.getProperties().get(CHIP_WATCH))) {
                 chips.getProperties().put(CHIP_WATCH, Boolean.TRUE);
@@ -232,6 +257,36 @@ public final class FinalExpertUiPolish {
                         for (Node added : List.copyOf(change.getAddedSubList())) polishChip(added);
                     }
                 });
+            }
+
+            if (!(chips.getParent() instanceof ScrollPane)
+                    && !Boolean.TRUE.equals(manual.getProperties().get(MANUAL_SCROLL))) {
+                int index = manual.getChildren().indexOf(chips);
+                if (index >= 0) {
+                    ScrollPane chipScroll = new ScrollPane(chips);
+                    chipScroll.getStyleClass().add("population-grb-chip-scroll");
+                    chipScroll.setFitToWidth(true);
+                    chipScroll.setFitToHeight(false);
+                    chipScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+                    chipScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+                    chipScroll.setPannable(true);
+                    chipScroll.setFocusTraversable(false);
+                    chipScroll.setMinHeight(72);
+                    chipScroll.setPrefHeight(78);
+                    chipScroll.setMaxHeight(78);
+                    chipScroll.setMinWidth(0);
+                    chipScroll.setMaxWidth(Double.MAX_VALUE);
+                    chipScroll.setStyle(
+                            "-fx-background-color: transparent;"
+                                    + "-fx-background: transparent;"
+                                    + "-fx-border-color: rgba(88, 145, 210, 0.18);"
+                                    + "-fx-border-radius: 8;"
+                                    + "-fx-background-radius: 8;"
+                    );
+                    VBox.setVgrow(chipScroll, Priority.NEVER);
+                    manual.getChildren().set(index, chipScroll);
+                    manual.getProperties().put(MANUAL_SCROLL, Boolean.TRUE);
+                }
             }
         }
 
@@ -252,11 +307,15 @@ public final class FinalExpertUiPolish {
 
     private static void polishChip(Node node) {
         if (!(node instanceof Button chip) || !chip.getStyleClass().contains("population-grb-chip")) return;
-        chip.setMinHeight(36);
-        chip.setPrefHeight(Region.USE_COMPUTED_SIZE);
-        chip.setMaxHeight(44);
+        chip.setMinHeight(34);
+        chip.setPrefHeight(36);
+        chip.setMaxHeight(38);
         chip.setMinWidth(Region.USE_PREF_SIZE);
-        chip.setMaxWidth(Double.MAX_VALUE);
+        chip.setPrefWidth(Region.USE_COMPUTED_SIZE);
+        chip.setMaxWidth(150);
+        chip.setWrapText(false);
+        chip.setTextOverrun(OverrunStyle.ELLIPSIS);
+        chip.setEllipsisString("…");
     }
 
     private static String manualCompletion(VBox manual, ComboBox<?> combo, TextField editor) {
