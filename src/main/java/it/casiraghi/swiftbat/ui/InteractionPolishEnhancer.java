@@ -52,6 +52,7 @@ import java.util.Locale;
  */
 public final class InteractionPolishEnhancer {
     private static final String WATCHED = InteractionPolishEnhancer.class.getName() + ".watched";
+    private static final String TABS_WATCHED = InteractionPolishEnhancer.class.getName() + ".tabsWatched";
     private static final String CARD_DONE = InteractionPolishEnhancer.class.getName() + ".cardDone";
     private static final String CARD_ACTIVE = InteractionPolishEnhancer.class.getName() + ".cardActive";
     private static final String CARD_EFFECT = InteractionPolishEnhancer.class.getName() + ".cardEffect";
@@ -76,6 +77,28 @@ public final class InteractionPolishEnhancer {
     private static void watch(Node node) {
         if (node == null) return;
         enhance(node);
+
+        /*
+         * I contenuti dei Tab non selezionati non sono sempre presenti nel scene graph.
+         * Li osserviamo esplicitamente: così GRB inclusi, Spettroscopia e Vista 3D
+         * ricevono le interazioni anche prima della loro prima apertura.
+         */
+        if (node instanceof TabPane tabs
+                && !Boolean.TRUE.equals(tabs.getProperties().get(TABS_WATCHED))) {
+            tabs.getProperties().put(TABS_WATCHED, Boolean.TRUE);
+            for (Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) watch(tab.getContent());
+            }
+            tabs.getTabs().addListener((ListChangeListener<Tab>) change -> {
+                while (change.next()) {
+                    if (!change.wasAdded()) continue;
+                    for (Tab tab : change.getAddedSubList()) {
+                        if (tab.getContent() != null) watch(tab.getContent());
+                    }
+                }
+            });
+        }
+
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
@@ -93,6 +116,11 @@ public final class InteractionPolishEnhancer {
     private static void scan(Node node) {
         if (node == null) return;
         enhance(node);
+        if (node instanceof TabPane tabs) {
+            for (Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) scan(tab.getContent());
+            }
+        }
         if (node instanceof Parent parent) {
             for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) scan(child);
         }
