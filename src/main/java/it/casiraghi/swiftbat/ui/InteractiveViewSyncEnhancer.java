@@ -1,7 +1,7 @@
 package it.casiraghi.swiftbat.ui;
 
-import it.casiraghi.swiftbat.ui.components.TimeEnergyHeatmapPane;
 import it.casiraghi.swiftbat.ui.components.ThreeDChartPane;
+import it.casiraghi.swiftbat.ui.components.TimeEnergyHeatmapPane;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.collections.ListChangeListener;
@@ -33,7 +33,6 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
-import javafx.scene.layout.VBox;
 
 import javax.swing.SwingUtilities;
 import java.awt.Component;
@@ -47,18 +46,9 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Keeps interactive scientific views coherent when switching between embedded
- * and in-place fullscreen representations.
- *
- * <p>The fullscreen views used by the application are normally fresh control
- * instances. That is useful for responsive sizing, but it also means that a
- * selection, rotation or zoom performed in one representation would otherwise
- * be lost in the other. This enhancer treats the two representations as two
- * views of one interaction state and copies the state in both directions.</p>
- *
- * <p>It also reserves the actual plot area for data interaction. A click in a
- * plot never opens 3D/fullscreen; a click on the surrounding visualization card
- * can open the current 2D/fullscreen view. 3D remains an explicit button action.</p>
+ * Synchronizes interactive state between embedded and in-place fullscreen
+ * scientific views. The plot itself is reserved for data interaction: opening
+ * fullscreen is allowed from the surrounding card, while 3D is always explicit.
  */
 public final class InteractiveViewSyncEnhancer {
     private static final String WATCHED = InteractiveViewSyncEnhancer.class.getName() + ".watched";
@@ -70,17 +60,12 @@ public final class InteractiveViewSyncEnhancer {
     private static final String RESTORE_DONE = InteractiveViewSyncEnhancer.class.getName() + ".restoreDone";
     private static final String FULL_LINE_DONE = InteractiveViewSyncEnhancer.class.getName() + ".fullLineDone";
 
-    /* Stable private-property keys used by the older enhancers. Marking them is
-       intentional: it disables only their automatic card-opening behavior while
-       retaining their chart/tooltips/export logic. */
     private static final String OLD_VISUAL_DONE = InteractionPolishEnhancer.class.getName() + ".visualDone";
     private static final String OLD_HISTOGRAM_DONE = PopulationCardEnhancer.class.getName() + ".installed";
     private static final String CHART_FOCUS = ChartInteractionEnhancer.class.getName() + ".focus";
-
     private static final double HIT_RADIUS = 18.0;
 
-    private InteractiveViewSyncEnhancer() {
-    }
+    private InteractiveViewSyncEnhancer() { }
 
     public static void install(Parent root) {
         if (root == null) return;
@@ -93,18 +78,14 @@ public final class InteractiveViewSyncEnhancer {
         enhance(node);
 
         if (node instanceof TabPane tabs) {
-            for (Tab tab : tabs.getTabs()) {
-                if (tab.getContent() != null) watch(tab.getContent());
-            }
-            String tabsKey = WATCHED + ".tabs";
-            if (!Boolean.TRUE.equals(tabs.getProperties().get(tabsKey))) {
-                tabs.getProperties().put(tabsKey, Boolean.TRUE);
+            for (Tab tab : tabs.getTabs()) if (tab.getContent() != null) watch(tab.getContent());
+            String key = WATCHED + ".tabs";
+            if (!Boolean.TRUE.equals(tabs.getProperties().get(key))) {
+                tabs.getProperties().put(key, Boolean.TRUE);
                 tabs.getTabs().addListener((ListChangeListener<Tab>) change -> {
                     while (change.next()) {
                         if (!change.wasAdded()) continue;
-                        for (Tab tab : change.getAddedSubList()) {
-                            if (tab.getContent() != null) watch(tab.getContent());
-                        }
+                        for (Tab tab : change.getAddedSubList()) if (tab.getContent() != null) watch(tab.getContent());
                     }
                 });
             }
@@ -136,53 +117,43 @@ public final class InteractiveViewSyncEnhancer {
 
     private static void enhance(Node node) {
         if (node instanceof Region region) {
-            if (isInteractiveVisualizationCard(region)) installCardInteraction(region);
+            if (isVisualizationCard(region)) installCardInteraction(region);
             if (region.getStyleClass().contains("population-histogram-card")) {
-                // PopulationCardEnhancer may still add export controls, but it must
-                // not turn a normal chart click into an implicit 3D navigation.
                 region.getProperties().put(OLD_HISTOGRAM_DONE, Boolean.TRUE);
             }
             if (region.getStyleClass().contains("population-filter-card")) installFastFilterCollapse(region);
         }
         if (node instanceof LineChart<?, ?> line) installSourceLineGuard(line);
         if (node instanceof BarChart<?, ?> bar) installBarGuard(bar);
+        if (node instanceof TimeEnergyHeatmapPane heatmap) heatmap.setCursor(Cursor.HAND);
         if (node instanceof Button button) {
             if (button.getStyleClass().contains("population-filter-restore")) installFastFilterRestore(button);
-            installFullscreenSynchronization(button);
+            installFullscreenSync(button);
         }
     }
 
-    /* ---------------- Card versus plot interaction ---------------- */
+    /* ---------------- Interaction routing ---------------- */
 
-    private static boolean isInteractiveVisualizationCard(Region region) {
-        if (region instanceof ThreeDChartPane) return true;
-        return region.getStyleClass().contains("overview-chart-card")
+    private static boolean isVisualizationCard(Region region) {
+        return region instanceof ThreeDChartPane
+                || region.getStyleClass().contains("overview-chart-card")
                 || region.getStyleClass().contains("spectroscopy-chart-card")
                 || region.getStyleClass().contains("time-energy-card")
                 || region.getStyleClass().contains("population-chart-card");
     }
 
     private static void installCardInteraction(Region card) {
-        // Must happen before InteractionPolishEnhancer is installed.
         card.getProperties().put(OLD_VISUAL_DONE, Boolean.TRUE);
         if (Boolean.TRUE.equals(card.getProperties().get(CARD_DONE))) return;
         card.getProperties().put(CARD_DONE, Boolean.TRUE);
-        if (!card.getStyleClass().contains("interactive-visual-card")) {
-            card.getStyleClass().add("interactive-visual-card");
-        }
+        if (!card.getStyleClass().contains("interactive-visual-card")) card.getStyleClass().add("interactive-visual-card");
         card.setPickOnBounds(true);
         card.setCursor(Cursor.HAND);
-
-        if (card.getStyleClass().contains("population-chart-card")) {
-            movePopulationActionsLeft(card);
-        }
+        if (card.getStyleClass().contains("population-chart-card")) movePopulationActionsLeft(card);
 
         card.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
-            if (event.getButton() != MouseButton.PRIMARY
-                    || event.getClickCount() != 1
-                    || !event.isStillSincePress()) return;
+            if (event.getButton() != MouseButton.PRIMARY || event.getClickCount() != 1 || !event.isStillSincePress()) return;
             if (insidePlot(event.getTarget(), card) || isActionControl(event.getTarget(), card)) return;
-
             Button fullscreen = fullscreenForCard(card);
             if (fullscreen == null || fullscreen.isDisabled()) return;
             fullscreen.fire();
@@ -192,23 +163,21 @@ public final class InteractiveViewSyncEnhancer {
 
     private static void movePopulationActionsLeft(Region card) {
         HBox actions = findActionRow(card);
-        if (actions == null || !(actions.getParent() instanceof HBox header)) return;
+        if (actions == null) return;
+        Parent rawParent = actions.getParent();
+        if (!(rawParent instanceof HBox header)) return;
         header.getChildren().removeIf(child -> child != actions && child.getClass() == Region.class);
-        actions.setAlignment(Pos.CENTER_LEFT);
         header.setAlignment(Pos.CENTER_LEFT);
+        actions.setAlignment(Pos.CENTER_LEFT);
         HBox.setHgrow(actions, Priority.NEVER);
     }
 
     private static HBox findActionRow(Parent root) {
         for (Node child : root.getChildrenUnmodifiable()) {
-            if (child instanceof HBox row) {
-                boolean hasFullscreen = findButton(row, true) != null;
-                boolean hasThreeD = findButton(row, false) != null;
-                if (hasFullscreen && hasThreeD) return row;
-            }
+            if (child instanceof HBox row && findButton(row, true) != null && findButton(row, false) != null) return row;
             if (child instanceof Parent parent) {
-                HBox nested = findActionRow(parent);
-                if (nested != null) return nested;
+                HBox found = findActionRow(parent);
+                if (found != null) return found;
             }
         }
         return null;
@@ -217,16 +186,14 @@ public final class InteractiveViewSyncEnhancer {
     private static Button fullscreenForCard(Region card) {
         Button local = findButton(card, true);
         if (local != null) return local;
-        if (card.getStyleClass().contains("overview-chart-card")) {
-            Node current = card.getParent();
-            while (current != null) {
-                if (current instanceof BorderPane pane) {
-                    Button button = findButton(pane, true);
-                    if (button != null) return button;
-                }
-                if (current.getStyleClass().contains("page-root")) break;
-                current = current.getParent();
+        if (!card.getStyleClass().contains("overview-chart-card")) return null;
+        Node current = card.getParent();
+        while (current != null) {
+            if (current instanceof BorderPane pane) {
+                Button found = findButton(pane, true);
+                if (found != null) return found;
             }
+            current = current.getParent();
         }
         return null;
     }
@@ -235,10 +202,8 @@ public final class InteractiveViewSyncEnhancer {
         if (!(rawTarget instanceof Node target)) return false;
         Node current = target;
         while (current != null && current != boundary) {
-            if (current instanceof XYChart<?, ?>
-                    || current instanceof TimeEnergyHeatmapPane
-                    || current instanceof SwingNode
-                    || current.getStyleClass().contains("three-d-viewer")) return true;
+            if (current instanceof XYChart<?, ?> || current instanceof TimeEnergyHeatmapPane
+                    || current instanceof SwingNode || current.getStyleClass().contains("three-d-viewer")) return true;
             current = current.getParent();
         }
         return false;
@@ -248,28 +213,27 @@ public final class InteractiveViewSyncEnhancer {
         if (!(rawTarget instanceof Node target)) return false;
         Node current = target;
         while (current != null && current != boundary) {
-            if (current instanceof ButtonBase
-                    || current instanceof ChoiceBox<?>
-                    || current instanceof ComboBoxBase<?>
-                    || current instanceof TextInputControl
-                    || current instanceof ScrollBar
-                    || current instanceof Slider) return true;
+            if (current instanceof ButtonBase || current instanceof ChoiceBox<?> || current instanceof ComboBoxBase<?>
+                    || current instanceof TextInputControl || current instanceof ScrollBar || current instanceof Slider) return true;
             current = current.getParent();
         }
         return false;
     }
 
-    /* ---------------- Prevent implicit 3D; keep plot selection ---------------- */
+    private static boolean hasVisualizationAncestor(Node node) {
+        Node current = node == null ? null : node.getParent();
+        while (current != null) {
+            if (current instanceof Region region && isVisualizationCard(region)) return true;
+            current = current.getParent();
+        }
+        return false;
+    }
 
     private static void installSourceLineGuard(LineChart<?, ?> chart) {
-        if (!hasInteractiveVisualizationAncestor(chart)
-                || Boolean.TRUE.equals(chart.getProperties().get(LINE_DONE))) return;
+        if (!hasVisualizationAncestor(chart) || Boolean.TRUE.equals(chart.getProperties().get(LINE_DONE))) return;
         chart.getProperties().put(LINE_DONE, Boolean.TRUE);
         if (!chart.getStyleClass().contains("interactive-plot")) chart.getStyleClass().add("interactive-plot");
         chart.setCursor(Cursor.HAND);
-
-        // Single click deliberately passes through to ChartInteractionEnhancer.
-        // Double click resets focus locally and must never be interpreted as 3D.
         chart.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
             if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() >= 2) {
                 clearLineFocus(chart);
@@ -279,29 +243,16 @@ public final class InteractiveViewSyncEnhancer {
     }
 
     private static void installBarGuard(BarChart<?, ?> chart) {
-        if (!hasInteractiveVisualizationAncestor(chart)
-                || Boolean.TRUE.equals(chart.getProperties().get(BAR_DONE))) return;
+        if (!hasVisualizationAncestor(chart) || Boolean.TRUE.equals(chart.getProperties().get(BAR_DONE))) return;
         chart.getProperties().put(BAR_DONE, Boolean.TRUE);
         if (!chart.getStyleClass().contains("interactive-plot")) chart.getStyleClass().add("interactive-plot");
         chart.setCursor(Cursor.HAND);
         chart.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
-            if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() >= 2) {
-                event.consume();
-            }
+            if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() >= 2) event.consume();
         });
     }
 
-    private static boolean hasInteractiveVisualizationAncestor(Node node) {
-        Node current = node == null ? null : node.getParent();
-        while (current != null) {
-            if (current instanceof Region region && isInteractiveVisualizationCard(region)) return true;
-            if (current.getStyleClass().contains("page-root")) break;
-            current = current.getParent();
-        }
-        return false;
-    }
-
-    /* ---------------- Fast Population filters ---------------- */
+    /* ---------------- Population filter toggle without layout animation ---------------- */
 
     private static void installFastFilterCollapse(Region card) {
         if (Boolean.TRUE.equals(card.getProperties().get(FILTER_DONE))) return;
@@ -309,16 +260,16 @@ public final class InteractiveViewSyncEnhancer {
         card.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
             if (event.getButton() != MouseButton.PRIMARY || event.getClickCount() != 1 || event.isConsumed()) return;
             if (isActionControl(event.getTarget(), card)) return;
-            Button restore = siblingRestoreButton(card);
+            Button restore = siblingRestore(card);
             if (restore == null) return;
-
             card.setOpacity(1);
             card.setTranslateY(0);
             card.setVisible(false);
             card.setManaged(false);
             restore.setVisible(true);
             restore.setManaged(true);
-            if (card.getParent() != null) card.getParent().requestLayout();
+            Parent parent = card.getParent();
+            if (parent != null) parent.requestLayout();
             event.consume();
         });
     }
@@ -338,13 +289,15 @@ public final class InteractiveViewSyncEnhancer {
             card.setTranslateY(0);
             card.setVisible(true);
             card.setManaged(true);
-            if (card.getParent() != null) card.getParent().requestLayout();
+            Parent parent = card.getParent();
+            if (parent != null) parent.requestLayout();
             event.consume();
         });
     }
 
-    private static Button siblingRestoreButton(Node card) {
-        if (!(card.getParent() instanceof Parent parent)) return null;
+    private static Button siblingRestore(Node card) {
+        Parent parent = card.getParent();
+        if (parent == null) return null;
         for (Node child : parent.getChildrenUnmodifiable()) {
             if (child instanceof Button button && button.getStyleClass().contains("population-filter-restore")) return button;
         }
@@ -352,46 +305,52 @@ public final class InteractiveViewSyncEnhancer {
     }
 
     private static Region siblingFilterCard(Node restore) {
-        if (!(restore.getParent() instanceof Parent parent)) return null;
+        Parent parent = restore.getParent();
+        if (parent == null) return null;
         for (Node child : parent.getChildrenUnmodifiable()) {
             if (child instanceof Region region && region.getStyleClass().contains("population-filter-card")) return region;
         }
         return null;
     }
 
-    /* ---------------- Fullscreen state synchronization ---------------- */
+    /* ---------------- Fullscreen synchronization ---------------- */
 
-    private enum SyncKind { EXPLORER_LINE, POPULATION_LINE, HEATMAP, THREE_D }
+    private enum Kind { EXPLORER_LINE, POPULATION_LINE, HEATMAP, THREE_D }
+    private record Source(Node node, Kind kind) { }
+    private record LineState(Set<String> focused, Set<String> visible) { }
+    private record HeatmapState(Set<Object> selected) { }
+    private record WaterfallState(Set<Integer> bands, double yaw, double pitch, double zoom, double panX, double panY) { }
+    private record ThreeDState(String window, WaterfallState view) { }
+    private record SeriesHit(XYChart.Series<?, ?> series) { }
 
-    private static void installFullscreenSynchronization(Button button) {
-        if (Boolean.TRUE.equals(button.getProperties().get(FULLSCREEN_DONE)) || !isFullscreenButton(button)) return;
+    private static void installFullscreenSync(Button button) {
+        if (!isFullscreenButton(button) || Boolean.TRUE.equals(button.getProperties().get(FULLSCREEN_DONE))) return;
         Source source = sourceFor(button);
         if (source == null) return;
         button.getProperties().put(FULLSCREEN_DONE, Boolean.TRUE);
-
         button.addEventFilter(ActionEvent.ACTION, event -> {
-            if (button.getScene() == null) return;
             Scene scene = button.getScene();
+            if (scene == null) return;
             Parent originalRoot = scene.getRoot();
-            Object before = capture(source.node(), source.kind());
-            Platform.runLater(() -> connectFullscreenSession(scene, originalRoot, source, before));
+            Object state = capture(source.node(), source.kind());
+            Platform.runLater(() -> bindFullscreen(scene, originalRoot, source, state));
         });
     }
 
     private static Source sourceFor(Button button) {
         ThreeDChartPane threeD = ancestor(button, ThreeDChartPane.class);
-        if (threeD != null) return new Source(threeD, SyncKind.THREE_D);
+        if (threeD != null) return new Source(threeD, Kind.THREE_D);
 
-        Parent timeEnergyCard = ancestorWithStyle(button, "time-energy-card");
-        if (timeEnergyCard != null) {
-            TimeEnergyHeatmapPane heatmap = findDescendant(timeEnergyCard, TimeEnergyHeatmapPane.class);
-            return heatmap == null ? null : new Source(heatmap, SyncKind.HEATMAP);
+        Parent heatmapCard = ancestorWithStyle(button, "time-energy-card");
+        if (heatmapCard != null) {
+            TimeEnergyHeatmapPane heatmap = findDescendant(heatmapCard, TimeEnergyHeatmapPane.class);
+            return heatmap == null ? null : new Source(heatmap, Kind.HEATMAP);
         }
 
         Parent populationCard = ancestorWithStyle(button, "population-chart-card");
         if (populationCard != null) {
             LineChart<?, ?> line = findLineChart(populationCard, "population-chart");
-            return line == null ? null : new Source(line, SyncKind.POPULATION_LINE);
+            return line == null ? null : new Source(line, Kind.POPULATION_LINE);
         }
 
         Parent overviewAction = ancestorWithStyle(button, "overview-action-card");
@@ -400,7 +359,7 @@ public final class InteractiveViewSyncEnhancer {
             while (current != null) {
                 if (current instanceof BorderPane pane) {
                     LineChart<?, ?> line = findExplorerLineChart(pane);
-                    if (line != null) return new Source(line, SyncKind.EXPLORER_LINE);
+                    if (line != null) return new Source(line, Kind.EXPLORER_LINE);
                 }
                 current = current.getParent();
             }
@@ -408,37 +367,35 @@ public final class InteractiveViewSyncEnhancer {
         return null;
     }
 
-    private static void connectFullscreenSession(Scene scene, Parent originalRoot, Source source, Object initialState) {
+    private static void bindFullscreen(Scene scene, Parent originalRoot, Source source, Object state) {
         Parent fullscreenRoot = scene.getRoot();
         if (fullscreenRoot == null || fullscreenRoot == originalRoot) return;
-        Node fullscreenNode = fullscreenTarget(fullscreenRoot, source.kind(), source.node());
-        if (fullscreenNode == null) return;
-
-        apply(fullscreenNode, source.kind(), initialState, true);
-        if (fullscreenNode instanceof LineChart<?, ?> line) installFullscreenLineInteraction(line);
+        Node fullscreen = fullscreenTarget(fullscreenRoot, source.kind());
+        if (fullscreen == null) return;
+        apply(fullscreen, source.kind(), state, true);
+        if (fullscreen instanceof LineChart<?, ?> line) installFullscreenLineSelection(line);
 
         @SuppressWarnings("unchecked")
         ChangeListener<Parent>[] holder = new ChangeListener[1];
         holder[0] = (obs, oldRoot, newRoot) -> {
             if (newRoot != originalRoot) return;
             scene.rootProperty().removeListener(holder[0]);
-            Object finalState = capture(fullscreenNode, source.kind());
+            Object finalState = capture(fullscreen, source.kind());
             Platform.runLater(() -> apply(source.node(), source.kind(), finalState, false));
         };
         scene.rootProperty().addListener(holder[0]);
     }
 
-    private static Node fullscreenTarget(Parent root, SyncKind kind, Node source) {
+    private static Node fullscreenTarget(Parent root, Kind kind) {
         return switch (kind) {
-            case THREE_D -> findDifferentDescendant(root, ThreeDChartPane.class, source);
-            case HEATMAP -> findDifferentDescendant(root, TimeEnergyHeatmapPane.class, source);
+            case THREE_D -> findDescendant(root, ThreeDChartPane.class);
+            case HEATMAP -> findDescendant(root, TimeEnergyHeatmapPane.class);
             case POPULATION_LINE -> findLineChart(root, "population-chart");
             case EXPLORER_LINE -> findExplorerLineChart(root);
         };
     }
 
-    private static Object capture(Node node, SyncKind kind) {
-        if (node == null) return null;
+    private static Object capture(Node node, Kind kind) {
         return switch (kind) {
             case EXPLORER_LINE, POPULATION_LINE -> node instanceof LineChart<?, ?> line ? captureLine(line) : null;
             case HEATMAP -> node instanceof TimeEnergyHeatmapPane heatmap ? captureHeatmap(heatmap) : null;
@@ -446,34 +403,20 @@ public final class InteractiveViewSyncEnhancer {
         };
     }
 
-    private static void apply(Node node, SyncKind kind, Object state, boolean openingFullscreen) {
+    private static void apply(Node node, Kind kind, Object state, boolean opening) {
         if (node == null || state == null) return;
-        switch (kind) {
-            case EXPLORER_LINE -> {
-                if (node instanceof LineChart<?, ?> line && state instanceof LineState lineState) {
-                    if (openingFullscreen) keepVisibleSeries(line, lineState.visibleSeries());
-                    applyLineFocus(line, lineState.focusedSeries());
-                }
-            }
-            case POPULATION_LINE -> {
-                if (node instanceof LineChart<?, ?> line && state instanceof LineState lineState) {
-                    applyLineFocus(line, lineState.focusedSeries());
-                }
-            }
-            case HEATMAP -> {
-                if (node instanceof TimeEnergyHeatmapPane heatmap && state instanceof HeatmapState heatmapState) {
-                    applyHeatmap(heatmap, heatmapState);
-                }
-            }
-            case THREE_D -> {
-                if (node instanceof ThreeDChartPane pane && state instanceof ThreeDState threeDState) {
-                    applyThreeD(pane, threeDState);
-                }
-            }
+        if ((kind == Kind.EXPLORER_LINE || kind == Kind.POPULATION_LINE)
+                && node instanceof LineChart<?, ?> line && state instanceof LineState lineState) {
+            if (opening && kind == Kind.EXPLORER_LINE) keepVisibleSeries(line, lineState.visible());
+            applyLineFocus(line, lineState.focused());
+        } else if (kind == Kind.HEATMAP && node instanceof TimeEnergyHeatmapPane heatmap && state instanceof HeatmapState heatmapState) {
+            applyHeatmap(heatmap, heatmapState);
+        } else if (kind == Kind.THREE_D && node instanceof ThreeDChartPane pane && state instanceof ThreeDState threeDState) {
+            applyThreeD(pane, threeDState);
         }
     }
 
-    /* ---------------- Line-chart focus ---------------- */
+    /* ---------------- Line focus state ---------------- */
 
     private static LineState captureLine(LineChart<?, ?> chart) {
         Set<String> visible = new LinkedHashSet<>();
@@ -481,7 +424,6 @@ public final class InteractiveViewSyncEnhancer {
             String name = seriesName(series);
             if (name != null && !isTrigger(name)) visible.add(name);
         }
-
         Set<String> focused = new LinkedHashSet<>();
         Object raw = chart.getProperties().get(CHART_FOCUS);
         if (raw instanceof Set<?> set) {
@@ -496,14 +438,14 @@ public final class InteractiveViewSyncEnhancer {
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private static void keepVisibleSeries(LineChart<?, ?> rawChart, Set<String> visible) {
-        if (visible == null || visible.isEmpty()) return;
+    private static void keepVisibleSeries(LineChart<?, ?> rawChart, Set<String> names) {
+        if (names == null || names.isEmpty()) return;
         LineChart chart = rawChart;
         List<XYChart.Series> keep = new ArrayList<>();
         for (Object raw : List.copyOf(chart.getData())) {
             XYChart.Series series = (XYChart.Series) raw;
             String name = seriesName(series);
-            if (name != null && (isTrigger(name) || visible.contains(name))) keep.add(series);
+            if (name != null && (isTrigger(name) || names.contains(name))) keep.add(series);
         }
         if (!keep.isEmpty()) chart.getData().setAll(keep);
     }
@@ -512,7 +454,7 @@ public final class InteractiveViewSyncEnhancer {
     private static void applyLineFocus(LineChart<?, ?> rawChart, Set<String> names) {
         LineChart chart = rawChart;
         Set<XYChart.Series> focus = new LinkedHashSet<>();
-        if (names != null && !names.isEmpty()) {
+        if (names != null) {
             for (Object raw : chart.getData()) {
                 XYChart.Series series = (XYChart.Series) raw;
                 String name = seriesName(series);
@@ -536,22 +478,19 @@ public final class InteractiveViewSyncEnhancer {
     private static void applyFocusOpacity(LineChart chart, Set<XYChart.Series> focus) {
         for (Object raw : chart.getData()) {
             XYChart.Series series = (XYChart.Series) raw;
-            Node seriesNode = series.getNode();
-            if (seriesNode == null) continue;
+            Node node = series.getNode();
+            if (node == null) continue;
             String name = seriesName(series);
-            boolean trigger = name != null && isTrigger(name);
-            seriesNode.setOpacity(focus.isEmpty() || focus.contains(series) ? 1.0 : trigger ? 0.50 : 0.09);
+            node.setOpacity(focus.isEmpty() || focus.contains(series) ? 1.0 : isTrigger(name) ? 0.50 : 0.09);
         }
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private static void installFullscreenLineInteraction(LineChart<?, ?> rawChart) {
+    private static void installFullscreenLineSelection(LineChart<?, ?> rawChart) {
         if (Boolean.TRUE.equals(rawChart.getProperties().get(FULL_LINE_DONE))) return;
         rawChart.getProperties().put(FULL_LINE_DONE, Boolean.TRUE);
         rawChart.setCursor(Cursor.HAND);
-        if (!rawChart.getStyleClass().contains("interactive-plot")) rawChart.getStyleClass().add("interactive-plot");
         LineChart chart = rawChart;
-
         chart.addEventHandler(MouseEvent.MOUSE_CLICKED, event -> {
             if (event.getButton() != MouseButton.PRIMARY) return;
             if (event.getClickCount() >= 2) {
@@ -561,18 +500,10 @@ public final class InteractiveViewSyncEnhancer {
             }
             if (event.getClickCount() != 1) return;
             SeriesHit hit = nearest(chart, event.getX(), event.getY());
-            if (hit == null || hit.series() == null) return;
-            String name = seriesName(hit.series());
-            if (name != null && isTrigger(name)) return;
-
-            Object stored = chart.getProperties().get(CHART_FOCUS);
-            Set<XYChart.Series> focus;
-            if (stored instanceof Set<?> existing) {
-                focus = (Set<XYChart.Series>) existing;
-            } else {
-                focus = new LinkedHashSet<>();
-                chart.getProperties().put(CHART_FOCUS, focus);
-            }
+            if (hit == null || hit.series() == null || isTrigger(seriesName(hit.series()))) return;
+            Object raw = chart.getProperties().get(CHART_FOCUS);
+            Set<XYChart.Series> focus = raw instanceof Set<?> ? (Set<XYChart.Series>) raw : new LinkedHashSet<>();
+            chart.getProperties().put(CHART_FOCUS, focus);
             if (!focus.add(hit.series())) focus.remove(hit.series());
             applyFocusOpacity(chart, focus);
             event.consume();
@@ -588,25 +519,24 @@ public final class InteractiveViewSyncEnhancer {
         SeriesHit result = null;
         for (Object rawSeries : chart.getData()) {
             XYChart.Series series = (XYChart.Series) rawSeries;
-            if (series.getData() == null) continue;
-            for (Object rawData : series.getData()) {
-                XYChart.Data data = (XYChart.Data) rawData;
-                if (data.getXValue() == null || data.getYValue() == null) continue;
-                double xDisplay;
-                double yDisplay;
+            for (Object rawPoint : series.getData()) {
+                XYChart.Data point = (XYChart.Data) rawPoint;
+                if (point.getXValue() == null || point.getYValue() == null) continue;
+                double x;
+                double y;
                 try {
-                    xDisplay = xAxis.getDisplayPosition(data.getXValue());
-                    yDisplay = yAxis.getDisplayPosition(data.getYValue());
+                    x = xAxis.getDisplayPosition(point.getXValue());
+                    y = yAxis.getDisplayPosition(point.getYValue());
                 } catch (RuntimeException ignored) {
                     continue;
                 }
-                if (!Double.isFinite(xDisplay) || !Double.isFinite(yDisplay)) continue;
-                Point2D xScene = xAxis.localToScene(xDisplay, 0);
-                Point2D yScene = yAxis.localToScene(0, yDisplay);
-                if (xScene == null || yScene == null) continue;
-                Point2D point = chart.sceneToLocal(xScene.getX(), yScene.getY());
-                double dx = point.getX() - mouseX;
-                double dy = point.getY() - mouseY;
+                if (!Double.isFinite(x) || !Double.isFinite(y)) continue;
+                Point2D sx = xAxis.localToScene(x, 0);
+                Point2D sy = yAxis.localToScene(0, y);
+                if (sx == null || sy == null) continue;
+                Point2D local = chart.sceneToLocal(sx.getX(), sy.getY());
+                double dx = local.getX() - mouseX;
+                double dy = local.getY() - mouseY;
                 double distance = dx * dx + dy * dy;
                 if (distance < best) {
                     best = distance;
@@ -626,68 +556,61 @@ public final class InteractiveViewSyncEnhancer {
         return name != null && name.toLowerCase(Locale.ROOT).startsWith("trigger");
     }
 
-    /* ---------------- Time-energy selection ---------------- */
+    /* ---------------- Heatmap state ---------------- */
 
     private static HeatmapState captureHeatmap(TimeEnergyHeatmapPane heatmap) {
-        Object value = fieldValue(heatmap, "selectedCells");
         Set<Object> copy = new LinkedHashSet<>();
-        if (value instanceof Set<?> set) copy.addAll(set);
+        Object raw = fieldValue(heatmap, "selectedCells");
+        if (raw instanceof Set<?> set) copy.addAll(set);
         return new HeatmapState(Set.copyOf(copy));
     }
 
     @SuppressWarnings("unchecked")
     private static void applyHeatmap(TimeEnergyHeatmapPane heatmap, HeatmapState state) {
-        Object value = fieldValue(heatmap, "selectedCells");
-        if (!(value instanceof Set<?> raw)) return;
+        Object raw = fieldValue(heatmap, "selectedCells");
+        if (!(raw instanceof Set<?>)) return;
         Set<Object> target = (Set<Object>) raw;
         target.clear();
-        target.addAll(state.selectedCells());
+        target.addAll(state.selected());
         invokeNoArgs(heatmap, "draw");
     }
 
-    /* ---------------- Java2D 3D state ---------------- */
+    /* ---------------- 3D renderer state ---------------- */
 
     private static ThreeDState captureThreeD(ThreeDChartPane pane) {
-        Object choiceValue = fieldValue(pane, "windowChoice");
-        String window = choiceValue instanceof ChoiceBox<?> choice && choice.getValue() != null
+        Object rawChoice = fieldValue(pane, "windowChoice");
+        String window = rawChoice instanceof ChoiceBox<?> choice && choice.getValue() != null
                 ? choice.getValue().toString() : null;
-        Object renderer = fieldValue(pane, "renderer");
-        return new ThreeDState(window, captureWaterfall(renderer));
+        return new ThreeDState(window, captureWaterfall(fieldValue(pane, "renderer")));
     }
 
     @SuppressWarnings("unchecked")
     private static void applyThreeD(ThreeDChartPane pane, ThreeDState state) {
-        Object choiceValue = fieldValue(pane, "windowChoice");
-        if (choiceValue instanceof ChoiceBox<?> rawChoice && state.window() != null) {
-            ChoiceBox<Object> choice = (ChoiceBox<Object>) rawChoice;
-            if (!state.window().equals(String.valueOf(choice.getValue()))) choice.setValue(state.window());
+        Object rawChoice = fieldValue(pane, "windowChoice");
+        if (rawChoice instanceof ChoiceBox<?> choice && state.window() != null
+                && !state.window().equals(String.valueOf(choice.getValue()))) {
+            ((ChoiceBox<Object>) choice).setValue(state.window());
         }
-        Object renderer = fieldValue(pane, "renderer");
-        applyWaterfall(renderer, state.view());
-        Object labelValue = fieldValue(pane, "zoomLabel");
-        if (labelValue instanceof Label label && state.view() != null) {
+        applyWaterfall(fieldValue(pane, "renderer"), state.view());
+        Object rawLabel = fieldValue(pane, "zoomLabel");
+        if (rawLabel instanceof Label label && state.view() != null) {
             label.setText("Zoom " + Math.round(state.view().zoom() * 100.0) + "%");
         }
     }
 
     private static WaterfallState captureWaterfall(Object renderer) {
-        if (renderer == null) return WaterfallState.defaults();
-        AtomicReference<WaterfallState> result = new AtomicReference<>(WaterfallState.defaults());
-        Runnable read = () -> {
-            Set<Integer> focused = new LinkedHashSet<>();
+        WaterfallState defaults = new WaterfallState(Set.of(), 0.32, 0.72, 1.0, 0.0, 0.0);
+        if (renderer == null) return defaults;
+        AtomicReference<WaterfallState> result = new AtomicReference<>(defaults);
+        runOnSwingAndWait(() -> {
+            Set<Integer> bands = new LinkedHashSet<>();
             Object raw = fieldValue(renderer, "focusedBands");
-            if (raw instanceof Set<?> set) {
-                for (Object item : set) if (item instanceof Integer index) focused.add(index);
-            }
-            result.set(new WaterfallState(
-                    Set.copyOf(focused),
-                    doubleField(renderer, "yaw", 0.32),
-                    doubleField(renderer, "pitch", 0.72),
-                    doubleField(renderer, "zoom", 1.0),
-                    doubleField(renderer, "panX", 0.0),
+            if (raw instanceof Set<?> set) for (Object item : set) if (item instanceof Integer index) bands.add(index);
+            result.set(new WaterfallState(Set.copyOf(bands),
+                    doubleField(renderer, "yaw", 0.32), doubleField(renderer, "pitch", 0.72),
+                    doubleField(renderer, "zoom", 1.0), doubleField(renderer, "panX", 0.0),
                     doubleField(renderer, "panY", 0.0)));
-        };
-        runOnSwingAndWait(read);
+        });
         return result.get();
     }
 
@@ -696,10 +619,10 @@ public final class InteractiveViewSyncEnhancer {
         if (renderer == null || state == null) return;
         SwingUtilities.invokeLater(() -> {
             Object raw = fieldValue(renderer, "focusedBands");
-            if (raw instanceof Set<?> set) {
-                Set<Object> focused = (Set<Object>) set;
-                focused.clear();
-                focused.addAll(state.focusedBands());
+            if (raw instanceof Set<?>) {
+                Set<Object> bands = (Set<Object>) raw;
+                bands.clear();
+                bands.addAll(state.bands());
             }
             setDoubleField(renderer, "yaw", state.yaw());
             setDoubleField(renderer, "pitch", state.pitch());
@@ -717,15 +640,13 @@ public final class InteractiveViewSyncEnhancer {
         }
         try {
             SwingUtilities.invokeAndWait(action);
-        } catch (Exception ignored) {
-            // A temporary EDT interruption must never prevent the view from opening.
-        }
+        } catch (Exception ignored) { }
     }
 
-    /* ---------------- Reflection helpers ---------------- */
+    /* ---------------- Reflection/tree helpers ---------------- */
 
     private static Object fieldValue(Object owner, String name) {
-        if (owner == null || name == null) return null;
+        if (owner == null) return null;
         Field field = findField(owner.getClass(), name);
         if (field == null) return null;
         try {
@@ -742,14 +663,13 @@ public final class InteractiveViewSyncEnhancer {
     }
 
     private static void setDoubleField(Object owner, String name, double value) {
-        Field field = findField(owner == null ? null : owner.getClass(), name);
+        if (owner == null) return;
+        Field field = findField(owner.getClass(), name);
         if (field == null) return;
         try {
             field.setAccessible(true);
             field.setDouble(owner, value);
-        } catch (ReflectiveOperationException | RuntimeException ignored) {
-            // Keep the previous view value if a future renderer changes internals.
-        }
+        } catch (ReflectiveOperationException | RuntimeException ignored) { }
     }
 
     private static Field findField(Class<?> type, String name) {
@@ -764,12 +684,12 @@ public final class InteractiveViewSyncEnhancer {
         return null;
     }
 
-    private static void invokeNoArgs(Object owner, String methodName) {
+    private static void invokeNoArgs(Object owner, String name) {
         if (owner == null) return;
         Class<?> current = owner.getClass();
         while (current != null) {
             try {
-                Method method = current.getDeclaredMethod(methodName);
+                Method method = current.getDeclaredMethod(name);
                 method.setAccessible(true);
                 method.invoke(owner);
                 return;
@@ -781,28 +701,24 @@ public final class InteractiveViewSyncEnhancer {
         }
     }
 
-    /* ---------------- Tree helpers ---------------- */
-
     private static boolean isFullscreenButton(Button button) {
-        String text = button.getText() == null ? "" : button.getText().trim().toLowerCase(Locale.ROOT);
-        String compact = text.replace(" ", "");
-        return text.contains("schermo intero") || text.contains("full screen") || compact.contains("fullscreen");
+        String text = normalize(button.getText());
+        return text.contains("schermointero") || text.contains("fullscreen");
+    }
+
+    private static String normalize(String text) {
+        return text == null ? "" : text.toLowerCase(Locale.ROOT).replace(" ", "");
     }
 
     private static Button findButton(Parent root, boolean fullscreen) {
-        if (root == null) return null;
         for (Node child : root.getChildrenUnmodifiable()) {
             if (child instanceof Button button && button.isVisible() && button.isManaged()) {
-                String text = button.getText() == null ? "" : button.getText().trim().toLowerCase(Locale.ROOT);
-                String compact = text.replace(" ", "");
-                boolean match = fullscreen
-                        ? text.contains("schermo intero") || text.contains("full screen") || compact.contains("fullscreen")
-                        : text.contains("3d");
-                if (match) return button;
+                String text = normalize(button.getText());
+                if (fullscreen ? text.contains("schermointero") || text.contains("fullscreen") : text.contains("3d")) return button;
             }
             if (child instanceof Parent parent) {
-                Button nested = findButton(parent, fullscreen);
-                if (nested != null) return nested;
+                Button found = findButton(parent, fullscreen);
+                if (found != null) return found;
             }
         }
         return null;
@@ -827,17 +743,15 @@ public final class InteractiveViewSyncEnhancer {
     }
 
     private static <T extends Node> T findDescendant(Parent root, Class<T> type) {
-        if (root == null) return null;
         for (Node child : root.getChildrenUnmodifiable()) {
             if (type.isInstance(child)) return type.cast(child);
             if (child instanceof TabPane tabs) {
                 for (Tab tab : tabs.getTabs()) {
-                    if (tab.getContent() != null) {
-                        if (type.isInstance(tab.getContent())) return type.cast(tab.getContent());
-                        if (tab.getContent() instanceof Parent tabParent) {
-                            T found = findDescendant(tabParent, type);
-                            if (found != null) return found;
-                        }
+                    Node content = tab.getContent();
+                    if (content != null && type.isInstance(content)) return type.cast(content);
+                    if (content instanceof Parent parent) {
+                        T found = findDescendant(parent, type);
+                        if (found != null) return found;
                     }
                 }
             }
@@ -849,47 +763,27 @@ public final class InteractiveViewSyncEnhancer {
         return null;
     }
 
-    private static <T extends Node> T findDifferentDescendant(Parent root, Class<T> type, Node excluded) {
-        T found = findDescendant(root, type);
-        return found == excluded ? null : found;
-    }
-
     private static LineChart<?, ?> findLineChart(Parent root, String styleClass) {
-        if (root == null) return null;
         for (Node child : root.getChildrenUnmodifiable()) {
             if (child instanceof LineChart<?, ?> line && line.getStyleClass().contains(styleClass)) return line;
             if (child instanceof Parent parent) {
-                LineChart<?, ?> nested = findLineChart(parent, styleClass);
-                if (nested != null) return nested;
+                LineChart<?, ?> found = findLineChart(parent, styleClass);
+                if (found != null) return found;
             }
         }
         return null;
     }
 
     private static LineChart<?, ?> findExplorerLineChart(Parent root) {
-        if (root == null) return null;
         for (Node child : root.getChildrenUnmodifiable()) {
-            if (child instanceof LineChart<?, ?> line
-                    && line.getStyleClass().contains("lightcurve-chart")
+            if (child instanceof LineChart<?, ?> line && line.getStyleClass().contains("lightcurve-chart")
                     && !line.getStyleClass().contains("population-chart")
                     && !line.getStyleClass().contains("spectral-model-chart")) return line;
             if (child instanceof Parent parent) {
-                LineChart<?, ?> nested = findExplorerLineChart(parent);
-                if (nested != null) return nested;
+                LineChart<?, ?> found = findExplorerLineChart(parent);
+                if (found != null) return found;
             }
         }
         return null;
     }
-
-    private record Source(Node node, SyncKind kind) { }
-    private record LineState(Set<String> focusedSeries, Set<String> visibleSeries) { }
-    private record HeatmapState(Set<Object> selectedCells) { }
-    private record ThreeDState(String window, WaterfallState view) { }
-    private record WaterfallState(Set<Integer> focusedBands, double yaw, double pitch,
-                                  double zoom, double panX, double panY) {
-        private static WaterfallState defaults() {
-            return new WaterfallState(Set.of(), 0.32, 0.72, 1.0, 0.0, 0.0);
-        }
-    }
-    private record SeriesHit(XYChart.Series<?, ?> series) { }
 }
