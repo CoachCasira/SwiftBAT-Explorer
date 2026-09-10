@@ -19,6 +19,7 @@ import java.util.List;
 public final class UiLocalizationWatcher {
     private static final String WATCHED = UiLocalizationWatcher.class.getName() + ".watched";
     private static final String TABS_WATCHED = UiLocalizationWatcher.class.getName() + ".tabsWatched";
+    private static final String TAB_TEXT_WATCHED = UiLocalizationWatcher.class.getName() + ".tabTextWatched";
     private static final String TEXT_WATCHED = UiLocalizationWatcher.class.getName() + ".textWatched";
     private static final String PROMPT_WATCHED = UiLocalizationWatcher.class.getName() + ".promptWatched";
     private static final String LOCALIZING = UiLocalizationWatcher.class.getName() + ".localizing";
@@ -48,12 +49,14 @@ public final class UiLocalizationWatcher {
         if (node instanceof TabPane tabs && !Boolean.TRUE.equals(tabs.getProperties().get(TABS_WATCHED))) {
             tabs.getProperties().put(TABS_WATCHED, Boolean.TRUE);
             for (Tab tab : tabs.getTabs()) {
+                installTabTextWatcher(tab);
                 if (tab.getContent() != null) watch(tab.getContent());
             }
             tabs.getTabs().addListener((ListChangeListener<Tab>) change -> {
                 while (change.next()) {
                     if (!change.wasAdded()) continue;
                     for (Tab tab : change.getAddedSubList()) {
+                        installTabTextWatcher(tab);
                         if (tab.getContent() == null) continue;
                         watch(tab.getContent());
                         localize(tab.getContent());
@@ -75,6 +78,32 @@ public final class UiLocalizationWatcher {
             }
         });
         for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) watch(child);
+    }
+
+    private static void installTabTextWatcher(Tab tab) {
+        if (tab == null || Boolean.TRUE.equals(tab.getProperties().get(TAB_TEXT_WATCHED))) return;
+        tab.getProperties().put(TAB_TEXT_WATCHED, Boolean.TRUE);
+        if (!(tab.getProperties().get(SUPPLEMENTAL_ORIGINAL) instanceof String)
+                && tab.getText() != null && !tab.getText().isBlank() && !MISSING.equals(tab.getText())) {
+            tab.getProperties().put(SUPPLEMENTAL_ORIGINAL, tab.getText());
+        }
+        tab.textProperty().addListener((obs, oldText, newText) -> {
+            if (localizationPass || newText == null || tab.textProperty().isBound()) return;
+            Object raw = tab.getProperties().get(SUPPLEMENTAL_ORIGINAL);
+            String source = raw instanceof String text ? text : null;
+            if (source != null && I18n.language() == I18n.Language.EN) {
+                String expected = UiTranslations.t(source);
+                if (newText.equals(expected)) return;
+                if (MISSING.equals(newText)) {
+                    tab.setText(MISSING.equals(expected) ? source : expected);
+                    return;
+                }
+            }
+            if (!newText.isBlank() && !MISSING.equals(newText)
+                    && I18n.language() == I18n.Language.IT) {
+                tab.getProperties().put(SUPPLEMENTAL_ORIGINAL, newText);
+            }
+        });
     }
 
     private static void installDynamicTextWatcher(Node node) {
