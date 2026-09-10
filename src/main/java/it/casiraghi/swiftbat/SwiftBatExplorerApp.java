@@ -14,6 +14,7 @@ import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
 import it.casiraghi.swiftbat.ui.MainView;
 import it.casiraghi.swiftbat.ui.SkyMap3DInteractionGuard;
 import it.casiraghi.swiftbat.ui.SpectroscopyStartupLayoutFix;
+import it.casiraghi.swiftbat.ui.TargetedLayoutPolish;
 import it.casiraghi.swiftbat.ui.UiBugFixes;
 import it.casiraghi.swiftbat.ui.UiCrossPlatformFastEnhancer;
 import it.casiraghi.swiftbat.ui.UiLastMileFixes;
@@ -102,6 +103,7 @@ public final class SwiftBatExplorerApp extends Application {
         // performs whole-subtree rescans while lists, charts or tables are moving.
         FinalRequestedUiFastFixes.install(mainView.getRoot());
         UiCrossPlatformFastEnhancer.install(mainView.getRoot());
+        TargetedLayoutPolish.install(mainView.getRoot());
 
         mainView.initialize();
     }
