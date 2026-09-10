@@ -182,6 +182,7 @@ public final class InPlaceFullscreen {
 
             ScrollPane readingScroll = new ScrollPane(reading);
             readingScroll.setFitToWidth(true);
+            readingScroll.setFitToHeight(false);
             readingScroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
             readingScroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
             readingScroll.setPannable(true);
@@ -239,6 +240,7 @@ public final class InPlaceFullscreen {
                 split.setBottom(readingScroll);
                 BorderPane.setMargin(content, Insets.EMPTY);
                 BorderPane.setMargin(readingScroll, new Insets(12, 0, 0, 0));
+                readingScroll.setFitToHeight(false);
                 readingScroll.setMinWidth(0);
                 readingScroll.setPrefWidth(Region.USE_COMPUTED_SIZE);
                 readingScroll.setMaxWidth(Double.MAX_VALUE);
@@ -248,12 +250,14 @@ public final class InPlaceFullscreen {
                 reading.setMinWidth(0);
                 reading.setPrefWidth(Region.USE_COMPUTED_SIZE);
                 reading.setMaxWidth(Double.MAX_VALUE);
+                reading.setMinHeight(Region.USE_PREF_SIZE);
             } else {
                 split.setBottom(null);
                 split.setRight(readingScroll);
                 BorderPane.setMargin(content, new Insets(0, 14, 0, 0));
                 BorderPane.setMargin(readingScroll, Insets.EMPTY);
                 double sideWidth = Math.max(320, Math.min(430, width * 0.255));
+                readingScroll.setFitToHeight(true);
                 readingScroll.setMinWidth(Math.min(300, sideWidth));
                 readingScroll.setPrefWidth(sideWidth);
                 readingScroll.setMaxWidth(sideWidth);
@@ -263,6 +267,8 @@ public final class InPlaceFullscreen {
                 reading.setMinWidth(0);
                 reading.setPrefWidth(sideWidth);
                 reading.setMaxWidth(Double.MAX_VALUE);
+                reading.setMinHeight(0);
+                reading.setMaxHeight(Double.MAX_VALUE);
             }
         }
 
