@@ -51,11 +51,32 @@
     -fx-max-width: infinity;
     -fx-padding: 0 11px 0 12px;
     -fx-background-color: transparent;
+    -fx-background-insets: 0;
     -fx-background-radius: 9px 0 0 9px;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-border-insets: 0;
+    -fx-effect: none;
     -fx-text-fill: #edf6ff;
     -fx-font-weight: 600;
     -fx-alignment: center-left;
     -fx-text-overrun: ellipsis;
+}
+
+/* JavaFX may leave the focused ListCell/Label skin with a one-pixel accent seam.
+   Force the value surface to stay borderless in every state so no magenta/red
+   line can protrude beyond the rounded selector. */
+.reference-redesign .choice-box:focused > .label,
+.reference-redesign .choice-box:showing > .label,
+.reference-redesign .combo-box-base:focused > .list-cell,
+.reference-redesign .combo-box-base:showing > .list-cell,
+.reference-redesign .combo-box:focused > .list-cell,
+.reference-redesign .combo-box:showing > .list-cell {
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-border-insets: 0;
+    -fx-background-insets: 0;
+    -fx-effect: none;
 }
 
 /* The right side is a fixed, narrow arrow lane with a subtle separator. */
@@ -130,4 +151,13 @@
 .reference-redesign .metadata-field-toolbar .choice-box-modern,
 .reference-redesign .compare-control-bar .choice-box-modern {
     -fx-font-size: 12px;
+}
+
+/* Sky-map fullscreen remains a normal primary action but without the neon glow
+   that looked like a continuous shimmer while the whole map card was hovered. */
+.reference-redesign .sky-fullscreen-stable,
+.reference-redesign .sky-fullscreen-stable:hover,
+.reference-redesign .sky-fullscreen-stable:focused,
+.reference-redesign .sky-fullscreen-stable:pressed {
+    -fx-effect: none;
 }
