@@ -2,6 +2,7 @@ package it.casiraghi.swiftbat.ui;
 
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
@@ -19,7 +20,7 @@ import java.util.List;
 
 /**
  * Final table geometry owner. Every table uses native TableColumn headers and
- * a single left-aligned origin for both header text and cell text.
+ * the same visible left origin for header and body text on Windows/macOS.
  */
 public final class FinalTableAlignmentFix {
     private static final String WATCHED = FinalTableAlignmentFix.class.getName() + ".watched";
@@ -36,9 +37,8 @@ public final class FinalTableAlignmentFix {
         if (node == null) return;
         if (node instanceof TableView<?> table) {
             normalizeTable(table);
-            return; // do not traverse VirtualFlow / skin internals
+            return;
         }
-
         if (node instanceof ScrollPane scroll) {
             if (scroll.getContent() != null) watch(scroll.getContent());
             if (!Boolean.TRUE.equals(scroll.getProperties().get(WATCHED))) {
@@ -84,15 +84,15 @@ public final class FinalTableAlignmentFix {
     }
 
     private static void normalizeTable(TableView<?> table) {
-        if (!table.getStyleClass().contains("final-aligned-table")) {
-            table.getStyleClass().add("final-aligned-table");
-        }
+        if (!table.getStyleClass().contains("final-aligned-table")) table.getStyleClass().add("final-aligned-table");
         if (CSS != null && !table.getStylesheets().contains(CSS)) table.getStylesheets().add(CSS);
         table.setMinWidth(0);
         table.setMaxWidth(Double.MAX_VALUE);
 
         Runnable normalize = () -> {
             for (TableColumn<?, ?> column : List.copyOf(table.getColumns())) normalizeColumn(column);
+            table.applyCss();
+            forceVisibleHeaderGeometry(table);
             table.refresh();
             table.requestLayout();
         };
@@ -101,18 +101,15 @@ public final class FinalTableAlignmentFix {
 
         if (!Boolean.TRUE.equals(table.getProperties().get(TABLE_DONE))) {
             table.getProperties().put(TABLE_DONE, Boolean.TRUE);
-            table.getColumns().addListener((ListChangeListener<TableColumn<?, ?>>) change -> normalize.run());
+            table.getColumns().addListener((ListChangeListener<TableColumn<?, ?>>) change -> Platform.runLater(normalize));
             table.skinProperty().addListener((obs, oldSkin, newSkin) -> Platform.runLater(normalize));
+            table.widthProperty().addListener((obs, oldWidth, newWidth) -> Platform.runLater(() -> forceVisibleHeaderGeometry(table)));
         }
     }
 
     private static void normalizeColumn(TableColumn<?, ?> column) {
         if (column == null) return;
 
-        // Compatibility with tables already created by the old layout: extract
-        // the actual title from the graphic header, then remove the entire HBox/X
-        // structure. Native TableColumn text is laid out by the same skin that
-        // owns the column boundary, so it cannot drift into the neighbouring cell.
         Node graphic = column.getGraphic();
         if (graphic instanceof HBox header && header.getStyleClass().contains("closable-column-header")) {
             String title = null;
@@ -126,7 +123,28 @@ public final class FinalTableAlignmentFix {
             column.setGraphic(null);
         }
 
+        if (!column.getStyleClass().contains("final-left-column")) column.getStyleClass().add("final-left-column");
+        column.setStyle("-fx-alignment: CENTER-LEFT;");
         for (TableColumn<?, ?> child : column.getColumns()) normalizeColumn(child);
+    }
+
+    /**
+     * JavaFX's macOS skin can keep CENTER alignment on the actual header Label
+     * even when the TableColumn is left aligned. Set the realized header nodes
+     * directly after CSS; this happens only on layout/resize, never while rows scroll.
+     */
+    private static void forceVisibleHeaderGeometry(TableView<?> table) {
+        try {
+            for (Node node : table.lookupAll(".column-header .label")) {
+                if (!(node instanceof Label label)) continue;
+                label.setAlignment(Pos.CENTER_LEFT);
+                label.setTextAlignment(javafx.scene.text.TextAlignment.LEFT);
+                label.setPadding(new Insets(0, 9, 0, 9));
+                label.setMaxWidth(Double.MAX_VALUE);
+            }
+        } catch (RuntimeException ignored) {
+            // The CSS rule remains the fallback while the skin is not realized.
+        }
     }
 
     private static String stylesheet() {
