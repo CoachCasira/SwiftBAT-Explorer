@@ -88,11 +88,13 @@ public final class PageScopedPolishRouter {
             invokeDefinitive("polishExplorerDashboard", new Class<?>[]{Node.class}, content);
             FinalExpertUiPolish.polishExplorer(content);
             ExplorerOverflowFix.apply(content);
+            ExplorerChoiceBoxEllipsisFix.install(content);
             FinalTableAlignmentFix.install(content);
             ExplorerScrollbarFix.install(content);
             Platform.runLater(() -> {
                 FinalExpertUiPolish.polishExplorer(content);
                 ExplorerOverflowFix.apply(content);
+                ExplorerChoiceBoxEllipsisFix.install(content);
                 ExplorerScrollbarFix.install(page);
             });
             return;
@@ -115,6 +117,7 @@ public final class PageScopedPolishRouter {
 
         FinalExpertUiPolish.polishExplorer(content);
         ExplorerOverflowFix.apply(content);
+        ExplorerChoiceBoxEllipsisFix.install(content);
         FinalTableAlignmentFix.install(content);
         ExplorerScrollbarFix.install(page);
 
@@ -122,6 +125,7 @@ public final class PageScopedPolishRouter {
             installMetadataWorkspace(page, tabs);
             FinalExpertUiPolish.polishExplorer(content);
             ExplorerOverflowFix.apply(content);
+            ExplorerChoiceBoxEllipsisFix.install(content);
             ExplorerScrollbarFix.install(page);
         });
     }
