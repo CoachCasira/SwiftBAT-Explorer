@@ -69,6 +69,10 @@ public final class PageScopedPolishRouter {
     }
 
     private static void polishExplorerWorkspaceChild(Node node) {
+        // Keep the outer ScrollPane in scope: its skin owns the main Explorer
+        // scrollbar shown on the right edge of the page.
+        ExplorerScrollbarFix.install(node);
+
         Node content = node instanceof ScrollPane scroll && scroll.getContent() != null
                 ? scroll.getContent() : node;
         TabPane tabs = findLogical(content, TabPane.class, null);
@@ -78,10 +82,12 @@ public final class PageScopedPolishRouter {
             ExplorerOverflowFix.apply(content);
             FinalTableAlignmentFix.install(content);
             MetadataFieldSearchFix.install(content);
+            ExplorerScrollbarFix.install(content);
             Platform.runLater(() -> {
                 FinalExpertUiPolish.polishExplorer(content);
                 ExplorerOverflowFix.apply(content);
                 MetadataFieldSearchFix.install(content);
+                ExplorerScrollbarFix.install(node);
             });
             return;
         }
@@ -99,11 +105,13 @@ public final class PageScopedPolishRouter {
         ExplorerOverflowFix.apply(content);
         FinalTableAlignmentFix.install(content);
         MetadataFieldSearchFix.install(content);
+        ExplorerScrollbarFix.install(content);
 
         Platform.runLater(() -> {
             FinalExpertUiPolish.polishExplorer(content);
             ExplorerOverflowFix.apply(content);
             MetadataFieldSearchFix.install(content);
+            ExplorerScrollbarFix.install(node);
         });
     }
 
