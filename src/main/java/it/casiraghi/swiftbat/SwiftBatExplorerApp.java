@@ -13,6 +13,7 @@ import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
 import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
 import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
 import it.casiraghi.swiftbat.ui.MainView;
+import it.casiraghi.swiftbat.ui.PageScopedPolishRouter;
 import it.casiraghi.swiftbat.ui.SkyMap3DInteractionGuard;
 import it.casiraghi.swiftbat.ui.SpectroscopyStartupLayoutFix;
 import it.casiraghi.swiftbat.ui.TargetedLayoutPolish;
@@ -108,10 +109,11 @@ public final class SwiftBatExplorerApp extends Application {
 
         mainView.initialize();
 
-        // One page-scoped finalizer after initialization. It fixes the very first
-        // Explorer layout before the first visible pulse and adds the manual GRB
-        // selector without introducing another global scene-graph watcher.
+        // The pages are swapped into MainView's pageHost, so the final compact
+        // geometry is routed exactly when Explorer/Population becomes active.
+        // Only pageHost's direct children are observed: no global scene rescans.
         FinalMacAndPopulationPolish.install(mainView.getRoot());
+        PageScopedPolishRouter.install(mainView.getRoot());
     }
 
     @Override
