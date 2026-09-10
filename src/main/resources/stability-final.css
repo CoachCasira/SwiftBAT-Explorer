@@ -38,9 +38,9 @@
 /* The visible table scrollbar is the external sibling created by Java code. */
 .reference-redesign .table-external-scrollbar {
     -fx-background-color: transparent;
-    -fx-pref-width: 10px;
-    -fx-min-width: 10px;
-    -fx-max-width: 10px;
+    -fx-pref-width: 12px;
+    -fx-min-width: 12px;
+    -fx-max-width: 12px;
     -fx-padding: 0;
 }
 
@@ -54,6 +54,7 @@
     -fx-background-color: linear-gradient(to bottom, rgba(200, 62, 239, 0.88), rgba(37, 177, 247, 0.92));
     -fx-background-radius: 999px;
     -fx-background-insets: 0;
+    -fx-min-height: 46px;
 }
 
 .reference-redesign .table-external-scrollbar .increment-button,
@@ -71,17 +72,32 @@
     -fx-shape: "";
 }
 
-/* Explorer GRB catalog: use the same clearly visible scrollbar thickness. */
+/* Explorer GRB catalog: same thickness and a usable minimum thumb length. */
 .reference-redesign .catalog-list .scroll-bar:vertical {
-    -fx-pref-width: 10px;
-    -fx-min-width: 10px;
-    -fx-max-width: 10px;
+    -fx-pref-width: 12px;
+    -fx-min-width: 12px;
+    -fx-max-width: 12px;
     -fx-background-color: transparent;
 }
 
 .reference-redesign .catalog-list .scroll-bar:vertical .thumb {
     -fx-background-color: linear-gradient(to bottom, rgba(200, 62, 239, 0.88), rgba(37, 177, 247, 0.92));
     -fx-background-radius: 999px;
+    -fx-min-height: 46px;
+}
+
+/* Population focus lock: compact icon button, visually consistent in every view. */
+.reference-redesign .population-curve-lock {
+    -fx-min-width: 44px;
+    -fx-pref-width: 44px;
+    -fx-max-width: 44px;
+    -fx-font-size: 16px;
+    -fx-padding: 7px 9px;
+}
+
+.reference-redesign .population-curve-lock:selected {
+    -fx-background-color: linear-gradient(to right, rgba(200, 62, 239, 0.92), rgba(37, 177, 247, 0.92));
+    -fx-border-color: rgba(132, 223, 255, 0.90);
 }
 
 /* ---------- Explorer side cards ---------- */
