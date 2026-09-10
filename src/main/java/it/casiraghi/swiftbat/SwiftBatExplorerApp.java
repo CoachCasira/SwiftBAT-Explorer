@@ -5,6 +5,7 @@ import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerCurveInteractionEnhancer;
+import it.casiraghi.swiftbat.ui.ExplorerSidebarLayoutFix;
 import it.casiraghi.swiftbat.ui.ExplorerVisualStabilityFixes;
 import it.casiraghi.swiftbat.ui.FinalRequestedUiFixes;
 import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
@@ -102,6 +103,9 @@ public final class SwiftBatExplorerApp extends Application {
         // polish after every legacy pass has created its dynamic controls.
         FinalRequestedUiFixes.install(mainView.getRoot());
         UiCrossPlatformPolishEnhancer.install(mainView.getRoot());
+        // The Explorer overview keeps its supporting cards on the right at every
+        // window size; only their width changes on laptop-sized workspaces.
+        ExplorerSidebarLayoutFix.install(mainView.getRoot());
 
         mainView.initialize();
     }
