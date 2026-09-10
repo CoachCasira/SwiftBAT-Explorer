@@ -10,8 +10,13 @@ import javafx.scene.chart.Axis;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.Button;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.ListView;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
+import javafx.scene.control.TableView;
 import javafx.scene.control.Tooltip;
 import javafx.scene.effect.Glow;
 import javafx.scene.input.MouseButton;
@@ -27,16 +32,10 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.WeakHashMap;
 
-/**
- * Low-overhead Explorer light-curve interaction owner.
- *
- * <p>New subtrees are visited once only. Hover hit testing works in plot-pixel
- * coordinates, avoiding thousands of localToScene/sceneToLocal transforms per
- * mouse event. Highlighting never changes child order, so it cannot trigger a
- * cascade of JavaFX scene-graph change notifications while the pointer moves.</p>
- */
+/** Low-overhead Explorer light-curve interaction owner. */
 public final class ExplorerCurveInteractionFastEnhancer {
     private static final String WATCHED = ExplorerCurveInteractionFastEnhancer.class.getName() + ".watched";
+    private static final String TAB_WATCHED = ExplorerCurveInteractionFastEnhancer.class.getName() + ".tabWatched";
     private static final String DONE = ExplorerCurveInteractionFastEnhancer.class.getName() + ".done";
     private static final String HOVER = ExplorerCurveInteractionFastEnhancer.class.getName() + ".hover";
     private static final String GENERIC_LINE_DONE = ChartInteractionEnhancer.class.getName() + ".lineDone";
@@ -75,18 +74,54 @@ public final class ExplorerCurveInteractionFastEnhancer {
         installedScene = scene;
         if (!WATCHED_SCENES.add(scene)) return;
         scene.rootProperty().addListener((obs, oldRoot, newRoot) -> {
-            if (newRoot == null) return;
+            // The normal application root is intentionally not scanned here.
+            // Only the temporary fullscreen root needs Explorer interactions.
+            if (!isFullscreenRoot(newRoot)) return;
             Platform.runLater(() -> {
                 watch(newRoot);
                 refreshNode(newRoot);
             });
         });
-        if (scene.getRoot() != null) watch(scene.getRoot());
+    }
+
+    private static boolean isFullscreenRoot(Node node) {
+        return node != null && node.getStyleClass().contains("in-place-fullscreen");
     }
 
     private static void watch(Node node) {
         if (node == null) return;
         enhance(node);
+
+        // Do not descend into chart/control skins: their transient nodes are not
+        // targets and watching them adds listeners while charts/tables scroll.
+        if (node instanceof LineChart<?, ?>
+                || node instanceof ChoiceBox<?>
+                || node instanceof ComboBox<?>
+                || node instanceof ListView<?>
+                || node instanceof TableView<?>) return;
+
+        if (node instanceof ScrollPane scroll) {
+            watch(scroll.getContent());
+            if (!Boolean.TRUE.equals(scroll.getProperties().get(WATCHED))) {
+                scroll.getProperties().put(WATCHED, Boolean.TRUE);
+                scroll.contentProperty().addListener((obs, oldContent, newContent) -> watch(newContent));
+            }
+            return;
+        }
+
+        if (node instanceof TabPane tabs) {
+            for (Tab tab : List.copyOf(tabs.getTabs())) watchTab(tab);
+            if (!Boolean.TRUE.equals(tabs.getProperties().get(WATCHED))) {
+                tabs.getProperties().put(WATCHED, Boolean.TRUE);
+                tabs.getTabs().addListener((ListChangeListener<Tab>) change -> {
+                    while (change.next()) if (change.wasAdded()) {
+                        for (Tab tab : List.copyOf(change.getAddedSubList())) watchTab(tab);
+                    }
+                });
+            }
+            return;
+        }
+
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
@@ -97,6 +132,14 @@ public final class ExplorerCurveInteractionFastEnhancer {
             }
         });
         for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) watch(child);
+    }
+
+    private static void watchTab(Tab tab) {
+        if (tab == null) return;
+        watch(tab.getContent());
+        if (Boolean.TRUE.equals(tab.getProperties().get(TAB_WATCHED))) return;
+        tab.getProperties().put(TAB_WATCHED, Boolean.TRUE);
+        tab.contentProperty().addListener((obs, oldContent, newContent) -> watch(newContent));
     }
 
     private static void enhance(Node node) {
@@ -308,8 +351,7 @@ public final class ExplorerCurveInteractionFastEnhancer {
     private static void refreshAll() {
         Platform.runLater(() -> {
             if (installedRoot != null) refreshNode(installedRoot);
-            if (installedScene != null && installedScene.getRoot() != null
-                    && installedScene.getRoot() != installedRoot) {
+            if (installedScene != null && isFullscreenRoot(installedScene.getRoot())) {
                 refreshNode(installedScene.getRoot());
             }
         });
@@ -318,9 +360,22 @@ public final class ExplorerCurveInteractionFastEnhancer {
     @SuppressWarnings("rawtypes")
     private static void refreshNode(Node node) {
         if (node == null) return;
-        if (node instanceof LineChart chart && isExplorerCurve(chart)) {
-            chart.getProperties().remove(HOVER);
-            applyVisualState(chart);
+        if (node instanceof LineChart chart) {
+            if (isExplorerCurve(chart)) {
+                chart.getProperties().remove(HOVER);
+                applyVisualState(chart);
+            }
+            return;
+        }
+        if (node instanceof ListView<?> || node instanceof TableView<?>
+                || node instanceof ChoiceBox<?> || node instanceof ComboBox<?>) return;
+        if (node instanceof ScrollPane scroll) {
+            refreshNode(scroll.getContent());
+            return;
+        }
+        if (node instanceof TabPane tabs) {
+            for (Tab tab : List.copyOf(tabs.getTabs())) refreshNode(tab.getContent());
+            return;
         }
         if (node instanceof Parent parent) {
             for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) refreshNode(child);
