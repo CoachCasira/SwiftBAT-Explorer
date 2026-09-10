@@ -1,16 +1,13 @@
 .final-aligned-table .column-header,
 .final-aligned-table .filler {
     -fx-padding: 0;
+    -fx-alignment: CENTER-LEFT;
 }
 
-/* JavaFX's native macOS table skin places header text about four logical pixels
-   further left than TableCell text even when the declared padding is identical.
-   Compensate that skin inset once here so every header starts on the exact same
-   visual axis as the values below it. */
 .final-aligned-table .column-header .label {
     -fx-alignment: CENTER-LEFT;
     -fx-text-alignment: left;
-    -fx-padding: 0 9 0 13;
+    -fx-padding: 0 9 0 9;
 }
 
 .final-aligned-table .table-cell {
@@ -23,12 +20,11 @@
     -fx-cell-size: 34px;
 }
 
-/* Safety only for a legacy header that exists for one pulse before the Java
-   normalizer converts it to a native TableColumn title. */
 .final-aligned-table .closable-column-header {
     -fx-padding: 0;
     -fx-spacing: 0;
 }
+
 .final-aligned-table .column-close-button {
     -fx-min-width: 0;
     -fx-pref-width: 0;
