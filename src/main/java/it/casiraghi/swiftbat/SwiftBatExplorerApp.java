@@ -3,6 +3,7 @@ package it.casiraghi.swiftbat;
 import it.casiraghi.swiftbat.ui.AdaptiveChromeEnhancer;
 import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
+import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
 import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
 import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
 import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
@@ -35,16 +36,16 @@ public final class SwiftBatExplorerApp extends Application {
                 SwiftBatExplorerApp.class.getResource("/reference-redesign.css").toExternalForm());
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/reference-redesign-final.css").toExternalForm());
-        // Geometria semplice e coerente per tutti i menu a tendina.
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/dropdown-clean.css").toExternalForm());
-        // Layout responsive di base per Population e shell.
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/responsive-layout.css").toExternalForm());
-        // Ultimo override visuale: interazioni coerenti e desktop 'roomy' anche
-        // prima del fullscreen del sistema operativo.
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/interactive-layout-final.css").toExternalForm());
+        // Ultimissimo layer: scrollbar delle tabelle, distribuzioni Population e
+        // geometria di stabilità non possono essere sovrascritte dai temi precedenti.
+        scene.getStylesheets().add(
+                SwiftBatExplorerApp.class.getResource("/stability-final.css").toExternalForm());
 
         stage.setTitle("SwiftBAT Explorer 1.3.0 — Reference UI Preview");
         stage.getIcons().setAll(BrandLogoAsset.image());
@@ -57,17 +58,16 @@ public final class SwiftBatExplorerApp extends Application {
         UiRefinements.install(mainView.getRoot());
         ExplorerBandSelectionEnhancer.install(mainView.getRoot());
 
-        // Installato prima degli enhancer storici: riserva il plot all'interazione
-        // scientifica e sincronizza lo stato tra vista embedded e fullscreen.
         InteractiveViewSyncEnhancer.install(mainView.getRoot());
         InteractionPolishEnhancer.install(mainView.getRoot());
         ChartInteractionEnhancer.install(mainView.getRoot());
         UiBugFixes.install(mainView.getRoot());
 
         ResponsiveLayoutEnhancer.install(mainView.getRoot());
-        // Ultimo passaggio runtime: sfrutta anche una normale finestra desktop
-        // (es. 1580 px) senza penalizzare la geometria compatta del portatile.
         AdaptiveChromeEnhancer.install(mainView.getRoot());
+        // Va installato per ultimo: neutralizza soltanto i relayout tardivi e
+        // rifinisce i controlli già creati, senza toccare la logica scientifica.
+        FinalUiStabilityEnhancer.install(mainView.getRoot());
         mainView.initialize();
     }
 
