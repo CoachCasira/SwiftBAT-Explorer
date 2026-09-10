@@ -3,6 +3,7 @@ package it.casiraghi.swiftbat;
 import it.casiraghi.swiftbat.ui.AdaptiveChromeEnhancer;
 import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
+import it.casiraghi.swiftbat.ui.ExplorerVisualStabilityFixes;
 import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
 import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
 import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
@@ -58,6 +59,7 @@ public final class SwiftBatExplorerApp extends Application {
         UiLocalizationWatcher.install(mainView.getRoot());
         UiRefinements.install(mainView.getRoot());
         ExplorerBandSelectionEnhancer.install(mainView.getRoot());
+        ExplorerVisualStabilityFixes.install(mainView.getRoot());
 
         InteractiveViewSyncEnhancer.install(mainView.getRoot());
         // Must be registered before InteractionPolishEnhancer: an actual 3D GRB
