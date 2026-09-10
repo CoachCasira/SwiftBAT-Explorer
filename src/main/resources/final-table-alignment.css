@@ -3,26 +3,12 @@
     -fx-padding: 0;
 }
 
+/* Native header text and body cells intentionally share the same 9 px left
+   inset. This is the only horizontal origin used by the final table layout. */
 .final-aligned-table .column-header .label {
     -fx-alignment: CENTER-LEFT;
     -fx-text-alignment: left;
-    -fx-padding: 0;
-}
-
-.final-aligned-table .closable-column-header {
-    -fx-alignment: CENTER-LEFT;
-    -fx-padding: 0 2 0 9;
-}
-
-.final-aligned-table .table-header-label {
-    -fx-alignment: CENTER-LEFT;
-    -fx-text-alignment: left;
-    -fx-padding: 0;
-}
-
-.final-aligned-table .column-close-button {
-    -fx-padding: 0;
-    -fx-alignment: CENTER;
+    -fx-padding: 0 9 0 9;
 }
 
 .final-aligned-table .table-cell {
@@ -33,4 +19,18 @@
 
 .final-aligned-table .table-row-cell {
     -fx-cell-size: 34px;
+}
+
+/* Kept only as a safety rule for a header created during the same JavaFX pulse
+   before FinalTableAlignmentFix converts it to a native TableColumn title. */
+.final-aligned-table .closable-column-header {
+    -fx-padding: 0;
+    -fx-spacing: 0;
+}
+.final-aligned-table .column-close-button {
+    -fx-min-width: 0;
+    -fx-pref-width: 0;
+    -fx-max-width: 0;
+    -fx-opacity: 0;
+    -fx-padding: 0;
 }
