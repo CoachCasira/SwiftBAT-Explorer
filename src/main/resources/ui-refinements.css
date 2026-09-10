@@ -86,3 +86,25 @@
     -fx-background-color: transparent;
     -fx-padding: 0;
 }
+
+/* Population / Included GRBs: stesso inset per header e celle, senza lettere tagliate. */
+.population-result-table {
+    -fx-padding: 1px 2px 1px 2px;
+}
+
+.population-result-table .table-cell {
+    -fx-padding: 7px 11px 7px 11px;
+}
+
+.population-result-table .closable-column-header {
+    -fx-padding: 0 6px 0 10px;
+    -fx-alignment: center-left;
+}
+
+.population-result-table .table-header-label {
+    -fx-padding: 0;
+}
+
+.population-table-toolbar {
+    -fx-padding: 1px 4px 2px 4px;
+}
