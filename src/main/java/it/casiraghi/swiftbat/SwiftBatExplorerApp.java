@@ -5,6 +5,7 @@ import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerVisualStabilityFixes;
+import it.casiraghi.swiftbat.ui.FinalRequestedUiFixes;
 import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
 import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
 import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
@@ -67,8 +68,15 @@ public final class SwiftBatExplorerApp extends Application {
         // marker click is selection, not a request to open the whole sky card.
         SkyMap3DInteractionGuard.install(mainView.getRoot());
         InteractionPolishEnhancer.install(mainView.getRoot());
-        ChartInteractionEnhancer.install(mainView.getRoot());
+
+        /*
+         * Population temporal-profile interaction must be installed before the
+         * generic chart enhancer. It owns selection, lock, spotlight and the
+         * continuous line hit-test, and marks those charts so the generic handler
+         * cannot install a second competing click/tooltip implementation.
+         */
         CurveInteractionLinkEnhancer.install(mainView.getRoot());
+        ChartInteractionEnhancer.install(mainView.getRoot());
         UiBugFixes.install(mainView.getRoot());
 
         AdaptiveChromeEnhancer.install(mainView.getRoot());
@@ -86,6 +94,11 @@ public final class SwiftBatExplorerApp extends Application {
         UiLastMileFixes.prepare(mainView.getRoot());
         FinalUiStabilityEnhancer.install(mainView.getRoot());
         UiLastMileFixes.install(mainView.getRoot());
+
+        // Deliberately last: normalizes skin-dependent scrollbar geometry and
+        // removes the legacy full-width Included-GRB export strip after every
+        // older UI pass has had a chance to create its dynamic controls.
+        FinalRequestedUiFixes.install(mainView.getRoot());
 
         mainView.initialize();
     }
