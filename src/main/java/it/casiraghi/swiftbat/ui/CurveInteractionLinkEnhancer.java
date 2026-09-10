@@ -9,9 +9,11 @@ import javafx.scene.Scene;
 import javafx.scene.chart.Axis;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBase;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.Tooltip;
+import javafx.scene.effect.Glow;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
@@ -27,11 +29,10 @@ import java.util.Set;
 import java.util.WeakHashMap;
 
 /**
- * Keeps line-curve interaction coherent across embedded and in-place fullscreen
- * views. When a chart already has a focused subset, hovering a dimmed curve
- * temporarily restores its visibility so it can be identified before clicking.
- * Population selections and the optional focus lock are stored globally by
- * series name so normal 2D, fullscreen 2D and population 3D stay coherent.
+ * Owns Population temporal-profile interaction across embedded 2D, fullscreen 2D
+ * and the 3D renderer. The selected subset is shared by series name. When locked,
+ * excluded curves are not hit-testable; one locked curve can additionally be
+ * spotlighted without hiding or dimming the other locked curves.
  */
 public final class CurveInteractionLinkEnhancer {
     private static final String WATCHED = CurveInteractionLinkEnhancer.class.getName() + ".watched";
@@ -40,8 +41,10 @@ public final class CurveInteractionLinkEnhancer {
     private static final String LOCK_DONE = CurveInteractionLinkEnhancer.class.getName() + ".lockDone";
     private static final String LOCK_SYNC = CurveInteractionLinkEnhancer.class.getName() + ".lockSync";
     private static final String LOCK_ADDED = CurveInteractionLinkEnhancer.class.getName() + ".lockAdded";
+    private static final String SPOTLIGHT_STYLE = CurveInteractionLinkEnhancer.class.getName() + ".spotlightStyle";
     private static final String CHART_FOCUS = ChartInteractionEnhancer.class.getName() + ".focus";
     private static final String CHART_LINE_DONE = ChartInteractionEnhancer.class.getName() + ".lineDone";
+    private static final String CHART_EXPORT_DONE = ChartInteractionEnhancer.class.getName() + ".exportDone";
     private static final double HIT_RADIUS = 18.0;
     private static final DecimalFormat NUMBER_FORMAT;
     private static final Set<Scene> WATCHED_SCENES = Collections.newSetFromMap(new WeakHashMap<>());
@@ -51,6 +54,7 @@ public final class CurveInteractionLinkEnhancer {
     private static Parent installedRoot;
     private static Scene installedScene;
     private static boolean populationLocked;
+    private static String populationSpotlight;
 
     static {
         DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(Locale.US);
@@ -79,6 +83,12 @@ public final class CurveInteractionLinkEnhancer {
         }
     }
 
+    public static String populationSpotlightName() {
+        synchronized (POPULATION_FOCUS) {
+            return populationSpotlight;
+        }
+    }
+
     public static void setPopulationFocusedNames(Set<String> names) {
         LinkedHashSet<String> normalized = new LinkedHashSet<>();
         if (names != null) {
@@ -90,18 +100,37 @@ public final class CurveInteractionLinkEnhancer {
         synchronized (POPULATION_FOCUS) {
             POPULATION_FOCUS.clear();
             POPULATION_FOCUS.addAll(normalized);
-            if (POPULATION_FOCUS.isEmpty()) populationLocked = false;
+            if (POPULATION_FOCUS.isEmpty()) {
+                populationLocked = false;
+                populationSpotlight = null;
+            } else if (populationSpotlight != null && !POPULATION_FOCUS.contains(populationSpotlight)) {
+                populationSpotlight = null;
+            }
         }
-        Platform.runLater(() -> {
-            refreshPopulationCharts();
-            syncPopulationLockToggles();
-        });
+        scheduleSharedRefresh();
     }
 
     public static void setPopulationFocusLocked(boolean locked) {
         synchronized (POPULATION_FOCUS) {
             populationLocked = locked && !POPULATION_FOCUS.isEmpty();
+            if (!populationLocked) populationSpotlight = null;
         }
+        scheduleSharedRefresh();
+    }
+
+    public static void setPopulationSpotlightName(String name) {
+        synchronized (POPULATION_FOCUS) {
+            String canonical = canonicalPopulationName(name);
+            if (!populationLocked || canonical == null || !POPULATION_FOCUS.contains(canonical)) {
+                populationSpotlight = null;
+            } else {
+                populationSpotlight = canonical;
+            }
+        }
+        Platform.runLater(CurveInteractionLinkEnhancer::refreshPopulationCharts);
+    }
+
+    private static void scheduleSharedRefresh() {
         Platform.runLater(() -> {
             refreshPopulationCharts();
             syncPopulationLockToggles();
@@ -224,106 +253,136 @@ public final class CurveInteractionLinkEnhancer {
     }
 
     private static void enhance(Node node) {
-        if (node instanceof LineChart<?, ?> chart) installLineInteraction(chart);
+        if (node instanceof LineChart<?, ?> chart && isPopulationChart(chart)) installPopulationLineInteraction(chart);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private static void installLineInteraction(LineChart<?, ?> rawChart) {
+    private static void installPopulationLineInteraction(LineChart<?, ?> rawChart) {
+        // This class is the sole interaction owner for Population line charts. Mark
+        // the generic enhancer as already installed so two independent hit-testers
+        // and tooltips cannot compete on the same chart.
+        rawChart.getProperties().put(CHART_LINE_DONE, Boolean.TRUE);
         if (Boolean.TRUE.equals(rawChart.getProperties().get(LINE_DONE))) {
-            if (isPopulationChart(rawChart)) Platform.runLater(() -> installPopulationLockControl(rawChart));
+            Platform.runLater(() -> {
+                installPopulationLockControl(rawChart);
+                installPopulationExport(rawChart);
+            });
             return;
         }
         rawChart.getProperties().put(LINE_DONE, Boolean.TRUE);
         LineChart chart = rawChart;
 
-        if (isPopulationChart(chart)) Platform.runLater(() -> installPopulationLockControl(chart));
-
-        Tooltip standaloneTooltip = Boolean.TRUE.equals(chart.getProperties().get(CHART_LINE_DONE)) ? null : new Tooltip();
-        if (standaloneTooltip != null) {
-            standaloneTooltip.setAutoHide(false);
-            standaloneTooltip.setShowDelay(Duration.ZERO);
-            standaloneTooltip.setHideDelay(Duration.ZERO);
-        }
+        Tooltip tooltip = new Tooltip();
+        tooltip.setAutoHide(false);
+        tooltip.setShowDelay(Duration.ZERO);
+        tooltip.setHideDelay(Duration.ZERO);
 
         chart.addEventHandler(MouseEvent.MOUSE_MOVED, event -> {
-            boolean lockedPopulation = isPopulationChart(chart) && populationFocusLocked();
-            SeriesHit hit = nearest(chart, event.getX(), event.getY(), lockedPopulation);
+            boolean locked = populationFocusLocked();
+            String spotlight = locked ? populationSpotlightName() : null;
+            SeriesHit hit = nearest(chart, event.getX(), event.getY(), locked, spotlight);
             Set<XYChart.Series> focus = focusedSeries(chart);
-            XYChart.Series hovered = hit == null || !selectable(hit.series()) || focus.isEmpty() ? null : hit.series();
+            XYChart.Series hovered = hit == null || focus.isEmpty() ? null : hit.series();
             chart.getProperties().put(HOVER, hovered);
             applyVisualState(chart);
 
-            if (standaloneTooltip != null) {
-                if (hit == null) {
-                    standaloneTooltip.hide();
-                } else {
-                    String seriesName = hit.series().getName() == null ? I18n.dynamic("Curva", "Curve") : hit.series().getName();
-                    String xLabel = chart.getXAxis().getLabel();
-                    String yLabel = chart.getYAxis().getLabel();
-                    standaloneTooltip.setText(seriesName + "\n"
-                            + (xLabel == null || xLabel.isBlank() ? "X" : xLabel) + ": " + format(hit.data().getXValue()) + "\n"
-                            + (yLabel == null || yLabel.isBlank() ? "Y" : yLabel) + ": " + format(hit.data().getYValue()));
-                    if (!standaloneTooltip.isShowing()) {
-                        standaloneTooltip.show(chart, event.getScreenX() + 14, event.getScreenY() + 14);
-                    } else {
-                        standaloneTooltip.setAnchorX(event.getScreenX() + 14);
-                        standaloneTooltip.setAnchorY(event.getScreenY() + 14);
-                    }
-                }
+            if (hit == null) {
+                tooltip.hide();
+                return;
+            }
+            String seriesName = hit.series().getName() == null ? I18n.dynamic("Curva", "Curve") : hit.series().getName();
+            String xLabel = chart.getXAxis().getLabel();
+            String yLabel = chart.getYAxis().getLabel();
+            tooltip.setText(seriesName + "\n"
+                    + (xLabel == null || xLabel.isBlank() ? "X" : xLabel) + ": " + format(hit.xValue()) + "\n"
+                    + (yLabel == null || yLabel.isBlank() ? "Y" : yLabel) + ": " + format(hit.yValue()));
+            if (!tooltip.isShowing()) {
+                tooltip.show(chart, event.getScreenX() + 14, event.getScreenY() + 14);
+            } else {
+                tooltip.setAnchorX(event.getScreenX() + 14);
+                tooltip.setAnchorY(event.getScreenY() + 14);
             }
         });
 
         chart.addEventHandler(MouseEvent.MOUSE_EXITED, event -> {
             chart.getProperties().remove(HOVER);
             applyVisualState(chart);
-            if (standaloneTooltip != null) standaloneTooltip.hide();
+            tooltip.hide();
         });
 
         chart.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
-            if (isPopulationChart(chart) && populationFocusLocked()
-                    && event.getButton() == MouseButton.PRIMARY) {
+            boolean locked = populationFocusLocked();
+            if (locked && event.getButton() == MouseButton.SECONDARY) {
+                setPopulationSpotlightName(null);
                 chart.getProperties().remove(HOVER);
-                applyVisualState(chart);
-                if (standaloneTooltip != null) standaloneTooltip.hide();
+                tooltip.hide();
                 event.consume();
                 return;
             }
-            Platform.runLater(() -> {
-                if (isPopulationChart(chart)) capturePopulationFocus(chart);
+            if (event.getButton() != MouseButton.PRIMARY) return;
+
+            if (locked) {
+                SeriesHit hit = nearest(chart, event.getX(), event.getY(), true, null);
+                if (hit != null && selectable(hit.series())) {
+                    String clicked = canonicalPopulationName(hit.series().getName());
+                    String current = populationSpotlightName();
+                    setPopulationSpotlightName(clicked != null && clicked.equals(current) ? null : clicked);
+                }
+                chart.getProperties().remove(HOVER);
+                tooltip.hide();
+                event.consume();
+                return;
+            }
+
+            SeriesHit hit = nearest(chart, event.getX(), event.getY(), false, null);
+            if (event.getClickCount() >= 2) {
+                tooltip.hide();
+                if (hit == null && !focusedSeries(chart).isEmpty()) {
+                    focusedSeries(chart).clear();
+                    capturePopulationFocus(chart);
+                    applyVisualState(chart);
+                } else {
+                    openThreeD(chart);
+                }
+                event.consume();
+                return;
+            }
+            if (event.getClickCount() == 1 && hit != null && selectable(hit.series())) {
+                Set<XYChart.Series> selected = focusedSeries(chart);
+                if (!selected.add(hit.series())) selected.remove(hit.series());
+                capturePopulationFocus(chart);
                 applyVisualState(chart);
-            });
+                event.consume();
+            }
         });
 
         chart.getData().addListener((ListChangeListener<XYChart.Series>) change -> Platform.runLater(() -> {
-            if (isPopulationChart(chart)) restorePopulationFocus(chart);
+            restorePopulationFocus(chart);
             applyVisualState(chart);
-            if (isPopulationChart(chart)) installPopulationLockControl(chart);
+            installPopulationLockControl(chart);
+            installPopulationExport(chart);
         }));
 
         Platform.runLater(() -> {
-            if (isPopulationChart(chart)) restorePopulationFocus(chart);
+            restorePopulationFocus(chart);
             applyVisualState(chart);
+            installPopulationLockControl(chart);
+            installPopulationExport(chart);
         });
     }
 
-    /**
-     * PopulationPage creates both the embedded and fullscreen 2D toolbars before
-     * this enhancer sees the chart. Injecting the same bound toggle here avoids
-     * duplicating state in the page and also covers dynamically-created fullscreen charts.
-     */
     private static void installPopulationLockControl(LineChart<?, ?> chart) {
-        if (chart == null || !isPopulationChart(chart) || chart.getScene() == null) return;
+        if (chart == null || chart.getScene() == null) return;
         Parent searchRoot = ancestorWithStyle(chart, "population-chart-card");
         if (searchRoot == null) searchRoot = ancestorWithStyle(chart, "in-place-fullscreen");
-        if (searchRoot == null) return;
-        if (containsLockToggle(searchRoot)) return;
+        if (searchRoot == null || containsLockToggle(searchRoot)) return;
 
         HBox toolbar = findPopulationToolbar(searchRoot);
         if (toolbar == null) return;
         ToggleButton lock = new ToggleButton();
         bindPopulationLockToggle(lock);
 
-        int insertAt = 0;
+        int insertAt = toolbar.getChildren().size();
         for (int index = 0; index < toolbar.getChildren().size(); index++) {
             Node child = toolbar.getChildren().get(index);
             if (child instanceof ButtonBase button) {
@@ -332,11 +391,50 @@ public final class CurveInteractionLinkEnhancer {
                     insertAt = index;
                     break;
                 }
-                insertAt = index + 1;
             }
         }
         toolbar.getChildren().add(Math.max(0, Math.min(insertAt, toolbar.getChildren().size())), lock);
         chart.getProperties().put(LOCK_ADDED, Boolean.TRUE);
+    }
+
+    private static void installPopulationExport(LineChart<?, ?> chart) {
+        if (chart == null || Boolean.TRUE.equals(chart.getProperties().get(CHART_EXPORT_DONE))) return;
+        Parent searchRoot = ancestorWithStyle(chart, "population-chart-card");
+        if (searchRoot == null) searchRoot = ancestorWithStyle(chart, "in-place-fullscreen");
+        if (searchRoot == null) return;
+        HBox toolbar = findPopulationToolbar(searchRoot);
+        if (toolbar == null || containsExportPng(toolbar)) return;
+
+        Button export = UiFactory.button("", "ghost-button");
+        I18n.setText(export, "Esporta PNG", "Export PNG");
+        String title = chart.getTitle() == null || chart.getTitle().isBlank() ? "population_chart" : chart.getTitle();
+        export.setOnAction(event -> ExportSupport.exportPng(export, chart,
+                title.replaceAll("[^A-Za-z0-9._-]+", "_") + "_2d.png"));
+
+        int insertAt = toolbar.getChildren().size();
+        for (int index = 0; index < toolbar.getChildren().size(); index++) {
+            Node child = toolbar.getChildren().get(index);
+            if (child instanceof ButtonBase button) {
+                String text = button.getText() == null ? "" : button.getText().toLowerCase(Locale.ROOT);
+                if (text.contains("3d") || text.contains("schermo intero") || text.contains("fullscreen")) {
+                    insertAt = index;
+                    break;
+                }
+            }
+        }
+        toolbar.getChildren().add(Math.max(0, Math.min(insertAt, toolbar.getChildren().size())), export);
+        chart.getProperties().put(CHART_EXPORT_DONE, Boolean.TRUE);
+    }
+
+    private static boolean containsExportPng(Parent root) {
+        for (Node child : root.getChildrenUnmodifiable()) {
+            if (child instanceof ButtonBase button) {
+                String text = button.getText() == null ? "" : button.getText().toLowerCase(Locale.ROOT);
+                if (text.contains("export png") || text.contains("esporta png")) return true;
+            }
+            if (child instanceof Parent parent && containsExportPng(parent)) return true;
+        }
+        return false;
     }
 
     private static boolean containsLockToggle(Parent root) {
@@ -388,45 +486,97 @@ public final class CurveInteractionLinkEnhancer {
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private static SeriesHit nearest(LineChart chart, double mouseX, double mouseY, boolean focusedOnly) {
+    private static SeriesHit nearest(LineChart chart, double mouseX, double mouseY,
+                                     boolean focusedOnly, String spotlightOnly) {
         if (chart.getScene() == null) return null;
         Axis xAxis = chart.getXAxis();
         Axis yAxis = chart.getYAxis();
         Set<XYChart.Series> focus = focusedOnly ? focusedSeries(chart) : Set.of();
         double best = HIT_RADIUS * HIT_RADIUS;
         SeriesHit result = null;
+
         for (Object rawSeries : chart.getData()) {
             XYChart.Series series = (XYChart.Series) rawSeries;
             if (focusedOnly && !focus.contains(series)) continue;
+            if (spotlightOnly != null && !spotlightOnly.equals(canonicalPopulationName(series.getName()))) continue;
             if (series.getData() == null || series.getData().isEmpty()) continue;
+
+            XYChart.Data previousData = null;
+            Point2D previousPoint = null;
             for (Object rawData : series.getData()) {
                 XYChart.Data data = (XYChart.Data) rawData;
-                Object xValue = data.getXValue();
-                Object yValue = data.getYValue();
-                if (xValue == null || yValue == null) continue;
-                double xDisplay;
-                double yDisplay;
-                try {
-                    xDisplay = xAxis.getDisplayPosition(xValue);
-                    yDisplay = yAxis.getDisplayPosition(yValue);
-                } catch (RuntimeException ignored) {
+                Point2D point = chartPoint(chart, xAxis, yAxis, data);
+                if (point == null) {
+                    previousData = null;
+                    previousPoint = null;
                     continue;
                 }
-                if (!Double.isFinite(xDisplay) || !Double.isFinite(yDisplay)) continue;
-                Point2D xScene = xAxis.localToScene(xDisplay, 0);
-                Point2D yScene = yAxis.localToScene(0, yDisplay);
-                if (xScene == null || yScene == null) continue;
-                Point2D point = chart.sceneToLocal(xScene.getX(), yScene.getY());
-                double dx = point.getX() - mouseX;
-                double dy = point.getY() - mouseY;
-                double distance = dx * dx + dy * dy;
-                if (distance < best) {
-                    best = distance;
-                    result = new SeriesHit(series, data);
+
+                double pointDistance = squaredDistance(point.getX(), point.getY(), mouseX, mouseY);
+                if (pointDistance < best) {
+                    best = pointDistance;
+                    result = new SeriesHit(series, data.getXValue(), data.getYValue());
                 }
+
+                if (previousPoint != null && previousData != null) {
+                    SegmentProjection projection = project(mouseX, mouseY, previousPoint, point);
+                    if (projection.distanceSquared() < best) {
+                        best = projection.distanceSquared();
+                        Object xValue = interpolateValue(previousData.getXValue(), data.getXValue(), projection.fraction());
+                        Object yValue = interpolateValue(previousData.getYValue(), data.getYValue(), projection.fraction());
+                        result = new SeriesHit(series, xValue, yValue);
+                    }
+                }
+                previousData = data;
+                previousPoint = point;
             }
         }
         return result;
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static Point2D chartPoint(LineChart chart, Axis xAxis, Axis yAxis, XYChart.Data data) {
+        Object xValue = data.getXValue();
+        Object yValue = data.getYValue();
+        if (xValue == null || yValue == null) return null;
+        try {
+            double xDisplay = xAxis.getDisplayPosition(xValue);
+            double yDisplay = yAxis.getDisplayPosition(yValue);
+            if (!Double.isFinite(xDisplay) || !Double.isFinite(yDisplay)) return null;
+            Point2D xScene = xAxis.localToScene(xDisplay, 0);
+            Point2D yScene = yAxis.localToScene(0, yDisplay);
+            if (xScene == null || yScene == null) return null;
+            return chart.sceneToLocal(xScene.getX(), yScene.getY());
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static SegmentProjection project(double px, double py, Point2D a, Point2D b) {
+        double vx = b.getX() - a.getX();
+        double vy = b.getY() - a.getY();
+        double lengthSquared = vx * vx + vy * vy;
+        if (lengthSquared < 1e-9) {
+            return new SegmentProjection(0, squaredDistance(a.getX(), a.getY(), px, py));
+        }
+        double fraction = ((px - a.getX()) * vx + (py - a.getY()) * vy) / lengthSquared;
+        fraction = Math.max(0, Math.min(1, fraction));
+        double x = a.getX() + fraction * vx;
+        double y = a.getY() + fraction * vy;
+        return new SegmentProjection(fraction, squaredDistance(x, y, px, py));
+    }
+
+    private static double squaredDistance(double x1, double y1, double x2, double y2) {
+        double dx = x1 - x2;
+        double dy = y1 - y2;
+        return dx * dx + dy * dy;
+    }
+
+    private static Object interpolateValue(Object first, Object second, double fraction) {
+        if (first instanceof Number a && second instanceof Number b) {
+            return a.doubleValue() + (b.doubleValue() - a.doubleValue()) * fraction;
+        }
+        return fraction < 0.5 ? first : second;
     }
 
     @SuppressWarnings("rawtypes")
@@ -449,16 +599,45 @@ public final class CurveInteractionLinkEnhancer {
         Set<XYChart.Series> focus = focusedSeries(chart);
         Object hoverRaw = chart.getProperties().get(HOVER);
         XYChart.Series hovered = hoverRaw instanceof XYChart.Series series ? series : null;
-        boolean lockedPopulation = isPopulationChart(chart) && populationFocusLocked();
+        boolean locked = populationFocusLocked();
+        String spotlight = locked ? populationSpotlightName() : null;
+
         for (Object raw : chart.getData()) {
             XYChart.Series series = (XYChart.Series) raw;
             Node node = series.getNode();
             if (node == null) continue;
             String name = series.getName();
-            boolean active = focus.isEmpty() || focus.contains(series)
-                    || (!lockedPopulation && series == hovered);
-            node.setOpacity(active ? 1.0 : isTrigger(name) ? 0.50 : 0.09);
+            boolean inFocus = focus.isEmpty() || focus.contains(series);
+            boolean active = inFocus || (!locked && series == hovered);
+            node.setOpacity(active ? 1.0 : isTrigger(name) ? 0.50 : 0.07);
+            applySpotlightStyle(node, name, spotlight != null && spotlight.equals(canonicalPopulationName(name)));
         }
+    }
+
+    private static void applySpotlightStyle(Node seriesNode, String name, boolean spotlight) {
+        Node line = seriesNode.lookup(".chart-series-line");
+        if (line == null) line = seriesNode;
+        if (spotlight) {
+            if (!line.getProperties().containsKey(SPOTLIGHT_STYLE)) {
+                line.getProperties().put(SPOTLIGHT_STYLE, line.getStyle() == null ? "" : line.getStyle());
+            }
+            String base = String.valueOf(line.getProperties().get(SPOTLIGHT_STYLE));
+            line.setStyle(base + "; -fx-stroke: " + spotlightColor(name) + "; -fx-stroke-width: 3.4px;");
+            line.setEffect(new Glow(0.88));
+            seriesNode.toFront();
+        } else if (line.getProperties().containsKey(SPOTLIGHT_STYLE)) {
+            Object original = line.getProperties().remove(SPOTLIGHT_STYLE);
+            line.setStyle(original == null ? "" : original.toString());
+            line.setEffect(null);
+        }
+    }
+
+    private static String spotlightColor(String name) {
+        if (name == null) return "#66E4FF";
+        String lower = name.toLowerCase(Locale.ROOT);
+        if (lower.equals("mediana") || lower.equals("median")) return "#FFBE62";
+        if (lower.contains("percentile")) return "#C79BFF";
+        return "#66E4FF";
     }
 
     @SuppressWarnings("rawtypes")
@@ -475,19 +654,12 @@ public final class CurveInteractionLinkEnhancer {
     private static void restorePopulationFocus(LineChart chart) {
         Set<String> desired = populationFocusedNames();
         Set<XYChart.Series> focus = focusedSeries(chart);
-        if (desired.isEmpty()) {
-            focus.clear();
-            return;
-        }
-        LinkedHashSet<XYChart.Series> matched = new LinkedHashSet<>();
+        focus.clear();
+        if (desired.isEmpty()) return;
         for (Object raw : chart.getData()) {
             XYChart.Series series = (XYChart.Series) raw;
             String name = canonicalPopulationName(series.getName());
-            if (name != null && desired.contains(name)) matched.add(series);
-        }
-        if (!matched.isEmpty()) {
-            focus.clear();
-            focus.addAll(matched);
+            if (name != null && desired.contains(name)) focus.add(series);
         }
     }
 
@@ -503,23 +675,44 @@ public final class CurveInteractionLinkEnhancer {
         if (node == null) return;
         if (node instanceof LineChart<?, ?> raw && isPopulationChart(raw)) {
             LineChart chart = raw;
-            Set<String> desired = populationFocusedNames();
-            Set<XYChart.Series> focus = focusedSeries(chart);
-            focus.clear();
-            if (!desired.isEmpty()) {
-                for (Object item : chart.getData()) {
-                    XYChart.Series series = (XYChart.Series) item;
-                    String name = canonicalPopulationName(series.getName());
-                    if (name != null && desired.contains(name)) focus.add(series);
-                }
-            }
+            restorePopulationFocus(chart);
             chart.getProperties().remove(HOVER);
             applyVisualState(chart);
             installPopulationLockControl(chart);
+            installPopulationExport(chart);
         }
         if (node instanceof Parent parent) {
             for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) refreshPopulationNode(child);
         }
+    }
+
+    private static boolean openThreeD(Node source) {
+        Node current = source;
+        for (int depth = 0; current != null && depth < 12; depth++, current = current.getParent()) {
+            if (current instanceof Parent parent) {
+                Button local = findThreeDButton(parent);
+                if (local != null) {
+                    local.fire();
+                    return true;
+                }
+            }
+            if (current.getStyleClass().contains("page-root")) break;
+        }
+        return false;
+    }
+
+    private static Button findThreeDButton(Parent root) {
+        for (Node child : root.getChildrenUnmodifiable()) {
+            if (child instanceof Button button && button.isVisible() && button.isManaged() && !button.isDisabled()) {
+                String text = button.getText() == null ? "" : button.getText().toLowerCase(Locale.ROOT);
+                if (text.contains("3d")) return button;
+            }
+            if (child instanceof Parent parent) {
+                Button nested = findThreeDButton(parent);
+                if (nested != null) return nested;
+            }
+        }
+        return null;
     }
 
     private static boolean isPopulationChart(LineChart<?, ?> chart) {
@@ -542,8 +735,9 @@ public final class CurveInteractionLinkEnhancer {
 
     private static String format(Object value) {
         if (value instanceof Number number) return NUMBER_FORMAT.format(number.doubleValue());
-        return String.valueOf(value);
+        return value == null ? "—" : String.valueOf(value);
     }
 
-    private record SeriesHit(XYChart.Series series, XYChart.Data data) { }
+    private record SeriesHit(XYChart.Series series, Object xValue, Object yValue) { }
+    private record SegmentProjection(double fraction, double distanceSquared) { }
 }
