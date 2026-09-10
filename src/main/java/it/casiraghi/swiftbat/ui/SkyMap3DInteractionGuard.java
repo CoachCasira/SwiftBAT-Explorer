@@ -1,6 +1,5 @@
 package it.casiraghi.swiftbat.ui;
 
-import it.casiraghi.swiftbat.model.SkyBurst;
 import it.casiraghi.swiftbat.ui.components.CelestialSpherePane;
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
@@ -11,24 +10,27 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Region;
 
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Locale;
-import java.util.function.Consumer;
 
 /**
- * Last-mile guard for the 3D sky map.
+ * Last-mile interaction owner for the sky-map card when the 3D sphere is present.
  *
- * InteractionPolishEnhancer installs fullscreen handling on the whole sky card.
- * A JavaFX SubScene reports itself as the outer mouse-event target even when a
- * 3D Sphere marker was picked, therefore the card-level filter cannot infer that
- * the user clicked a GRB. This guard is installed before InteractionPolishEnhancer
- * and resolves the actual 3D PickResult first: marker clicks select the GRB and
- * are consumed; clicks on empty 3D space keep propagating and may open fullscreen.
+ * The generic visualization enhancer used a capturing event filter on the whole
+ * card. With a JavaFX SubScene this could schedule fullscreen before the embedded
+ * 3D scene had a chance to consume a GRB-marker click. Re-parenting the view while
+ * JavaFX was still recomputing mouse coordinates then produced Scene.getEffectiveCamera
+ * NullPointerExceptions and could freeze the application.
+ *
+ * This class marks the sky card as already handled BEFORE InteractionPolishEnhancer
+ * is installed and uses a normal bubbling handler instead. Marker clicks are consumed
+ * inside CelestialSpherePane, therefore they select the GRB only. A click on unused
+ * card / sky background reaches this handler and opens fullscreen.
  */
 public final class SkyMap3DInteractionGuard {
     private static final String WATCHED = SkyMap3DInteractionGuard.class.getName() + ".watched";
     private static final String CARD_DONE = SkyMap3DInteractionGuard.class.getName() + ".cardDone";
+    private static final String GENERIC_VISUAL_DONE = InteractionPolishEnhancer.class.getName() + ".visualDone";
 
     private SkyMap3DInteractionGuard() { }
 
@@ -66,67 +68,70 @@ public final class SkyMap3DInteractionGuard {
     private static void enhance(Node node) {
         if (!(node instanceof Region card)) return;
         if (!card.getStyleClass().contains("card")) return;
+
         CelestialSpherePane sphere = findDescendant(card, CelestialSpherePane.class);
         Button fullscreen = findFullscreenButton(card);
         if (sphere == null || fullscreen == null) return;
         if (Boolean.TRUE.equals(card.getProperties().get(CARD_DONE))) return;
+
         card.getProperties().put(CARD_DONE, Boolean.TRUE);
 
-        // The sky fullscreen button must be visually stable: no pulsing/glitter effect.
+        // Prevent InteractionPolishEnhancer from installing its capturing filter here.
+        card.getProperties().put(GENERIC_VISUAL_DONE, Boolean.TRUE);
+
+        card.setPickOnBounds(true);
+
         if (!fullscreen.getStyleClass().contains("sky-fullscreen-stable")) {
             fullscreen.getStyleClass().add("sky-fullscreen-stable");
         }
 
-        card.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
-            if (event.getButton() != MouseButton.PRIMARY
+        /*
+         * Bubble phase is intentional.
+         * CelestialSpherePane consumes real marker clicks in its SubScene handler,
+         * so those clicks never reach us. Empty/background clicks do reach us and
+         * may safely request fullscreen after the embedded scene finished handling them.
+         */
+        card.addEventHandler(MouseEvent.MOUSE_CLICKED, event -> {
+            if (event.isConsumed()
+                    || event.getButton() != MouseButton.PRIMARY
                     || event.getClickCount() != 1
                     || !event.isStillSincePress()) {
                 return;
             }
 
-            Node picked = event.getPickResult() == null
-                    ? null
-                    : event.getPickResult().getIntersectedNode();
-            if (!(picked != null && picked.getUserData() instanceof SkyBurst burst)) {
-                return;
-            }
+            if (isControlTarget(event.getTarget(), card)) return;
+            if (fullscreen.isDisabled() || card.getScene() == null) return;
 
-            CelestialSpherePane owningSphere = findOwningSphere(picked, sphere);
-            owningSphere.select(burst);
-            notifySelection(owningSphere, burst);
-
-            // Critical: stop the later card fullscreen filter only for an actual GRB pick.
-            event.consume();
+            // Defer only after the complete mouse dispatch has finished; this avoids
+            // detaching/re-parenting a SubScene while JavaFX is still resolving its camera.
+            Platform.runLater(() -> {
+                if (card.getScene() != null && !fullscreen.isDisabled()) {
+                    fullscreen.fire();
+                }
+            });
         });
     }
 
-    private static CelestialSpherePane findOwningSphere(Node picked, CelestialSpherePane fallback) {
-        Node current = picked;
-        while (current != null) {
-            if (current instanceof CelestialSpherePane sphere) return sphere;
+    private static boolean isControlTarget(Object rawTarget, Node boundary) {
+        if (!(rawTarget instanceof Node target)) return false;
+        Node current = target;
+        while (current != null && current != boundary) {
+            if (current instanceof javafx.scene.control.ButtonBase
+                    || current instanceof javafx.scene.control.ChoiceBox<?>
+                    || current instanceof javafx.scene.control.ComboBoxBase<?>
+                    || current instanceof javafx.scene.control.TextInputControl
+                    || current instanceof javafx.scene.control.ScrollBar
+                    || current instanceof javafx.scene.control.Slider) {
+                return true;
+            }
             current = current.getParent();
         }
-        return fallback;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static void notifySelection(CelestialSpherePane sphere, SkyBurst burst) {
-        try {
-            Field field = CelestialSpherePane.class.getDeclaredField("onSelect");
-            field.setAccessible(true);
-            Object value = field.get(sphere);
-            if (value instanceof Consumer<?> consumer) {
-                ((Consumer<SkyBurst>) consumer).accept(burst);
-            }
-        } catch (ReflectiveOperationException ignored) {
-            // select(...) already keeps the marker highlighted. If the callback field
-            // ever changes name, normal marker handling can be updated in one place.
-        }
+        return false;
     }
 
     private static Button findFullscreenButton(Parent root) {
         for (Node child : root.getChildrenUnmodifiable()) {
-            if (child instanceof Button button) {
+            if (child instanceof Button button && button.isVisible() && button.isManaged()) {
                 String text = button.getText() == null ? "" : button.getText().trim().toLowerCase(Locale.ROOT);
                 String compact = text.replace(" ", "");
                 if (text.contains("schermo intero") || text.contains("full screen") || compact.contains("fullscreen")) {
