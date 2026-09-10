@@ -1,9 +1,11 @@
 package it.casiraghi.swiftbat.ui;
 
+import it.casiraghi.swiftbat.ui.components.ThreeDChartPane;
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.scene.Node;
 import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.CheckMenuItem;
@@ -16,16 +18,19 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.WeakHashMap;
 
 /**
- * Multi-band selector shared by the Explorer 2D curve and its fullscreen copy.
- * The historical ChoiceBox remains the data refresh engine; fullscreen views
- * receive a synchronized selector and can restore series from the latest full
- * four-band snapshot without rebuilding the dashboard.
+ * Multi-band selector shared by the Explorer 2D curve, its fullscreen copy and
+ * the 3D energy-band view. The historical ChoiceBox remains the data refresh
+ * engine; dynamic fullscreen roots are watched explicitly because InPlaceFullscreen
+ * temporarily replaces the Scene root.
  */
 public final class ExplorerBandSelectionEnhancer {
     private static final String WATCHED = ExplorerBandSelectionEnhancer.class.getName() + ".watched";
@@ -40,8 +45,10 @@ public final class ExplorerBandSelectionEnhancer {
     private static final String ALL_BANDS = "Tutte le bande";
     private static final List<String> BANDS = List.of(
             "15–25 keV", "25–50 keV", "50–100 keV", "100–350 keV");
+    private static final Set<Scene> WATCHED_SCENES = Collections.newSetFromMap(new WeakHashMap<>());
 
     private static Parent installedRoot;
+    private static Scene installedScene;
     private static boolean totalMode = true;
     private static final LinkedHashSet<String> selectedBands = new LinkedHashSet<>();
     private static final Map<String, List<SeriesPoint>> globalSeriesData = new LinkedHashMap<>();
@@ -52,7 +59,41 @@ public final class ExplorerBandSelectionEnhancer {
         if (root == null) return;
         installedRoot = root;
         watch(root);
+        observeScene(root);
         Platform.runLater(() -> scan(root));
+    }
+
+    /** Effective energy bands that the Explorer 3D view must display. */
+    public static Set<String> effectiveBandsFor3D() {
+        if (totalMode || selectedBands.isEmpty()) return new LinkedHashSet<>(BANDS);
+        return new LinkedHashSet<>(selectedBands);
+    }
+
+    private static void observeScene(Parent root) {
+        if (root.getScene() != null) watchScene(root.getScene());
+        root.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) watchScene(newScene);
+        });
+    }
+
+    private static void watchScene(Scene scene) {
+        if (scene == null) return;
+        installedScene = scene;
+        if (!WATCHED_SCENES.add(scene)) return;
+        scene.rootProperty().addListener((obs, oldRoot, newRoot) -> {
+            if (newRoot == null) return;
+            Platform.runLater(() -> {
+                watch(newRoot);
+                scan(newRoot);
+                refreshNode(newRoot);
+            });
+        });
+        Parent current = scene.getRoot();
+        if (current != null) Platform.runLater(() -> {
+            watch(current);
+            scan(current);
+            refreshNode(current);
+        });
     }
 
     private static void watch(Node node) {
@@ -266,17 +307,25 @@ public final class ExplorerBandSelectionEnhancer {
 
     private static void refreshAllLightCurves() {
         if (installedRoot == null) return;
-        Platform.runLater(() -> refreshNode(installedRoot));
+        Platform.runLater(() -> {
+            refreshNode(installedRoot);
+            if (installedScene != null && installedScene.getRoot() != null && installedScene.getRoot() != installedRoot) {
+                refreshNode(installedScene.getRoot());
+            }
+        });
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static void refreshNode(Node node) {
+        if (node == null) return;
+        if (node instanceof BandMenuButton selector) selector.syncMenuState();
         if (node instanceof LineChart<?, ?> raw && raw.getStyleClass().contains("lightcurve-chart")) {
             LineChart<Number, Number> chart = (LineChart) raw;
             rememberSeries(chart);
             applyBandFilter(chart);
             ensureFullscreenSelector(chart);
         }
+        if (node instanceof ThreeDChartPane pane) pane.refreshBandSelection();
         if (node instanceof Parent parent) {
             for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) refreshNode(child);
         }
