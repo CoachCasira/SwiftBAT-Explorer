@@ -82,6 +82,7 @@ public final class PageScopedPolishRouter {
         TabPane tabs = findLogical(content, TabPane.class, null);
         if (tabs == null) {
             invokeDefinitive("polishExplorerDashboard", new Class<?>[]{Node.class}, content);
+            FinalExpertUiPolish.polishExplorer(content);
             return;
         }
         for (Tab tab : tabs.getTabs()) {
@@ -90,9 +91,12 @@ public final class PageScopedPolishRouter {
             VBox chartCard = findLogical(tabContent, VBox.class, "overview-chart-card");
             if (chartCard != null) {
                 invokeDefinitive("polishExplorerDashboard", new Class<?>[]{Node.class}, tabContent);
-                return;
+                break;
             }
         }
+        // Must run on the complete dashboard, not only on the 2D tab: this also
+        // restores the existing searchable/grouped A-Z metadata selector.
+        FinalExpertUiPolish.polishExplorer(content);
     }
 
     private static void activatePopulation(PopulationPage page) {
@@ -106,8 +110,10 @@ public final class PageScopedPolishRouter {
 
         invokeDefinitive("alignPopulationFilters", new Class<?>[]{VBox.class}, filterCard);
         invokeDefinitive("installManualSelector", new Class<?>[]{PopulationPage.class, VBox.class}, page, filterCard);
+        FinalExpertUiPolish.polishPopulation(filterCard);
         Platform.runLater(() -> {
             invokeDefinitive("alignPopulationFilters", new Class<?>[]{VBox.class}, filterCard);
+            FinalExpertUiPolish.polishPopulation(filterCard);
             filterCard.requestLayout();
         });
     }
