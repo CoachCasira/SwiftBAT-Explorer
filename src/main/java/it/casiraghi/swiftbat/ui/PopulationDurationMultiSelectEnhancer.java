@@ -10,8 +10,11 @@ import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.MenuButton;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SeparatorMenuItem;
-import javafx.scene.layout.Pane;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
@@ -23,7 +26,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Replaces only the visible Population T90 ChoiceBox with a checkbox-based
@@ -140,18 +142,26 @@ public final class PopulationDurationMultiSelectEnhancer {
                 backing.setValue(selected.iterator().next());
             } else {
                 // PopulationPage's native filter has one duration slot. ALL is
-                // used as its neutral backing value; the exact union is applied
-                // around preview/candidate selection without changing the pipeline.
+                // its neutral backing value; the exact union is applied around
+                // preview/candidate selection without changing the pipeline.
                 backing.setValue(ALL_T90);
             }
             internal = false;
 
             syncVisualState();
-            if (isMultipleSpecific()) refreshPreviewForUnion();
-            else invoke(page, "updateCandidatePreview");
+            if (isMultipleSpecific()) {
+                internal = true;
+                try {
+                    refreshPreviewForUnion();
+                } finally {
+                    internal = false;
+                }
+            } else {
+                invoke(page, "updateCandidatePreview");
+            }
 
-            // CheckMenuItem closes a popup after a click. Re-open it so experts
-            // can tick a second class immediately, just like the Explorer band menu.
+            // Keep the popup available so a second checkbox can be selected
+            // immediately, mirroring the Explorer multi-band selector.
             Platform.runLater(() -> {
                 if (menu.getScene() != null && menu.isVisible() && !selected.contains(ALL_T90)) menu.show();
             });
@@ -172,8 +182,8 @@ public final class PopulationDurationMultiSelectEnhancer {
 
         private void relabel() {
             all.setText(I18n.dynamic("Tutte le durate", "All durations"));
-            shortItem.setText(I18n.dynamic("Short · T90 ≤ 2 s", "Short · T90 ≤ 2 s"));
-            longItem.setText(I18n.dynamic("Long · T90 > 2 s", "Long · T90 > 2 s"));
+            shortItem.setText("Short · T90 ≤ 2 s");
+            longItem.setText("Long · T90 > 2 s");
             unknownItem.setText(I18n.dynamic("T90 non disponibile", "T90 unavailable"));
             updateMenuText();
         }
@@ -183,8 +193,7 @@ public final class PopulationDurationMultiSelectEnhancer {
             if (selected.contains(ALL_T90) || selected.isEmpty()) {
                 text = I18n.dynamic("Tutte le durate", "All durations");
             } else if (selected.size() == 1) {
-                String value = selected.iterator().next();
-                text = display(value);
+                text = display(selected.iterator().next());
             } else {
                 text = I18n.dynamic(selected.size() + " classi T90", selected.size() + " T90 classes");
             }
@@ -254,9 +263,8 @@ public final class PopulationDurationMultiSelectEnhancer {
             });
             backing.setValue(ALL_T90);
 
-            // startAnalysis() builds its selected Candidate list synchronously in
-            // the same ActionEvent. Restore the shared metadata on the next pulse,
-            // before any background loading can mutate Population UI state.
+            // PopulationPage builds the Candidate list synchronously inside the
+            // same ActionEvent. Restore shared metadata on the next JavaFX pulse.
             Platform.runLater(() -> {
                 target.clear();
                 target.putAll(original);
@@ -265,8 +273,8 @@ public final class PopulationDurationMultiSelectEnhancer {
         }
 
         private boolean hasManualSelection() {
-            for (Node node : findAll(page, Button.class)) {
-                if (node.getStyleClass().contains("population-grb-chip")) return true;
+            for (Button button : findAll(page, Button.class)) {
+                if (button.getStyleClass().contains("population-grb-chip")) return true;
             }
             return false;
         }
@@ -282,7 +290,6 @@ public final class PopulationDurationMultiSelectEnhancer {
                     selected.add(ALL_T90);
                     backing.setValue(ALL_T90);
                     syncVisualState();
-                    Platform.runLater(this::schedulePreviewCorrection);
                 });
             }
         }
@@ -349,7 +356,7 @@ public final class PopulationDurationMultiSelectEnhancer {
             method.setAccessible(true);
             method.invoke(target);
         } catch (ReflectiveOperationException | RuntimeException ignored) {
-            // Compatibility enhancer: a preview failure must never block analysis.
+            // Compatibility enhancer: preview failures must never block analysis.
         }
     }
 
@@ -362,8 +369,23 @@ public final class PopulationDurationMultiSelectEnhancer {
     private static <T extends Node> void collect(Node node, Class<T> type, List<T> out) {
         if (node == null) return;
         if (type.isInstance(node)) out.add(type.cast(node));
+
+        // Traverse logical content rather than skin internals. This works before
+        // the first scene/layout pulse and keeps the enhancer lightweight.
+        if (node instanceof ScrollPane scroll) {
+            collect(scroll.getContent(), type, out);
+            return;
+        }
+        if (node instanceof SplitPane split) {
+            for (Node item : List.copyOf(split.getItems())) collect(item, type, out);
+            return;
+        }
+        if (node instanceof TabPane tabs) {
+            for (Tab tab : List.copyOf(tabs.getTabs())) collect(tab.getContent(), type, out);
+            return;
+        }
         if (node instanceof Parent parent) {
-            for (Node child : parent.getChildrenUnmodifiable()) collect(child, type, out);
+            for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) collect(child, type, out);
         }
     }
 
