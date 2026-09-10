@@ -1,7 +1,6 @@
 package it.casiraghi.swiftbat;
 
 import it.casiraghi.swiftbat.ui.AdaptiveChromeEnhancer;
-import it.casiraghi.swiftbat.ui.AlienEasterEggManager;
 import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
 import it.casiraghi.swiftbat.ui.FinalMacAndPopulationPolish;
@@ -60,10 +59,6 @@ public final class SwiftBatExplorerApp extends Application {
         stage.setMinHeight(790);
         stage.setScene(scene);
         stage.show();
-
-        // Review-only Easter egg control. No automatic timer is active yet:
-        // the alien appears only when the explicit test button is pressed.
-        AlienEasterEggManager.install(mainView.getRoot());
 
         UiLocalizationWatcher.install(mainView.getRoot());
         UiRefinements.install(mainView.getRoot());
