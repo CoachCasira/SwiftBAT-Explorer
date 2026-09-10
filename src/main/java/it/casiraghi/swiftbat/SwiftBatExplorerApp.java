@@ -5,8 +5,8 @@ import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerCurveInteractionFastEnhancer;
-import it.casiraghi.swiftbat.ui.ExplorerVisualStabilityFixes;
-import it.casiraghi.swiftbat.ui.FinalRequestedUiFixes;
+import it.casiraghi.swiftbat.ui.ExplorerVisualFastFixes;
+import it.casiraghi.swiftbat.ui.FinalRequestedUiFastFixes;
 import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
 import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
 import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
@@ -63,7 +63,7 @@ public final class SwiftBatExplorerApp extends Application {
         UiLocalizationWatcher.install(mainView.getRoot());
         UiRefinements.install(mainView.getRoot());
         ExplorerBandSelectionEnhancer.install(mainView.getRoot());
-        ExplorerVisualStabilityFixes.install(mainView.getRoot());
+        ExplorerVisualFastFixes.install(mainView.getRoot());
 
         InteractiveViewSyncEnhancer.install(mainView.getRoot());
         // Must be registered before InteractionPolishEnhancer: an actual 3D GRB
@@ -98,11 +98,9 @@ public final class SwiftBatExplorerApp extends Application {
         FinalUiStabilityEnhancer.install(mainView.getRoot());
         UiLastMileFixes.install(mainView.getRoot());
 
-        // Deliberately last: normalize skin-dependent scrollbar geometry first,
-        // then apply the lightweight cross-platform icon/translation/layout pass.
-        // There is now a single owner for the Explorer right sidebar, so it can
-        // never jump to the bottom after the first layout pulse.
-        FinalRequestedUiFixes.install(mainView.getRoot());
+        // Deliberately last: incremental skin fixes only. None of these passes
+        // performs whole-subtree rescans while lists, charts or tables are moving.
+        FinalRequestedUiFastFixes.install(mainView.getRoot());
         UiCrossPlatformFastEnhancer.install(mainView.getRoot());
 
         mainView.initialize();
