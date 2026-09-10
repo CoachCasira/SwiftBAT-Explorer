@@ -19,18 +19,11 @@ public final class ExplorerScrollbarFix {
     private static final String INSTALLED = ExplorerScrollbarFix.class.getName() + ".installed";
     private static final String VIRTUAL_INSTALLED = ExplorerScrollbarFix.class.getName() + ".virtualInstalled";
     private static final String SCHEDULED = ExplorerScrollbarFix.class.getName() + ".scheduled";
-    private static final String THUMB_STYLED = ExplorerScrollbarFix.class.getName() + ".thumbStyled";
-    private static final String TRACK_STYLED = ExplorerScrollbarFix.class.getName() + ".trackStyled";
+    private static final String STABLE_CLASS = "explorer-stable-scrollbar";
 
     private static final double BAR_THICKNESS = 16.0;
     private static final double THUMB_THICKNESS = 11.0;
     private static final double MIN_THUMB_LENGTH = 64.0;
-
-    private static final String THUMB_STYLE =
-            "-fx-background-color: linear-gradient(to bottom, #ed22e9, #0ba7ff);"
-                    + " -fx-background-radius: 8px;";
-    private static final String TRACK_STYLE =
-            "-fx-background-color: rgba(4,18,34,0.72); -fx-background-radius: 8px;";
 
     private ExplorerScrollbarFix() { }
 
@@ -42,7 +35,6 @@ public final class ExplorerScrollbarFix {
 
     private static void installRecursively(Node node) {
         if (node == null) return;
-
         if (node instanceof ScrollPane scroll) {
             installScrollPane(scroll);
             if (scroll.getContent() != null) installRecursively(scroll.getContent());
@@ -96,11 +88,7 @@ public final class ExplorerScrollbarFix {
         schedule(control);
     }
 
-    /**
-     * Coalesces all first-layout requests. The previous implementation appended
-     * CSS to the thumb on every pulse; the inline style string therefore grew
-     * indefinitely until JavaFX's CSS parser exhausted the heap.
-     */
+    /** Coalesce first-layout requests; never force a whole-subtree CSS pass. */
     private static void schedule(Parent root) {
         if (root == null || Boolean.TRUE.equals(root.getProperties().get(SCHEDULED))) return;
         root.getProperties().put(SCHEDULED, Boolean.TRUE);
@@ -116,13 +104,13 @@ public final class ExplorerScrollbarFix {
     private static void fixNow(Parent root) {
         try {
             if (root.getScene() == null) return;
-            root.applyCss();
+            // No root.applyCss(): skins notify us when their internal scrollbars
+            // materialise. Forcing CSS here made Explorer re-style large subtrees.
             Set<Node> bars = root.lookupAll(".scroll-bar");
             for (Node node : bars) {
                 if (!(node instanceof ScrollBar bar)) continue;
                 installStableSkin(bar);
                 styleBar(bar);
-                bar.requestLayout();
             }
         } catch (RuntimeException ignored) {
             // A control may briefly be between skins during a tab replacement.
@@ -134,38 +122,29 @@ public final class ExplorerScrollbarFix {
         try {
             bar.setSkin(new StableScrollBarSkin(bar));
         } catch (RuntimeException ignored) {
-            // Leave the native skin in place if JavaFX is currently rebuilding it.
+            // Leave native skin in place if JavaFX is currently rebuilding it.
         }
     }
 
     private static void styleBar(ScrollBar bar) {
+        if (!bar.getStyleClass().contains(STABLE_CLASS)) bar.getStyleClass().add(STABLE_CLASS);
         if (bar.getOrientation() == Orientation.VERTICAL) {
-            bar.setMinWidth(BAR_THICKNESS);
-            bar.setPrefWidth(BAR_THICKNESS);
-            bar.setMaxWidth(BAR_THICKNESS);
-        } else {
+            if (bar.getPrefWidth() != BAR_THICKNESS) {
+                bar.setMinWidth(BAR_THICKNESS);
+                bar.setPrefWidth(BAR_THICKNESS);
+                bar.setMaxWidth(BAR_THICKNESS);
+            }
+        } else if (bar.getPrefHeight() != BAR_THICKNESS) {
             bar.setMinHeight(BAR_THICKNESS);
             bar.setPrefHeight(BAR_THICKNESS);
             bar.setMaxHeight(BAR_THICKNESS);
         }
-
-        for (Node part : bar.lookupAll(".thumb")) {
-            if (!(part instanceof Region thumb)) continue;
-            if (!Boolean.TRUE.equals(thumb.getProperties().get(THUMB_STYLED))) {
-                thumb.getProperties().put(THUMB_STYLED, Boolean.TRUE);
-                thumb.setStyle(THUMB_STYLE);
-            }
-        }
-        for (Node part : bar.lookupAll(".track")) {
-            if (!(part instanceof Region track)) continue;
-            if (!Boolean.TRUE.equals(track.getProperties().get(TRACK_STYLED))) {
-                track.getProperties().put(TRACK_STYLED, Boolean.TRUE);
-                track.setStyle(TRACK_STYLE);
-            }
-        }
     }
 
     private static final class StableScrollBarSkin extends ScrollBarSkin {
+        private Region thumb;
+        private Region track;
+
         private StableScrollBarSkin(ScrollBar control) {
             super(control);
         }
@@ -179,14 +158,11 @@ public final class ExplorerScrollbarFix {
         private void enforceThumbGeometry() {
             ScrollBar bar = getSkinnable();
             if (bar == null) return;
-
-            Node thumbNode = bar.lookup(".thumb");
-            Node trackNode = bar.lookup(".track");
-            if (!(thumbNode instanceof Region thumb) || !(trackNode instanceof Region track)) return;
+            resolveParts(bar);
+            if (thumb == null || track == null) return;
 
             Bounds trackBounds = track.getBoundsInParent();
             if (trackBounds == null) return;
-
             double range = bar.getMax() - bar.getMin();
             double ratio = range <= 0.0 ? 0.0 : (bar.getValue() - bar.getMin()) / range;
             ratio = Math.max(0.0, Math.min(1.0, ratio));
@@ -194,8 +170,7 @@ public final class ExplorerScrollbarFix {
             if (bar.getOrientation() == Orientation.VERTICAL) {
                 double trackLength = Math.max(0.0, trackBounds.getHeight());
                 if (trackLength <= 0.0) return;
-                double nativeLength = thumb.getHeight();
-                double length = Math.min(trackLength, Math.max(MIN_THUMB_LENGTH, nativeLength));
+                double length = Math.min(trackLength, Math.max(MIN_THUMB_LENGTH, thumb.getHeight()));
                 double thickness = Math.min(THUMB_THICKNESS, Math.max(5.0, trackBounds.getWidth() - 2.0));
                 double px = trackBounds.getMinX() + (trackBounds.getWidth() - thickness) / 2.0;
                 double py = trackBounds.getMinY() + ratio * Math.max(0.0, trackLength - length);
@@ -203,13 +178,20 @@ public final class ExplorerScrollbarFix {
             } else {
                 double trackLength = Math.max(0.0, trackBounds.getWidth());
                 if (trackLength <= 0.0) return;
-                double nativeLength = thumb.getWidth();
-                double length = Math.min(trackLength, Math.max(MIN_THUMB_LENGTH, nativeLength));
+                double length = Math.min(trackLength, Math.max(MIN_THUMB_LENGTH, thumb.getWidth()));
                 double thickness = Math.min(THUMB_THICKNESS, Math.max(5.0, trackBounds.getHeight() - 2.0));
                 double px = trackBounds.getMinX() + ratio * Math.max(0.0, trackLength - length);
                 double py = trackBounds.getMinY() + (trackBounds.getHeight() - thickness) / 2.0;
                 thumb.resizeRelocate(px, py, length, thickness);
             }
+        }
+
+        private void resolveParts(ScrollBar bar) {
+            if (thumb != null && thumb.getParent() != null && track != null && track.getParent() != null) return;
+            Node thumbNode = bar.lookup(".thumb");
+            Node trackNode = bar.lookup(".track");
+            thumb = thumbNode instanceof Region region ? region : null;
+            track = trackNode instanceof Region region ? region : null;
         }
     }
 }
