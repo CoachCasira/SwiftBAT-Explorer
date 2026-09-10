@@ -5,11 +5,11 @@ import it.casiraghi.swiftbat.model.SkyBurst;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
-import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.chart.BarChart;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
@@ -18,9 +18,11 @@ import javafx.scene.control.Labeled;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollBar;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TableView;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
@@ -33,10 +35,12 @@ import java.util.Map;
 import java.util.function.Predicate;
 
 /**
- * Final low-cost UI pass for the issues that are easiest to notice during real use:
- * thin table scrollbars that do not steal a visible column, stable virtualized GRB
- * cells, compact Population histograms, Explorer side-card alignment and a last
- * safety net against technical translation placeholders.
+ * Final low-cost UI pass for real-use stability issues.
+ *
+ * <p>Important layout rule: this class never listens to min/pref/max height
+ * properties and then writes those same properties back. Population histogram
+ * geometry is applied once per relevant UI event, after the older responsive
+ * layer has run. This avoids resize feedback loops and visible oscillation.</p>
  */
 public final class FinalUiStabilityEnhancer {
     private static final String WATCHED = FinalUiStabilityEnhancer.class.getName() + ".watched";
@@ -44,10 +48,10 @@ public final class FinalUiStabilityEnhancer {
     private static final String TABLE_DONE = FinalUiStabilityEnhancer.class.getName() + ".tableDone";
     private static final String CATALOG_DONE = FinalUiStabilityEnhancer.class.getName() + ".catalogDone";
     private static final String HISTOGRAM_DONE = FinalUiStabilityEnhancer.class.getName() + ".histogramDone";
-    private static final String HISTOGRAM_GUARD = FinalUiStabilityEnhancer.class.getName() + ".histogramGuard";
     private static final String SIDE_DONE = FinalUiStabilityEnhancer.class.getName() + ".sideDone";
     private static final String FILTER_DONE = FinalUiStabilityEnhancer.class.getName() + ".filterDone";
     private static final String POPULATION_TABS_DONE = FinalUiStabilityEnhancer.class.getName() + ".populationTabsDone";
+    private static final String POPULATION_STABILITY_PENDING = FinalUiStabilityEnhancer.class.getName() + ".populationStabilityPending";
     private static final String REPAIRING = FinalUiStabilityEnhancer.class.getName() + ".repairing";
 
     private static final String MISSING = "[Missing English translation]";
@@ -73,12 +77,34 @@ public final class FinalUiStabilityEnhancer {
     public static void install(Parent root) {
         if (root == null) return;
         watch(root, root);
+        installScenePolish(root);
         I18n.languageProperty().addListener((obs, oldValue, newValue) ->
                 Platform.runLater(() -> repairTree(root)));
         Platform.runLater(() -> {
             repairTree(root);
             stopDelayedPopulationRelayout(root);
+            stabilizePopulationHistograms(root);
+            polishFullscreenReading(root.getScene() == null ? null : root.getScene().getRoot());
         });
+    }
+
+    private static void installScenePolish(Parent appRoot) {
+        Scene scene = appRoot.getScene();
+        if (scene == null) {
+            appRoot.sceneProperty().addListener((obs, oldScene, newScene) -> {
+                if (newScene != null) installSceneRootListener(newScene);
+            });
+        } else {
+            installSceneRootListener(scene);
+        }
+    }
+
+    private static void installSceneRootListener(Scene scene) {
+        String key = FinalUiStabilityEnhancer.class.getName() + ".sceneRootListener";
+        if (Boolean.TRUE.equals(scene.getProperties().get(key))) return;
+        scene.getProperties().put(key, Boolean.TRUE);
+        scene.rootProperty().addListener((obs, oldRoot, newRoot) ->
+                Platform.runLater(() -> polishFullscreenReading(newRoot)));
     }
 
     private static void watch(Node node, Parent appRoot) {
@@ -90,7 +116,7 @@ public final class FinalUiStabilityEnhancer {
             installStableCatalogCells(list);
         }
         if (node instanceof VBox box && box.getStyleClass().contains("population-histogram-card")) {
-            installHistogramCap(box);
+            installHistogramStability(box, appRoot);
         }
         if (node instanceof Region region && region.getStyleClass().contains("overview-action-card")) {
             polishExplorerSide(region);
@@ -131,10 +157,7 @@ public final class FinalUiStabilityEnhancer {
                 if (!change.wasAdded()) continue;
                 for (Node added : List.copyOf(change.getAddedSubList())) watch(added, appRoot);
             }
-            Platform.runLater(() -> {
-                polishNearby(parent);
-                stopDelayedPopulationRelayout(appRoot);
-            });
+            Platform.runLater(() -> polishNearby(parent));
         });
         for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) watch(child, appRoot);
     }
@@ -203,7 +226,8 @@ public final class FinalUiStabilityEnhancer {
         if (!table.getStyleClass().contains("stable-table-scroll")) {
             table.getStyleClass().add("stable-table-scroll");
         }
-        table.skinProperty().addListener((obs, oldSkin, newSkin) -> Platform.runLater(() -> polishTableBars(table)));
+        table.skinProperty().addListener((obs, oldSkin, newSkin) ->
+                Platform.runLater(() -> polishTableBars(table)));
         table.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) Platform.runLater(() -> polishTableBars(table));
         });
@@ -331,36 +355,65 @@ public final class FinalUiStabilityEnhancer {
 
     /* ---------------- Population distributions ---------------- */
 
-    private static void installHistogramCap(VBox card) {
+    private static void installHistogramStability(VBox card, Parent appRoot) {
         if (Boolean.TRUE.equals(card.getProperties().get(HISTOGRAM_DONE))) return;
         card.getProperties().put(HISTOGRAM_DONE, Boolean.TRUE);
-        card.minHeightProperty().addListener((obs, oldValue, newValue) -> enforceHistogramGeometry(card));
-        card.prefHeightProperty().addListener((obs, oldValue, newValue) -> enforceHistogramGeometry(card));
-        card.maxHeightProperty().addListener((obs, oldValue, newValue) -> enforceHistogramGeometry(card));
-        Platform.runLater(() -> enforceHistogramGeometry(card));
+        requestPopulationStability(appRoot);
     }
 
-    private static void enforceHistogramGeometry(VBox card) {
-        if (Boolean.TRUE.equals(card.getProperties().get(HISTOGRAM_GUARD))) return;
-        card.getProperties().put(HISTOGRAM_GUARD, Boolean.TRUE);
-        try {
-            card.setMinHeight(365);
-            card.setPrefHeight(420);
-            card.setMaxHeight(455);
-            BarChart<?, ?> chart = findBarChart(card);
-            if (chart != null) {
-                chart.setMinHeight(295);
-                chart.setPrefHeight(340);
-                chart.setMaxHeight(365);
-                VBox.setVgrow(chart, Priority.NEVER);
+    private static void requestPopulationStability(Parent appRoot) {
+        if (appRoot == null || Boolean.TRUE.equals(appRoot.getProperties().get(POPULATION_STABILITY_PENDING))) return;
+        appRoot.getProperties().put(POPULATION_STABILITY_PENDING, Boolean.TRUE);
+        Platform.runLater(() -> {
+            appRoot.getProperties().remove(POPULATION_STABILITY_PENDING);
+            stopDelayedPopulationRelayout(appRoot);
+            stabilizePopulationHistograms(appRoot);
+        });
+    }
+
+    private static void stabilizePopulationHistograms(Node node) {
+        if (node == null) return;
+        if (node instanceof VBox box && box.getStyleClass().contains("population-histogram-card")) {
+            stabilizeHistogram(box);
+        }
+        if (node instanceof TabPane tabs) {
+            for (Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) stabilizePopulationHistograms(tab.getContent());
             }
-            if (card.getParent() instanceof HBox row) {
-                row.setSpacing(10);
-                row.setPadding(new Insets(10, 12, 12, 12));
-                row.setAlignment(Pos.TOP_LEFT);
+        }
+        if (node instanceof Parent parent) {
+            for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) {
+                stabilizePopulationHistograms(child);
             }
-        } finally {
-            card.getProperties().remove(HISTOGRAM_GUARD);
+        }
+    }
+
+    private static void stabilizeHistogram(VBox card) {
+        double sceneHeight = card.getScene() == null || card.getScene().getHeight() <= 0
+                ? 900.0 : card.getScene().getHeight();
+        double cardHeight = Math.max(385.0, Math.min(495.0, sceneHeight * 0.47));
+        double chartHeight = Math.max(295.0, Math.min(390.0, cardHeight - 100.0));
+
+        card.setMinWidth(0);
+        card.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(card, Priority.ALWAYS);
+        card.setMinHeight(0);
+        card.setPrefHeight(cardHeight);
+        card.setMaxHeight(cardHeight);
+
+        BarChart<?, ?> chart = findBarChart(card);
+        if (chart != null) {
+            chart.setMinWidth(0);
+            chart.setMaxWidth(Double.MAX_VALUE);
+            chart.setMinHeight(0);
+            chart.setPrefHeight(chartHeight);
+            chart.setMaxHeight(chartHeight);
+            VBox.setVgrow(chart, Priority.NEVER);
+        }
+
+        if (card.getParent() instanceof HBox row) {
+            row.setFillHeight(false);
+            row.setAlignment(Pos.TOP_LEFT);
         }
     }
 
@@ -375,41 +428,28 @@ public final class FinalUiStabilityEnhancer {
         return null;
     }
 
-    /* ---------------- Remove delayed Population layout jump ---------------- */
+    /* ---------------- Population relayout coalescing ---------------- */
 
     private static void installPopulationRelayoutGuard(Region filterCard, Parent appRoot) {
         if (Boolean.TRUE.equals(filterCard.getProperties().get(FILTER_DONE))) return;
         filterCard.getProperties().put(FILTER_DONE, Boolean.TRUE);
-        filterCard.visibleProperty().addListener((obs, oldValue, newValue) ->
-                Platform.runLater(() -> {
-                    stopDelayedPopulationRelayout(appRoot);
-                    repolishPopulationHistograms(appRoot);
-                }));
-        filterCard.managedProperty().addListener((obs, oldValue, newValue) ->
-                Platform.runLater(() -> {
-                    stopDelayedPopulationRelayout(appRoot);
-                    repolishPopulationHistograms(appRoot);
-                }));
+        filterCard.visibleProperty().addListener((obs, oldValue, newValue) -> requestPopulationStability(appRoot));
+        filterCard.managedProperty().addListener((obs, oldValue, newValue) -> requestPopulationStability(appRoot));
     }
 
     private static void installPopulationRestoreGuard(Button restore, Parent appRoot) {
         String key = FILTER_DONE + ".restore";
         if (Boolean.TRUE.equals(restore.getProperties().get(key))) return;
         restore.getProperties().put(key, Boolean.TRUE);
-        restore.visibleProperty().addListener((obs, oldValue, newValue) ->
-                Platform.runLater(() -> stopDelayedPopulationRelayout(appRoot)));
-        restore.managedProperty().addListener((obs, oldValue, newValue) ->
-                Platform.runLater(() -> stopDelayedPopulationRelayout(appRoot)));
+        restore.visibleProperty().addListener((obs, oldValue, newValue) -> requestPopulationStability(appRoot));
+        restore.managedProperty().addListener((obs, oldValue, newValue) -> requestPopulationStability(appRoot));
     }
 
     private static void installPopulationTabGuard(TabPane tabs, Parent appRoot) {
         if (Boolean.TRUE.equals(tabs.getProperties().get(POPULATION_TABS_DONE))) return;
         tabs.getProperties().put(POPULATION_TABS_DONE, Boolean.TRUE);
         tabs.getSelectionModel().selectedItemProperty().addListener((obs, oldTab, newTab) ->
-                Platform.runLater(() -> {
-                    stopDelayedPopulationRelayout(appRoot);
-                    repolishPopulationHistograms(appRoot);
-                }));
+                requestPopulationStability(appRoot));
     }
 
     private static void stopDelayedPopulationRelayout(Parent appRoot) {
@@ -418,18 +458,32 @@ public final class FinalUiStabilityEnhancer {
         if (value instanceof PauseTransition pause) pause.stop();
     }
 
-    private static void repolishPopulationHistograms(Node node) {
+    /* ---------------- Fullscreen reading panels ---------------- */
+
+    private static void polishFullscreenReading(Node node) {
         if (node == null) return;
-        if (node instanceof VBox box && box.getStyleClass().contains("population-histogram-card")) {
-            enforceHistogramGeometry(box);
-        }
-        if (node instanceof TabPane tabs) {
-            for (Tab tab : tabs.getTabs()) {
-                if (tab.getContent() != null) repolishPopulationHistograms(tab.getContent());
+        if (node instanceof ScrollPane scroll
+                && scroll.getContent() instanceof VBox reading
+                && reading.getStyleClass().contains("spectroscopy-assistant")) {
+            boolean sidePanel = scroll.getParent() instanceof BorderPane split && split.getRight() == scroll;
+            if (sidePanel) {
+                scroll.setFitToHeight(true);
+                scroll.setMinHeight(0);
+                scroll.setMaxHeight(Double.MAX_VALUE);
+                reading.setMinHeight(0);
+                reading.setMaxHeight(Double.MAX_VALUE);
+                for (Node child : reading.getChildren()) {
+                    if (child instanceof VBox section) {
+                        section.setMaxHeight(Double.MAX_VALUE);
+                        VBox.setVgrow(section, Priority.ALWAYS);
+                    }
+                }
             }
+            polishFullscreenReading(scroll.getContent());
+            return;
         }
         if (node instanceof Parent parent) {
-            for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) repolishPopulationHistograms(child);
+            for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) polishFullscreenReading(child);
         }
     }
 
@@ -438,9 +492,6 @@ public final class FinalUiStabilityEnhancer {
         while (current != null) {
             if (current instanceof Region region && region.getStyleClass().contains("overview-action-card")) {
                 polishExplorerSide(region);
-            }
-            if (current instanceof VBox box && box.getStyleClass().contains("population-histogram-card")) {
-                enforceHistogramGeometry(box);
             }
             current = current.getParent();
         }
