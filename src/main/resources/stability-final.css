@@ -1,8 +1,20 @@
 /* SwiftBAT Explorer 1.3.0 — last visual stability layer. */
 
-/* ---------- Tables: scrollbar in a real external gutter ---------- */
+/* ---------- Tables: one external vertical scrollbar ---------- */
 .reference-redesign .external-table-scroll-shell {
     -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
+
+/* The native VirtualFlow bar remains the scrolling engine, but it occupies no
+   horizontal layout space. The visible scrollbar is the sibling below. */
+.reference-redesign .data-table .scroll-bar:vertical {
+    -fx-opacity: 0;
+    -fx-background-color: transparent;
+    -fx-pref-width: 0;
+    -fx-min-width: 0;
+    -fx-max-width: 0;
     -fx-padding: 0;
 }
 
@@ -21,7 +33,7 @@
 }
 
 .reference-redesign .table-external-scrollbar .thumb {
-    -fx-background-color: linear-gradient(to bottom, rgba(200, 62, 239, 0.90), rgba(37, 177, 247, 0.92));
+    -fx-background-color: linear-gradient(to bottom, rgba(200, 62, 239, 0.82), rgba(37, 177, 247, 0.86));
     -fx-background-radius: 999px;
     -fx-background-insets: 0;
 }
@@ -39,6 +51,36 @@
 .reference-redesign .table-external-scrollbar .decrement-arrow {
     -fx-padding: 0;
     -fx-shape: "";
+}
+
+/* Use the same explicit right-edge separator for header and body. Previously
+   the header used a CSS border while the body used -fx-table-cell-border-color;
+   JavaFX can rasterise those two mechanisms one pixel apart on Windows. */
+.reference-redesign .data-table {
+    -fx-table-cell-border-color: transparent;
+}
+
+.reference-redesign .data-table .column-header {
+    -fx-border-color: transparent rgba(116, 141, 190, 0.18) transparent transparent;
+    -fx-border-width: 0 1 0 0;
+    -fx-border-insets: 0;
+}
+
+.reference-redesign .data-table .table-cell {
+    -fx-border-color: transparent rgba(116, 141, 190, 0.18) transparent transparent;
+    -fx-border-width: 0 1 0 0;
+    -fx-border-insets: 0;
+}
+
+.reference-redesign .data-table .filler {
+    -fx-border-color: transparent;
+}
+
+.reference-redesign .data-table .column-header-background,
+.reference-redesign .data-table .virtual-flow,
+.reference-redesign .data-table .clipped-container,
+.reference-redesign .data-table .sheet {
+    -fx-background-insets: 0;
 }
 
 /* ---------- Explorer side cards ---------- */
