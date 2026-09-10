@@ -10,15 +10,22 @@ import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Cursor;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.SnapshotParameters;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBase;
+import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.ComboBoxBase;
 import javafx.scene.control.Label;
+import javafx.scene.control.ScrollBar;
+import javafx.scene.control.Slider;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
+import javafx.scene.control.TextInputControl;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.effect.Effect;
 import javafx.scene.effect.GaussianBlur;
@@ -40,16 +47,20 @@ import java.util.Locale;
 
 /**
  * Rifiniture di interazione che non modificano la logica scientifica:
- * card di lettura sollevabili/focalizzabili, export affidabile della tabella
- * Population e dimensionamento sicuro delle schede di spettroscopia.
+ * card di lettura sollevabili/focalizzabili, aperture visuali a singolo click,
+ * export affidabile della tabella Population e sizing sicuro della spettroscopia.
  */
 public final class InteractionPolishEnhancer {
     private static final String WATCHED = InteractionPolishEnhancer.class.getName() + ".watched";
     private static final String CARD_DONE = InteractionPolishEnhancer.class.getName() + ".cardDone";
     private static final String CARD_ACTIVE = InteractionPolishEnhancer.class.getName() + ".cardActive";
     private static final String CARD_EFFECT = InteractionPolishEnhancer.class.getName() + ".cardEffect";
+    private static final String VISUAL_DONE = InteractionPolishEnhancer.class.getName() + ".visualDone";
+    private static final String VISUAL_EFFECT = InteractionPolishEnhancer.class.getName() + ".visualEffect";
+    private static final String ZOOM_DONE = InteractionPolishEnhancer.class.getName() + ".zoomDone";
     private static final String TABLE_WATCHED = InteractionPolishEnhancer.class.getName() + ".tableWatched";
     private static final String TABLE_DONE = InteractionPolishEnhancer.class.getName() + ".tableDone";
+    private static final String TABLE_POLISHED = InteractionPolishEnhancer.class.getName() + ".tablePolished";
     private static final String SPECTRO_TABS_DONE = InteractionPolishEnhancer.class.getName() + ".spectroTabsDone";
     private static final String ACTIVE_OVERLAY = InteractionPolishEnhancer.class.getName() + ".activeOverlay";
     private static final String CHART_ENHANCER_TABLE_DONE = ChartInteractionEnhancer.class.getName() + ".tableDone";
@@ -88,14 +99,192 @@ public final class InteractionPolishEnhancer {
     }
 
     private static void enhance(Node node) {
+        if (node instanceof Label label && label.getStyleClass().contains("sky-zoom-label")) {
+            polishSkyZoomLabel(label);
+        }
         if (node instanceof Region region) {
             if (isReadingCard(region)) installReadingCard(region);
+            if (isVisualizationCard(region)) installVisualizationCard(region);
             keepSpectroscopyContentInside(region);
         }
         if (node instanceof TableView<?> table) installPopulationTableExport(table);
         if (node instanceof TabPane tabs && tabs.getStyleClass().contains("spectroscopy-tabs")) {
             installSpectroscopyTabSizing(tabs);
         }
+    }
+
+    private static void polishSkyZoomLabel(Label label) {
+        if (Boolean.TRUE.equals(label.getProperties().get(ZOOM_DONE))) return;
+        label.getProperties().put(ZOOM_DONE, Boolean.TRUE);
+        // La sfera 3D usa lo stesso indicatore minimale dipinto nella Mollweide 2D.
+        label.setStyle("-fx-background-color: transparent;"
+                + "-fx-border-color: transparent;"
+                + "-fx-background-radius: 0;"
+                + "-fx-border-radius: 0;"
+                + "-fx-padding: 0;"
+                + "-fx-text-fill: #7187aa;"
+                + "-fx-font-size: 11px;"
+                + "-fx-font-weight: normal;");
+    }
+
+    private static boolean isVisualizationCard(Region region) {
+        if (region.getStyleClass().contains("overview-chart-card")) return true;
+
+        if (region.getClass().getSimpleName().equals("ThreeDChartPane")) {
+            return findFullscreenButton(region) != null;
+        }
+
+        if (region.getStyleClass().contains("spectroscopy-chart-card")) {
+            return findThreeDButton(region) != null || findFullscreenButton(region) != null;
+        }
+
+        if (region.getStyleClass().contains("time-energy-card")) {
+            return findFullscreenButton(region) != null;
+        }
+
+        // Card principale della mappa celeste: comprende header, legenda e superficie 2D/3D.
+        return region.getStyleClass().contains("card")
+                && findFullscreenButton(region) != null
+                && (containsDescendantNamed(region, "MollweideSkyPane")
+                || containsDescendantNamed(region, "CelestialSpherePane"));
+    }
+
+    private static void installVisualizationCard(Region card) {
+        if (Boolean.TRUE.equals(card.getProperties().get(VISUAL_DONE))) return;
+        card.getProperties().put(VISUAL_DONE, Boolean.TRUE);
+        card.getProperties().put(VISUAL_EFFECT, card.getEffect());
+        card.setPickOnBounds(true);
+        card.setCursor(Cursor.HAND);
+
+        card.addEventHandler(MouseEvent.MOUSE_ENTERED, event -> {
+            card.setCursor(Cursor.HAND);
+            card.setEffect(new DropShadow(24, Color.color(0.04, 0.80, 1.0, 0.30)));
+        });
+        card.addEventHandler(MouseEvent.MOUSE_EXITED, event -> {
+            Object previous = card.getProperties().get(VISUAL_EFFECT);
+            card.setEffect(previous instanceof Effect effect ? effect : null);
+        });
+
+        /*
+         * Event filter: il comando viene prenotato prima che un grafico consumi il click.
+         * In questo modo funziona anche sopra linee, barre, canvas e SwingNode, mentre
+         * i veri controlli (bottoni, menu, slider...) mantengono il loro comportamento.
+         */
+        card.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
+            if (event.getButton() != MouseButton.PRIMARY
+                    || event.getClickCount() != 1
+                    || !event.isStillSincePress()
+                    || isInteractiveTarget(event.getTarget(), card)) {
+                return;
+            }
+            Platform.runLater(() -> activateVisualizationCard(card));
+        });
+    }
+
+    private static void activateVisualizationCard(Region card) {
+        if (card.getScene() == null) return;
+
+        // Explorer 2D: un click apre direttamente la corrispondente Vista 3D fullscreen.
+        if (card.getStyleClass().contains("overview-chart-card")) {
+            if (openExplorerThreeDFullscreen(card)) return;
+        }
+
+        // Modello e flusso spettroscopici: replica a singolo click il precedente accesso 3D.
+        if (card.getStyleClass().contains("spectroscopy-chart-card")) {
+            Button threeD = findThreeDButton(card);
+            if (threeD != null && !threeD.isDisabled()) {
+                threeD.fire();
+                return;
+            }
+        }
+
+        // Mappa celeste, mappa tempo-energia e pannello 3D Explorer: fullscreen della vista corrente.
+        Button fullscreen = findFullscreenButton(card);
+        if (fullscreen != null && !fullscreen.isDisabled()) fullscreen.fire();
+    }
+
+    private static boolean openExplorerThreeDFullscreen(Node source) {
+        TabPane tabs = findAncestorTabPane(source);
+        if (tabs == null) return false;
+        Tab target = null;
+        for (Tab tab : tabs.getTabs()) {
+            String text = tab.getText() == null ? "" : tab.getText().toLowerCase(Locale.ROOT);
+            if (text.contains("3d")) {
+                target = tab;
+                break;
+            }
+        }
+        if (target == null || target.getContent() == null) return false;
+        tabs.getSelectionModel().select(target);
+        Tab finalTarget = target;
+        Platform.runLater(() -> {
+            Button fullscreen = finalTarget.getContent() instanceof Parent parent
+                    ? findFullscreenButton(parent) : null;
+            if (fullscreen != null && !fullscreen.isDisabled()) fullscreen.fire();
+        });
+        return true;
+    }
+
+    private static TabPane findAncestorTabPane(Node node) {
+        Node current = node == null ? null : node.getParent();
+        while (current != null) {
+            if (current instanceof TabPane tabs) return tabs;
+            current = current.getParent();
+        }
+        return null;
+    }
+
+    private static boolean isInteractiveTarget(Object rawTarget, Node boundary) {
+        if (!(rawTarget instanceof Node target)) return false;
+        Node current = target;
+        while (current != null && current != boundary) {
+            if (current instanceof ButtonBase
+                    || current instanceof ChoiceBox<?>
+                    || current instanceof ComboBoxBase<?>
+                    || current instanceof TextInputControl
+                    || current instanceof ScrollBar
+                    || current instanceof Slider) {
+                return true;
+            }
+            current = current.getParent();
+        }
+        return false;
+    }
+
+    private static Button findFullscreenButton(Parent root) {
+        return findButton(root, true);
+    }
+
+    private static Button findThreeDButton(Parent root) {
+        return findButton(root, false);
+    }
+
+    private static Button findButton(Parent root, boolean fullscreen) {
+        if (root == null) return null;
+        for (Node child : root.getChildrenUnmodifiable()) {
+            if (child instanceof Button button && button.isVisible() && button.isManaged()) {
+                String text = button.getText() == null ? "" : button.getText().trim().toLowerCase(Locale.ROOT);
+                String compact = text.replace(" ", "");
+                boolean match = fullscreen
+                        ? text.contains("schermo intero") || text.contains("full screen") || compact.contains("fullscreen")
+                        : text.contains("3d");
+                if (match) return button;
+            }
+            if (child instanceof Parent parent) {
+                Button nested = findButton(parent, fullscreen);
+                if (nested != null) return nested;
+            }
+        }
+        return null;
+    }
+
+    private static boolean containsDescendantNamed(Parent root, String simpleName) {
+        if (root == null || simpleName == null) return false;
+        for (Node child : root.getChildrenUnmodifiable()) {
+            if (child.getClass().getSimpleName().equals(simpleName)) return true;
+            if (child instanceof Parent parent && containsDescendantNamed(parent, simpleName)) return true;
+        }
+        return false;
     }
 
     private static boolean isReadingCard(Region region) {
@@ -262,7 +451,9 @@ public final class InteractionPolishEnhancer {
             table.getColumns().addListener((ListChangeListener<TableColumn>) change ->
                     Platform.runLater(() -> installPopulationTableExport(table)));
         }
-        if (Boolean.TRUE.equals(table.getProperties().get(TABLE_DONE)) || !isPopulationResultTable(table)) return;
+        if (!isPopulationResultTable(table)) return;
+        polishPopulationTable(table);
+        if (Boolean.TRUE.equals(table.getProperties().get(TABLE_DONE))) return;
         if (!(table.getParent() instanceof VBox box)) return;
 
         table.getProperties().put(TABLE_DONE, Boolean.TRUE);
@@ -278,10 +469,10 @@ public final class InteractionPolishEnhancer {
                 export, table, "population_included_grbs.xlsx", I18n.t("GRB inclusi")));
 
         HBox toolbar = new HBox(8, UiFactory.spacer(), export);
-        toolbar.getStyleClass().add("data-toolbar");
+        toolbar.getStyleClass().addAll("data-toolbar", "population-table-toolbar");
         toolbar.setAlignment(Pos.CENTER_RIGHT);
-        toolbar.setMinHeight(38);
-        toolbar.setPrefHeight(38);
+        toolbar.setMinHeight(42);
+        toolbar.setPrefHeight(42);
         toolbar.setMaxWidth(Double.MAX_VALUE);
         VBox.setVgrow(toolbar, Priority.NEVER);
         box.getChildren().add(0, toolbar);
@@ -295,7 +486,7 @@ public final class InteractionPolishEnhancer {
         boolean coverage = false;
         boolean quality = false;
         for (TableColumn<?, ?> column : table.getColumns()) {
-            String text = column.getText() == null ? "" : column.getText().trim().toLowerCase(Locale.ROOT);
+            String text = visibleColumnName(column).toLowerCase(Locale.ROOT);
             grb |= text.equals("grb");
             t90 |= text.contains("t90");
             redshift |= text.contains("redshift");
@@ -303,6 +494,59 @@ public final class InteractionPolishEnhancer {
             quality |= text.contains("qualità") || text.contains("quality") || text.contains("flag");
         }
         return grb && t90 && redshift && coverage && quality;
+    }
+
+    private static String visibleColumnName(TableColumn<?, ?> column) {
+        String text = column.getText();
+        if (text != null && !text.isBlank()) return text.trim();
+        String graphicText = firstLabelText(column.getGraphic());
+        if (!graphicText.isBlank()) return graphicText;
+        String exported = TablePreferences.exportColumnName(column);
+        return exported == null ? "" : exported.trim();
+    }
+
+    private static String firstLabelText(Node node) {
+        if (node == null) return "";
+        if (node instanceof Label label && label.getText() != null && !label.getText().isBlank()) {
+            return label.getText().trim();
+        }
+        if (node instanceof Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable()) {
+                String found = firstLabelText(child);
+                if (!found.isBlank()) return found;
+            }
+        }
+        return "";
+    }
+
+    private static void polishPopulationTable(TableView<?> table) {
+        if (Boolean.TRUE.equals(table.getProperties().get(TABLE_POLISHED))) return;
+        table.getProperties().put(TABLE_POLISHED, Boolean.TRUE);
+        if (!table.getStyleClass().contains("population-result-table")) {
+            table.getStyleClass().add("population-result-table");
+        }
+        for (TableColumn<?, ?> column : table.getColumns()) {
+            String name = visibleColumnName(column).toLowerCase(Locale.ROOT);
+            if (name.equals("grb")) {
+                column.setMinWidth(145);
+                column.setPrefWidth(165);
+            } else if (name.contains("t90")) {
+                column.setMinWidth(125);
+                column.setPrefWidth(145);
+            } else if (name.contains("classe") || name.equals("class")) {
+                column.setMinWidth(205);
+                column.setPrefWidth(230);
+            } else if (name.contains("redshift")) {
+                column.setMinWidth(175);
+                column.setPrefWidth(195);
+            } else if (name.contains("copertura") || name.contains("coverage")) {
+                column.setMinWidth(125);
+                column.setPrefWidth(145);
+            } else if (name.contains("qualità") || name.contains("quality") || name.contains("flag")) {
+                column.setMinWidth(260);
+                column.setPrefWidth(300);
+            }
+        }
     }
 
     private static void installSpectroscopyTabSizing(TabPane tabs) {
