@@ -1,5 +1,6 @@
 package it.casiraghi.swiftbat.ui;
 
+import it.casiraghi.swiftbat.model.GrbData;
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
 import javafx.scene.Node;
@@ -56,19 +57,19 @@ public final class PageScopedPolishRouter {
         if (workspace == null) return;
         page.getProperties().put(EXPLORER_BRIDGE, Boolean.TRUE);
 
-        for (Node child : List.copyOf(workspace.getChildren())) polishExplorerWorkspaceChild(child);
+        for (Node child : List.copyOf(workspace.getChildren())) polishExplorerWorkspaceChild(page, child);
         workspace.getChildren().addListener((ListChangeListener<Node>) change -> {
             while (change.next()) {
                 if (!change.wasAdded()) continue;
-                for (Node added : List.copyOf(change.getAddedSubList())) polishExplorerWorkspaceChild(added);
+                for (Node added : List.copyOf(change.getAddedSubList())) polishExplorerWorkspaceChild(page, added);
             }
         });
         Platform.runLater(() -> {
-            for (Node child : List.copyOf(workspace.getChildren())) polishExplorerWorkspaceChild(child);
+            for (Node child : List.copyOf(workspace.getChildren())) polishExplorerWorkspaceChild(page, child);
         });
     }
 
-    private static void polishExplorerWorkspaceChild(Node node) {
+    private static void polishExplorerWorkspaceChild(ExplorerPage page, Node node) {
         // Keep the outer ScrollPane in scope: its skin owns the main Explorer
         // scrollbar shown on the right edge of the page.
         ExplorerScrollbarFix.install(node);
@@ -81,16 +82,20 @@ public final class PageScopedPolishRouter {
             FinalExpertUiPolish.polishExplorer(content);
             ExplorerOverflowFix.apply(content);
             FinalTableAlignmentFix.install(content);
-            MetadataFieldSearchFix.install(content);
             ExplorerScrollbarFix.install(content);
             Platform.runLater(() -> {
                 FinalExpertUiPolish.polishExplorer(content);
                 ExplorerOverflowFix.apply(content);
-                MetadataFieldSearchFix.install(content);
                 ExplorerScrollbarFix.install(node);
             });
             return;
         }
+
+        // Replace the fifth Explorer tab (Metadata) with the rebuilt workspace.
+        // This is index-based on purpose: it does not depend on IT/EN labels and
+        // the legacy ChoiceBox never reaches the visible scene graph.
+        installMetadataWorkspace(page, tabs);
+
         for (Tab tab : tabs.getTabs()) {
             Node tabContent = tab.getContent();
             if (tabContent == null) continue;
@@ -104,15 +109,24 @@ public final class PageScopedPolishRouter {
         FinalExpertUiPolish.polishExplorer(content);
         ExplorerOverflowFix.apply(content);
         FinalTableAlignmentFix.install(content);
-        MetadataFieldSearchFix.install(content);
         ExplorerScrollbarFix.install(content);
 
         Platform.runLater(() -> {
+            installMetadataWorkspace(page, tabs);
             FinalExpertUiPolish.polishExplorer(content);
             ExplorerOverflowFix.apply(content);
-            MetadataFieldSearchFix.install(content);
             ExplorerScrollbarFix.install(node);
         });
+    }
+
+    private static void installMetadataWorkspace(ExplorerPage page, TabPane tabs) {
+        if (tabs == null || tabs.getTabs().size() < 5) return;
+        GrbData data = readCurrentData(page);
+        if (data == null) return;
+        Tab metadata = tabs.getTabs().get(4);
+        Node current = metadata.getContent();
+        if (current != null && current.getStyleClass().contains("metadata-workspace-v3")) return;
+        metadata.setContent(MetadataWorkspaceV3.build(data));
     }
 
     private static void activatePopulation(PopulationPage page) {
@@ -143,6 +157,17 @@ public final class PageScopedPolishRouter {
             field.setAccessible(true);
             Object value = field.get(page);
             return value instanceof StackPane pane ? pane : null;
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private static GrbData readCurrentData(ExplorerPage page) {
+        try {
+            Field field = ExplorerPage.class.getDeclaredField("currentData");
+            field.setAccessible(true);
+            Object value = field.get(page);
+            return value instanceof GrbData data ? data : null;
         } catch (ReflectiveOperationException | RuntimeException ignored) {
             return null;
         }
