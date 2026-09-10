@@ -8,8 +8,8 @@ import javafx.scene.layout.StackPane;
 import java.util.List;
 
 /**
- * Routes the final lightweight polish only to pages when MainView swaps them
- * into the page host. It observes one small children list, not the scene graph.
+ * Routes the lightweight page-specific polish when MainView swaps a page into
+ * the page host. Only that direct children list is observed: no global scans.
  */
 public final class PageScopedPolishRouter {
     private static final String DONE = PageScopedPolishRouter.class.getName() + ".done";
@@ -31,7 +31,10 @@ public final class PageScopedPolishRouter {
     }
 
     private static void route(Node node) {
-        if (node instanceof Parent parent) FinalMacAndPopulationPolish.install(parent);
+        if (!(node instanceof Parent parent)) return;
+        FinalMacAndPopulationPolish.install(parent);
+        // Runs after the older compatibility pass and owns the final geometry.
+        DefinitiveLayoutAndManualSelectionFix.install(parent);
     }
 
     private static StackPane findPageHost(Node node) {
