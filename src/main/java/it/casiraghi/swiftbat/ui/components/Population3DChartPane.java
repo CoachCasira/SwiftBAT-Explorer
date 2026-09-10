@@ -11,6 +11,7 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -22,7 +23,10 @@ import javafx.scene.layout.VBox;
 import javax.swing.SwingUtilities;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 /** Vista interattiva 3D degli stessi elementi statistici mostrati nel profilo 2D. */
 public final class Population3DChartPane extends BorderPane {
@@ -34,12 +38,20 @@ public final class Population3DChartPane extends BorderPane {
     private final Java2DWaterfallPanel renderer = new Java2DWaterfallPanel();
     private final CumulativeAnalysisService analysisService = new CumulativeAnalysisService();
     private final Label sampleLabel = UiFactory.label("Nessun campione", "three-d-context");
+    private final ToggleButton focusLock = new ToggleButton();
+
+    private List<CumulativeAnalysisService.NormalizedCurve> sourceCurves = List.of();
+    private CumulativeAnalysisService.PopulationProfile sourceProfile;
+    private double sourceHalfWindowSeconds = 60.0;
 
     public Population3DChartPane() {
         getStyleClass().add("three-d-panel");
         setMinHeight(560);
         setPrefHeight(700);
         renderer.setFocusListener(CurveInteractionLinkEnhancer::setPopulationFocusedNames);
+        CurveInteractionLinkEnhancer.bindPopulationLockToggle(focusLock);
+        focusLock.selectedProperty().addListener((obs, oldValue, selected) -> refreshDataset());
+
         SwingUtilities.invokeLater(() -> {
             renderer.setPresentation(new Java2DWaterfallPanel.Presentation(
                     "Nessuna curva normalizzata disponibile per la vista 3D.",
@@ -64,19 +76,58 @@ public final class Population3DChartPane extends BorderPane {
     public void setData(List<CumulativeAnalysisService.NormalizedCurve> curves,
                         CumulativeAnalysisService.PopulationProfile profile,
                         double halfWindowSeconds) {
-        Java2DWaterfallPanel.Dataset dataset = toDataset(curves, profile, halfWindowSeconds);
-        int curveCount = curves == null ? 0 : curves.size();
+        sourceCurves = curves == null ? List.of() : List.copyOf(curves);
+        sourceProfile = profile;
+        sourceHalfWindowSeconds = halfWindowSeconds;
+        refreshDataset();
+    }
+
+    private void refreshDataset() {
+        Java2DWaterfallPanel.Dataset dataset = toDataset(sourceCurves, sourceProfile, sourceHalfWindowSeconds);
+        Set<String> focused = CurveInteractionLinkEnhancer.populationFocusedNames();
+        boolean locked = CurveInteractionLinkEnhancer.populationFocusLocked() && !focused.isEmpty();
+        if (locked) dataset = keepOnlyLabels(dataset, focused);
+
+        int curveCount = sourceCurves.size();
         if (dataset.isEmpty()) {
             I18n.setText(sampleLabel, "Nessun campione", "No sample");
+        } else if (locked) {
+            int selectedCount = dataset.bandCount();
+            I18n.setText(sampleLabel,
+                    selectedCount + " curve bloccate",
+                    selectedCount + " locked curves");
         } else {
             I18n.setText(sampleLabel,
                     curveCount + " GRB · mediana + fascia centrale",
                     curveCount + " GRBs · median + central band");
         }
+
+        Java2DWaterfallPanel.Dataset finalDataset = dataset;
         SwingUtilities.invokeLater(() -> {
-            renderer.setDataset(dataset);
-            renderer.setFocusedLabels(CurveInteractionLinkEnhancer.populationFocusedNames());
+            renderer.setDataset(finalDataset);
+            renderer.setFocusedLabels(focused);
         });
+    }
+
+    private Java2DWaterfallPanel.Dataset keepOnlyLabels(Java2DWaterfallPanel.Dataset source, Set<String> labelsToKeep) {
+        if (source == null || source.isEmpty() || labelsToKeep == null || labelsToKeep.isEmpty()) return source;
+        List<Integer> indices = new ArrayList<>();
+        for (int index = 0; index < source.labels().length; index++) {
+            if (labelsToKeep.contains(source.labels()[index])) indices.add(index);
+        }
+        if (indices.isEmpty()) return source;
+
+        double[][] rates = new double[indices.size()][];
+        String[] labels = new String[indices.size()];
+        Color[] colors = new Color[indices.size()];
+        for (int target = 0; target < indices.size(); target++) {
+            int sourceIndex = indices.get(target);
+            rates[target] = Arrays.copyOf(source.rates()[sourceIndex], source.rates()[sourceIndex].length);
+            labels[target] = source.labels()[sourceIndex];
+            colors[target] = source.colors()[sourceIndex];
+        }
+        return new Java2DWaterfallPanel.Dataset(
+                Arrays.copyOf(source.times(), source.times().length), rates, labels, colors);
     }
 
     private Java2DWaterfallPanel.Dataset toDataset(List<CumulativeAnalysisService.NormalizedCurve> curves,
@@ -165,7 +216,7 @@ public final class Population3DChartPane extends BorderPane {
                 this, renderer, "population_temporal_profile_3d.png"));
         Button reset = UiFactory.button("Centra vista", "secondary-button");
         reset.setOnAction(event -> SwingUtilities.invokeLater(renderer::resetView));
-        HBox footer = new HBox(12, note, spacer, export, reset);
+        HBox footer = new HBox(12, note, spacer, focusLock, export, reset);
         footer.setAlignment(Pos.CENTER_LEFT);
         footer.getStyleClass().add("three-d-footer");
         return footer;
