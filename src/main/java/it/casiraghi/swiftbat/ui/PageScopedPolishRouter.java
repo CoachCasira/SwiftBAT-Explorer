@@ -83,6 +83,7 @@ public final class PageScopedPolishRouter {
         if (tabs == null) {
             invokeDefinitive("polishExplorerDashboard", new Class<?>[]{Node.class}, content);
             FinalExpertUiPolish.polishExplorer(content);
+            Platform.runLater(() -> FinalExpertUiPolish.polishExplorer(content));
             return;
         }
         for (Tab tab : tabs.getTabs()) {
@@ -97,6 +98,9 @@ public final class PageScopedPolishRouter {
         // Must run on the complete dashboard, not only on the 2D tab: this also
         // restores the existing searchable/grouped A-Z metadata selector.
         FinalExpertUiPolish.polishExplorer(content);
+        // The legacy compatibility pass schedules one post-CSS width correction;
+        // our final user-requested geometry is deliberately re-applied afterwards.
+        Platform.runLater(() -> FinalExpertUiPolish.polishExplorer(content));
     }
 
     private static void activatePopulation(PopulationPage page) {
