@@ -51,9 +51,10 @@ public final class PageScopedPolishRouter {
         FinalMacAndPopulationPolish.install(parent);
         DefinitiveLayoutAndManualSelectionFix.install(parent);
 
-        // The compatibility enhancers above intentionally use ordinary scene
-        // traversal. These two calls enter the logical content of JavaFX Controls
-        // explicitly, so the final requested geometry is guaranteed to run.
+        // Final table geometry owner. It deliberately stops at TableView nodes,
+        // so VirtualFlow/skin internals are never scanned while scrolling.
+        FinalTableAlignmentFix.install(parent);
+
         if (parent instanceof ExplorerPage explorer) activateExplorer(explorer);
         if (parent instanceof PopulationPage population) activatePopulation(population);
     }
@@ -83,7 +84,12 @@ public final class PageScopedPolishRouter {
         if (tabs == null) {
             invokeDefinitive("polishExplorerDashboard", new Class<?>[]{Node.class}, content);
             FinalExpertUiPolish.polishExplorer(content);
-            Platform.runLater(() -> FinalExpertUiPolish.polishExplorer(content));
+            ExplorerOverflowFix.apply(content);
+            FinalTableAlignmentFix.install(content);
+            Platform.runLater(() -> {
+                FinalExpertUiPolish.polishExplorer(content);
+                ExplorerOverflowFix.apply(content);
+            });
             return;
         }
         for (Tab tab : tabs.getTabs()) {
@@ -95,12 +101,19 @@ public final class PageScopedPolishRouter {
                 break;
             }
         }
-        // Must run on the complete dashboard, not only on the 2D tab: this also
-        // restores the existing searchable/grouped A-Z metadata selector.
+
+        // Run on the complete dashboard: fixes the 2D toolbar, all Explorer
+        // tables and restores the searchable/grouped A-Z metadata selector.
         FinalExpertUiPolish.polishExplorer(content);
-        // The legacy compatibility pass schedules one post-CSS width correction;
-        // our final user-requested geometry is deliberately re-applied afterwards.
-        Platform.runLater(() -> FinalExpertUiPolish.polishExplorer(content));
+        ExplorerOverflowFix.apply(content);
+        FinalTableAlignmentFix.install(content);
+
+        // Older compatibility passes schedule a post-CSS correction. Reapply the
+        // final geometry one pulse later so the laptop layout cannot regress.
+        Platform.runLater(() -> {
+            FinalExpertUiPolish.polishExplorer(content);
+            ExplorerOverflowFix.apply(content);
+        });
     }
 
     private static void activatePopulation(PopulationPage page) {
@@ -111,6 +124,10 @@ public final class PageScopedPolishRouter {
             return;
         }
         page.getProperties().put(POPULATION_BRIDGE, Boolean.TRUE);
+
+        // The watcher remains on the page so result tables created only after
+        // Analyze group receive the same header/cell geometry automatically.
+        FinalTableAlignmentFix.install(page);
 
         invokeDefinitive("alignPopulationFilters", new Class<?>[]{VBox.class}, filterCard);
         invokeDefinitive("installManualSelector", new Class<?>[]{PopulationPage.class, VBox.class}, page, filterCard);
