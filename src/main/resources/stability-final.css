@@ -53,25 +53,15 @@
 }
 
 /* ---------- Explorer side cards ---------- */
-.reference-redesign .overview-action-card,
-.reference-redesign .overview-action-card + .card {
+/* JavaFX CSS is intentionally simpler than browser CSS: do not use the
+   unsupported adjacent-sibling selector here. Width is finalized in Java. */
+.reference-redesign .overview-action-card {
     -fx-max-width: Infinity;
 }
 
 /* ---------- Population distributions ---------- */
-.reference-redesign .population-histogram-card {
-    -fx-min-height: 365px;
-    -fx-pref-height: 420px;
-    -fx-max-height: 455px;
-}
-
-.reference-redesign .population-histogram-card .bar-chart {
-    -fx-min-height: 295px;
-    -fx-pref-height: 340px;
-    -fx-max-height: 365px;
-}
-
-/* Prevent oversized bars from making the three distributions look artificially tall. */
+/* Dynamic min/pref/max geometry belongs to the JavaFX layout controller.
+   Keeping it out of CSS prevents CSS and Java from fighting on every relayout. */
 .reference-redesign .population-histogram-card .chart-plot-background {
     -fx-background-insets: 0;
 }
