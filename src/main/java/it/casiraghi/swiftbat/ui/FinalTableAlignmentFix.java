@@ -1,12 +1,14 @@
 package it.casiraghi.swiftbat.ui;
 
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.control.Label;
+import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
@@ -19,12 +21,14 @@ import java.net.URL;
 import java.util.List;
 
 /**
- * Final table geometry owner. Every table uses native TableColumn headers and
- * the same visible left origin for header and body text on Windows/macOS.
+ * Final table geometry owner. Each header is one full-width Label with exactly
+ * the same left inset as the body cells. This avoids platform-dependent header
+ * offsets in the JavaFX table skin, especially on macOS.
  */
 public final class FinalTableAlignmentFix {
     private static final String WATCHED = FinalTableAlignmentFix.class.getName() + ".watched";
     private static final String TABLE_DONE = FinalTableAlignmentFix.class.getName() + ".tableDone";
+    private static final String TITLE_KEY = FinalTableAlignmentFix.class.getName() + ".title";
     private static final String CSS = stylesheet();
 
     private FinalTableAlignmentFix() { }
@@ -37,7 +41,7 @@ public final class FinalTableAlignmentFix {
         if (node == null) return;
         if (node instanceof TableView<?> table) {
             normalizeTable(table);
-            return;
+            return; // never walk VirtualFlow rows/cells while scrolling
         }
         if (node instanceof ScrollPane scroll) {
             if (scroll.getContent() != null) watch(scroll.getContent());
@@ -91,9 +95,6 @@ public final class FinalTableAlignmentFix {
 
         Runnable normalize = () -> {
             for (TableColumn<?, ?> column : List.copyOf(table.getColumns())) normalizeColumn(column);
-            table.applyCss();
-            forceVisibleHeaderGeometry(table);
-            table.refresh();
             table.requestLayout();
         };
         normalize.run();
@@ -103,48 +104,52 @@ public final class FinalTableAlignmentFix {
             table.getProperties().put(TABLE_DONE, Boolean.TRUE);
             table.getColumns().addListener((ListChangeListener<TableColumn<?, ?>>) change -> Platform.runLater(normalize));
             table.skinProperty().addListener((obs, oldSkin, newSkin) -> Platform.runLater(normalize));
-            table.widthProperty().addListener((obs, oldWidth, newWidth) -> Platform.runLater(() -> forceVisibleHeaderGeometry(table)));
+            I18n.languageProperty().addListener((obs, oldLanguage, newLanguage) -> Platform.runLater(normalize));
         }
     }
 
     private static void normalizeColumn(TableColumn<?, ?> column) {
         if (column == null) return;
 
-        Node graphic = column.getGraphic();
-        if (graphic instanceof HBox header && header.getStyleClass().contains("closable-column-header")) {
-            String title = null;
-            for (Node child : header.getChildren()) {
-                if (child instanceof Label label && label.getText() != null && !label.getText().isBlank()) {
-                    title = label.getText();
-                    break;
-                }
-            }
-            if (title != null) column.setText(title);
-            column.setGraphic(null);
-        }
+        String title = extractTitle(column);
+        if (title != null && !title.isBlank()) column.getProperties().put(TITLE_KEY, title);
+        Object saved = column.getProperties().get(TITLE_KEY);
+        String finalTitle = saved instanceof String text ? text : (title == null ? "" : title);
 
-        if (!column.getStyleClass().contains("final-left-column")) column.getStyleClass().add("final-left-column");
+        Label header = new Label(finalTitle);
+        header.getStyleClass().addAll("table-header-label", "final-table-header-label");
+        header.setAlignment(Pos.CENTER_LEFT);
+        header.setTextAlignment(javafx.scene.text.TextAlignment.LEFT);
+        header.setTextOverrun(OverrunStyle.ELLIPSIS);
+        header.setEllipsisString("…");
+        header.setPadding(new Insets(0, 9, 0, 9));
+        header.setMinWidth(0);
+        header.setMaxWidth(Double.MAX_VALUE);
+        header.prefWidthProperty().bind(Bindings.max(0.0, column.widthProperty().subtract(1.0)));
+
+        column.setText("");
+        column.setGraphic(header);
         column.setStyle("-fx-alignment: CENTER-LEFT;");
+
         for (TableColumn<?, ?> child : column.getColumns()) normalizeColumn(child);
     }
 
-    /**
-     * JavaFX's macOS skin can keep CENTER alignment on the actual header Label
-     * even when the TableColumn is left aligned. Set the realized header nodes
-     * directly after CSS; this happens only on layout/resize, never while rows scroll.
-     */
-    private static void forceVisibleHeaderGeometry(TableView<?> table) {
-        try {
-            for (Node node : table.lookupAll(".column-header .label")) {
-                if (!(node instanceof Label label)) continue;
-                label.setAlignment(Pos.CENTER_LEFT);
-                label.setTextAlignment(javafx.scene.text.TextAlignment.LEFT);
-                label.setPadding(new Insets(0, 9, 0, 9));
-                label.setMaxWidth(Double.MAX_VALUE);
-            }
-        } catch (RuntimeException ignored) {
-            // The CSS rule remains the fallback while the skin is not realized.
+    private static String extractTitle(TableColumn<?, ?> column) {
+        String text = column.getText();
+        if (text != null && !text.isBlank()) return text;
+        Node graphic = column.getGraphic();
+        if (graphic instanceof Label label && label.getText() != null && !label.getText().isBlank()) {
+            return label.getText();
         }
+        if (graphic instanceof HBox box) {
+            for (Node child : box.getChildren()) {
+                if (child instanceof Label label && label.getText() != null && !label.getText().isBlank()) {
+                    return label.getText();
+                }
+            }
+        }
+        Object stored = column.getProperties().get(TITLE_KEY);
+        return stored instanceof String value ? value : "";
     }
 
     private static String stylesheet() {
