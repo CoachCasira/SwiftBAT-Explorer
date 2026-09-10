@@ -1,5 +1,6 @@
 package it.casiraghi.swiftbat.ui;
 
+import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.beans.value.ChangeListener;
 import javafx.event.EventHandler;
@@ -21,6 +22,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -62,7 +64,10 @@ public final class InPlaceFullscreen {
         private final StackPane fullscreenRoot;
         private final ChangeListener<Boolean> fullscreenListener;
         private final EventHandler<KeyEvent> keyHandler;
+        private final PauseTransition restoreDelay = new PauseTransition(Duration.millis(110));
         private boolean active;
+        private boolean closing;
+        private boolean leaveFullscreenRequested;
 
         private Session(Scene scene, Stage stage, Node owner, String title, Node content) {
             this.scene = scene;
@@ -94,8 +99,12 @@ public final class InPlaceFullscreen {
             back.setOnAction(event -> close(false));
             keyHandler = this::handleKeyPressed;
             fullscreenListener = (observable, wasFullscreen, isFullscreen) -> {
-                if (active && wasFullscreen && !isFullscreen) close(true);
+                if (!active || !wasFullscreen || isFullscreen) return;
+                leaveFullscreenRequested = true;
+                if (!closing) beginClosing();
+                scheduleRootRestore();
             };
+            restoreDelay.setOnFinished(event -> finishClose());
         }
 
         private Node prepareContent(String title, Node content) {
@@ -420,17 +429,63 @@ public final class InPlaceFullscreen {
             }
         }
 
+        /**
+         * Never detach the fullscreen tree synchronously from an input/fullscreen
+         * callback. A CelestialSpherePane owns a SubScene; removing that SubScene
+         * while Glass is still recomputing mouse enter/exit coordinates leaves the
+         * event with a null Scene and causes Scene.getEffectiveCamera() NPE loops.
+         */
         private void close(boolean leaveFullscreen) {
             if (!active) return;
-            active = false;
-            scene.removeEventFilter(KeyEvent.KEY_PRESSED, keyHandler);
-            stage.fullScreenProperty().removeListener(fullscreenListener);
-            scene.getProperties().remove(ACTIVE_SESSION);
-            scene.setRoot(originalRoot);
-            stage.setFullScreenExitHint(originalExitHint);
+            leaveFullscreenRequested |= leaveFullscreen || !originallyFullscreen;
+            if (!closing) beginClosing();
 
-            if (leaveFullscreen || !originallyFullscreen) stage.setFullScreen(false);
-            if (previousFocus != null) previousFocus.requestFocus();
+            if (leaveFullscreenRequested && stage.isFullScreen()) {
+                // Leave native fullscreen on a later pulse. The property listener
+                // will schedule the root restore only after Windows/Glass reports
+                // that the transition has actually completed.
+                Platform.runLater(() -> {
+                    if (!active) return;
+                    if (stage.isFullScreen()) stage.setFullScreen(false);
+                    else scheduleRootRestore();
+                });
+            } else {
+                scheduleRootRestore();
+            }
+        }
+
+        private void beginClosing() {
+            if (closing) return;
+            closing = true;
+            scene.removeEventFilter(KeyEvent.KEY_PRESSED, keyHandler);
+            stage.setFullScreenExitHint(originalExitHint);
+        }
+
+        private void scheduleRootRestore() {
+            if (!active) return;
+            restoreDelay.stop();
+            restoreDelay.playFromStart();
+        }
+
+        private void finishClose() {
+            if (!active) return;
+            if (leaveFullscreenRequested && stage.isFullScreen()) {
+                scheduleRootRestore();
+                return;
+            }
+
+            /* The delay above intentionally lets queued MOUSE_EXITED/ENTERED
+               events drain before the SubScene-containing fullscreen root is
+               detached from this Scene. */
+            if (scene.getRoot() == fullscreenRoot) scene.setRoot(originalRoot);
+            scene.getProperties().remove(ACTIVE_SESSION);
+            stage.fullScreenProperty().removeListener(fullscreenListener);
+            stage.setFullScreenExitHint(originalExitHint);
+            restoreDelay.stop();
+            active = false;
+            closing = false;
+
+            if (previousFocus != null) Platform.runLater(previousFocus::requestFocus);
         }
     }
 }
