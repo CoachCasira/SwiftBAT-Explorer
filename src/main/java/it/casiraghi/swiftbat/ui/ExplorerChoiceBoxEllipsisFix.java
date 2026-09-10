@@ -16,20 +16,13 @@ import javafx.scene.control.skin.ChoiceBoxSkin;
 
 import java.util.List;
 
-/**
- * Makes the selected text of the two Explorer 2D ChoiceBoxes stay strictly
- * inside the area before the dropdown arrow, including on the very first
- * JavaFX layout pulse on macOS.
- *
- * <p>The previous implementation changed the Label only through runLater().
- * ChoiceBoxSkin could lay the label out again afterwards and the text would
- * paint under the arrow. This version owns the skin of the two overview
- * ChoiceBoxes and reapplies the text geometry after every native skin layout.
- * The value/items and popup behaviour are otherwise unchanged.</p>
- */
+/** Keeps Explorer 2D ChoiceBox text inside the arrow lane without extra CSS pulses. */
 public final class ExplorerChoiceBoxEllipsisFix {
     private static final String INSTALLED = ExplorerChoiceBoxEllipsisFix.class.getName() + ".installed";
+    private static final String LABEL_CACHE = ExplorerChoiceBoxEllipsisFix.class.getName() + ".label";
+    private static final String SCHEDULED = ExplorerChoiceBoxEllipsisFix.class.getName() + ".scheduled";
     private static final double RIGHT_TEXT_RESERVE = 38.0;
+    private static final Insets LABEL_PADDING = new Insets(0, RIGHT_TEXT_RESERVE, 0, 0);
 
     private ExplorerChoiceBoxEllipsisFix() { }
 
@@ -40,12 +33,10 @@ public final class ExplorerChoiceBoxEllipsisFix {
 
     private static void visitLogical(Node node) {
         if (node == null) return;
-
         if (node instanceof ChoiceBox<?> choice && insideOverviewChart(choice)) {
             installChoice(choice);
             return;
         }
-
         if (node instanceof ScrollPane scroll) {
             if (scroll.getContent() != null) visitLogical(scroll.getContent());
             return;
@@ -76,56 +67,62 @@ public final class ExplorerChoiceBoxEllipsisFix {
     private static void installChoice(ChoiceBox<?> choice) {
         if (!Boolean.TRUE.equals(choice.getProperties().get(INSTALLED))) {
             choice.getProperties().put(INSTALLED, Boolean.TRUE);
-
-            // Install before the first render whenever possible. The custom skin
-            // delegates all behaviour to ChoiceBoxSkin and only fixes the selected
-            // label after the skin has completed its normal layout.
             try {
                 choice.setSkin(new EllipsisChoiceBoxSkin((ChoiceBox) choice));
             } catch (RuntimeException ignored) {
-                // If JavaFX is momentarily changing skins, the listener below
-                // applies the same geometry as soon as the skin exists.
+                // A later skin callback will apply the same geometry.
             }
 
-            choice.skinProperty().addListener((obs, oldSkin, newSkin) -> schedule(choice));
+            choice.skinProperty().addListener((obs, oldSkin, newSkin) -> {
+                choice.getProperties().remove(LABEL_CACHE);
+                schedule(choice);
+            });
             choice.widthProperty().addListener((obs, oldWidth, newWidth) -> schedule(choice));
             choice.valueProperty().addListener((obs, oldValue, newValue) -> {
                 updateTooltip(choice);
                 schedule(choice);
             });
         }
-
         updateTooltip(choice);
-        applySelectedLabel(choice);
         schedule(choice);
     }
 
     private static void schedule(ChoiceBox<?> choice) {
-        Platform.runLater(() -> applySelectedLabel(choice));
+        if (choice == null || Boolean.TRUE.equals(choice.getProperties().get(SCHEDULED))) return;
+        choice.getProperties().put(SCHEDULED, Boolean.TRUE);
+        Platform.runLater(() -> {
+            choice.getProperties().remove(SCHEDULED);
+            applySelectedLabel(choice);
+        });
     }
 
     private static void applySelectedLabel(ChoiceBox<?> choice) {
-        if (choice == null) return;
+        if (choice == null || choice.getSkin() == null) return;
         try {
-            choice.applyCss();
-            Node labelNode = choice.lookup(".label");
-            if (!(labelNode instanceof Label label)) return;
+            Label label = cachedLabel(choice);
+            if (label == null) return;
 
-            // Do not rely on a maxWidth that ChoiceBoxSkin can overwrite. The
-            // right padding is part of the Label itself, therefore the actual
-            // text layout always reserves the arrow area and ELLIPSIS is applied
-            // before the arrow instead of underneath it.
-            label.setMinWidth(0);
-            label.setMaxWidth(Double.MAX_VALUE);
-            label.setWrapText(false);
-            label.setTextOverrun(OverrunStyle.ELLIPSIS);
-            label.setEllipsisString("...");
-            label.setPadding(new Insets(0, RIGHT_TEXT_RESERVE, 0, 0));
-            label.setClip(null);
-            label.requestLayout();
+            if (label.getMinWidth() != 0) label.setMinWidth(0);
+            if (label.getMaxWidth() != Double.MAX_VALUE) label.setMaxWidth(Double.MAX_VALUE);
+            if (label.isWrapText()) label.setWrapText(false);
+            if (label.getTextOverrun() != OverrunStyle.ELLIPSIS) label.setTextOverrun(OverrunStyle.ELLIPSIS);
+            if (!"...".equals(label.getEllipsisString())) label.setEllipsisString("...");
+            if (!LABEL_PADDING.equals(label.getPadding())) label.setPadding(LABEL_PADDING);
+            if (label.getClip() != null) label.setClip(null);
         } catch (RuntimeException ignored) {
-            // A ChoiceBox can briefly be between skins during tab replacement.
+            // The ChoiceBox can briefly be between skins during tab replacement.
         }
+    }
+
+    private static Label cachedLabel(ChoiceBox<?> choice) {
+        Object cached = choice.getProperties().get(LABEL_CACHE);
+        if (cached instanceof Label label && label.getScene() == choice.getScene()) return label;
+        Node found = choice.lookup(".label");
+        if (found instanceof Label label) {
+            choice.getProperties().put(LABEL_CACHE, label);
+            return label;
+        }
+        return null;
     }
 
     private static void updateTooltip(ChoiceBox<?> choice) {
@@ -134,9 +131,8 @@ public final class ExplorerChoiceBoxEllipsisFix {
         if (text.isBlank()) return;
         Tooltip tooltip = choice.getTooltip();
         if (tooltip == null) {
-            tooltip = UiFactory.quickTooltip(text);
-            choice.setTooltip(tooltip);
-        } else {
+            choice.setTooltip(UiFactory.quickTooltip(text));
+        } else if (!text.equals(tooltip.getText())) {
             tooltip.setText(text);
         }
     }
@@ -149,6 +145,8 @@ public final class ExplorerChoiceBoxEllipsisFix {
         @Override
         protected void layoutChildren(double x, double y, double w, double h) {
             super.layoutChildren(x, y, w, h);
+            // No applyCss()/requestLayout() here: calling either from layoutChildren
+            // creates unnecessary CSS/layout churn while the Explorer is scrolled.
             applySelectedLabel(getSkinnable());
         }
     }
