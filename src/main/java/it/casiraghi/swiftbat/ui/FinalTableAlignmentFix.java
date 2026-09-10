@@ -18,16 +18,7 @@ import javafx.scene.layout.HBox;
 import java.net.URL;
 import java.util.List;
 
-/**
- * Single owner for table alignment across the application.
- *
- * <p>Headers stay native TableColumn headers. This avoids the previous race
- * where TablePreferences restored a native header after this class had inserted
- * a custom graphic header. On macOS the native header label has a small internal
- * offset compared with body cells, so the label gets one explicit 13 px left
- * inset while body cells keep 9 px. The geometry is applied when the skin is
- * created, therefore it is correct from the first visible frame.</p>
- */
+/** Single owner for table alignment across the application. */
 public final class FinalTableAlignmentFix {
     private static final String WATCHED = FinalTableAlignmentFix.class.getName() + ".watched";
     private static final String TABLE_DONE = FinalTableAlignmentFix.class.getName() + ".tableDone";
@@ -44,7 +35,7 @@ public final class FinalTableAlignmentFix {
         if (node == null) return;
         if (node instanceof TableView<?> table) {
             normalizeTable(table);
-            return; // never traverse VirtualFlow rows while scrolling
+            return;
         }
         if (node instanceof ScrollPane scroll) {
             if (scroll.getContent() != null) watch(scroll.getContent());
@@ -105,8 +96,6 @@ public final class FinalTableAlignmentFix {
             applyHeaderGeometry(table);
             table.requestLayout();
         };
-
-        // Run immediately so column state is correct before the first pulse.
         normalize.run();
         Platform.runLater(normalize);
 
@@ -114,24 +103,23 @@ public final class FinalTableAlignmentFix {
             table.getProperties().put(TABLE_DONE, Boolean.TRUE);
             table.getColumns().addListener((ListChangeListener<TableColumn<?, ?>>) change -> Platform.runLater(normalize));
             table.skinProperty().addListener((obs, oldSkin, newSkin) -> Platform.runLater(normalize));
+            table.sceneProperty().addListener((obs, oldScene, newScene) -> {
+                if (newScene != null) Platform.runLater(normalize);
+            });
             I18n.languageProperty().addListener((obs, oldLanguage, newLanguage) -> Platform.runLater(normalize));
         }
     }
 
     private static void normalizeColumn(TableColumn<?, ?> column) {
         if (column == null) return;
-
         String title = extractTitle(column);
         if (title != null && !title.isBlank()) column.getProperties().put(TITLE_KEY, title);
         Object saved = column.getProperties().get(TITLE_KEY);
         String finalTitle = saved instanceof String value ? value : (title == null ? "" : title);
 
-        // Native header only: no HBox, no close-X graphic, no custom full-width
-        // label that can be measured independently from the actual column.
         column.setGraphic(null);
         column.setText(finalTitle);
         column.setStyle("-fx-alignment: CENTER-LEFT;");
-
         for (TableColumn<?, ?> child : column.getColumns()) normalizeColumn(child);
     }
 
@@ -143,7 +131,10 @@ public final class FinalTableAlignmentFix {
                 if (!(node instanceof Label label)) continue;
                 label.setAlignment(Pos.CENTER_LEFT);
                 label.setTextAlignment(javafx.scene.text.TextAlignment.LEFT);
-                label.setPadding(new Insets(0, 9, 0, 13));
+                // JavaFX's macOS header skin already contributes about 4 px on
+                // the left. Body cells use 9 px, so 5 px here produces the same
+                // final visual origin instead of shifting the header to the right.
+                label.setPadding(new Insets(0, 9, 0, 5));
             }
         } catch (RuntimeException ignored) {
             // The table may briefly be between skins while a tab is replaced.
