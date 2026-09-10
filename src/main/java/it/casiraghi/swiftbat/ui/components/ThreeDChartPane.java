@@ -1,6 +1,7 @@
 package it.casiraghi.swiftbat.ui.components;
 
 import it.casiraghi.swiftbat.model.TabularData;
+import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
 import it.casiraghi.swiftbat.ui.I18n;
 import it.casiraghi.swiftbat.ui.InPlaceFullscreen;
 import it.casiraghi.swiftbat.ui.UiFactory;
@@ -37,6 +38,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Contenitore JavaFX per il renderer scientifico Java2D tempo-energia.
@@ -57,6 +59,7 @@ public final class ThreeDChartPane extends BorderPane {
     private final Java2DWaterfallPanel renderer = new Java2DWaterfallPanel();
     private final Label contextLabel = UiFactory.label("GRB", "three-d-context");
     private final Label zoomLabel = UiFactory.label("Zoom 100%", "three-d-zoom-inline");
+    private final FlowPane legend = new FlowPane(12, 5);
     private final boolean allowFullscreen;
     private final StackPane viewer;
 
@@ -121,6 +124,12 @@ public final class ThreeDChartPane extends BorderPane {
         contextLabel.setText(this.contextName);
     }
 
+    /** Rebuilds this already-created 3D pane when the Explorer 2D band selector changes. */
+    public void refreshBandSelection() {
+        refreshLegend();
+        rebuildDataset();
+    }
+
     private void rebuildDataset() {
         Java2DWaterfallPanel.Dataset dataset = toDataset(sourceData,
                 WINDOWS.getOrDefault(windowChoice.getValue(), 60.0));
@@ -132,9 +141,16 @@ public final class ThreeDChartPane extends BorderPane {
         int timeIndex = data.indexOf("TIME_FROM_TRIGGER_CENTER_S");
         if (timeIndex < 0) return Java2DWaterfallPanel.Dataset.empty();
 
-        int[] bandIndices = new int[BANDS.size()];
-        for (int band = 0; band < BANDS.size(); band++) {
-            bandIndices[band] = data.indexOf(BANDS.get(band).field());
+        Set<String> selectedLabels = ExplorerBandSelectionEnhancer.effectiveBandsFor3D();
+        List<Band> activeBands = new ArrayList<>();
+        for (Band band : BANDS) {
+            if (selectedLabels.contains(band.label())) activeBands.add(band);
+        }
+        if (activeBands.isEmpty()) activeBands.addAll(BANDS);
+
+        int[] bandIndices = new int[activeBands.size()];
+        for (int band = 0; band < activeBands.size(); band++) {
+            bandIndices[band] = data.indexOf(activeBands.get(band).field());
             if (bandIndices[band] < 0) return Java2DWaterfallPanel.Dataset.empty();
         }
 
@@ -145,9 +161,9 @@ public final class ThreeDChartPane extends BorderPane {
             if (!Double.isFinite(time)) continue;
             if (!Double.isInfinite(selectedWindow) && Math.abs(time) > selectedWindow) continue;
 
-            double[] rates = new double[BANDS.size()];
+            double[] rates = new double[activeBands.size()];
             boolean valid = true;
-            for (int band = 0; band < BANDS.size(); band++) {
+            for (int band = 0; band < activeBands.size(); band++) {
                 int column = bandIndices[band];
                 if (column >= row.size()) {
                     valid = false;
@@ -166,15 +182,15 @@ public final class ThreeDChartPane extends BorderPane {
 
         List<Sample> samples = sampleRows(eligible, 520);
         double[] times = new double[samples.size()];
-        double[][] rates = new double[BANDS.size()][samples.size()];
+        double[][] rates = new double[activeBands.size()][samples.size()];
         for (int index = 0; index < samples.size(); index++) {
             Sample sample = samples.get(index);
             times[index] = sample.time();
-            for (int band = 0; band < BANDS.size(); band++) rates[band][index] = sample.rates()[band];
+            for (int band = 0; band < activeBands.size(); band++) rates[band][index] = sample.rates()[band];
         }
 
-        String[] labels = BANDS.stream().map(Band::label).toArray(String[]::new);
-        Color[] colors = BANDS.stream().map(Band::color).toArray(Color[]::new);
+        String[] labels = activeBands.stream().map(Band::label).toArray(String[]::new);
+        Color[] colors = activeBands.stream().map(Band::color).toArray(Color[]::new);
         return new Java2DWaterfallPanel.Dataset(times, rates, labels, colors);
     }
 
@@ -200,21 +216,27 @@ public final class ThreeDChartPane extends BorderPane {
         titleRow.getChildren().addAll(title, spacer, contextLabel);
 
         Label text = UiFactory.wrappedLabel(
-                "Asse X = tempo dal trigger; asse Y = rate; profondità = quattro bande energetiche. "
+                "Asse X = tempo dal trigger; asse Y = rate; profondità = bande energetiche attive nel grafico 2D. "
                         + "Ogni linea è una curva di luce a bin di 1 secondo: la vista non rappresenta "
                         + "una distanza nello spazio né uno spettro continuo. Trascina per ruotare e usa la rotella per lo zoom.",
                 "overlay-caption");
         text.setMaxWidth(Double.MAX_VALUE);
 
-        FlowPane legend = new FlowPane(12, 5);
+        refreshLegend();
+        header.getChildren().addAll(titleRow, text, legend);
+        return header;
+    }
+
+    private void refreshLegend() {
+        Set<String> selectedLabels = ExplorerBandSelectionEnhancer.effectiveBandsFor3D();
+        legend.getChildren().clear();
         for (Band band : BANDS) {
+            if (!selectedLabels.contains(band.label())) continue;
             Label item = new Label("● " + band.label());
             item.setStyle("-fx-text-fill: " + toHex(band.color()) + ";");
             item.getStyleClass().add("legend-item");
             legend.getChildren().add(item);
         }
-        header.getChildren().addAll(titleRow, text, legend);
-        return header;
     }
 
     private HBox buildFooter() {
