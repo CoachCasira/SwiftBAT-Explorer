@@ -5,6 +5,7 @@ import javafx.collections.ListChangeListener;
 import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.CheckBox;
@@ -20,8 +21,11 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.WeakHashMap;
 
 /**
  * Last-mile fixes for Explorer controls that depend on the first JavaFX layout pass.
@@ -34,6 +38,7 @@ public final class ExplorerVisualStabilityFixes {
     private static final String WINDOW_DONE = ExplorerVisualStabilityFixes.class.getName() + ".windowDone";
     private static final String CHART_DONE = ExplorerVisualStabilityFixes.class.getName() + ".chartDone";
     private static final String SCROLL_DONE = ExplorerVisualStabilityFixes.class.getName() + ".scrollDone";
+    private static final Set<Scene> WATCHED_SCENES = Collections.newSetFromMap(new WeakHashMap<>());
 
     private static Parent installedRoot;
 
@@ -43,10 +48,52 @@ public final class ExplorerVisualStabilityFixes {
         if (root == null) return;
         installedRoot = root;
         watch(root);
+        observeScene(root);
         Platform.runLater(() -> {
             scan(root);
             polishAllScrollbars(root);
         });
+    }
+
+    private static void observeScene(Parent root) {
+        if (root.getScene() != null) watchScene(root.getScene());
+        root.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene != null) watchScene(newScene);
+        });
+    }
+
+    private static void watchScene(Scene scene) {
+        if (scene == null || !WATCHED_SCENES.add(scene)) return;
+        scene.rootProperty().addListener((obs, oldRoot, newRoot) -> {
+            if (newRoot == null) return;
+            // InPlaceFullscreen swaps the Scene root. The old implementation only
+            // watched descendants of the application root, so the fullscreen chart
+            // was never repaired after InteractiveViewSyncEnhancer had synchronized it.
+            Platform.runLater(() -> repairDynamicRoot(newRoot));
+        });
+        Parent current = scene.getRoot();
+        if (current != null) Platform.runLater(() -> repairDynamicRoot(current));
+    }
+
+    private static void repairDynamicRoot(Parent root) {
+        watch(root);
+        scan(root);
+        repairExplorerCharts(root);
+        polishAllScrollbars(root);
+        // A second pulse covers JavaFX series nodes and axis layout that are created
+        // after the first CSS/layout pass of the new fullscreen root.
+        Platform.runLater(() -> repairExplorerCharts(root));
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static void repairExplorerCharts(Node node) {
+        if (node == null) return;
+        if (node instanceof LineChart<?, ?> raw && isExplorerLightCurve(raw)) {
+            ensureScientificSeries((LineChart<Number, Number>) raw);
+        }
+        if (node instanceof Parent parent) {
+            for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) repairExplorerCharts(child);
+        }
     }
 
     private static void watch(Node node) {
@@ -150,9 +197,6 @@ public final class ExplorerVisualStabilityFixes {
         rawChart.getProperties().put(CHART_DONE, Boolean.TRUE);
         LineChart<Number, Number> chart = (LineChart) rawChart;
 
-        // Fullscreen charts are created dynamically. If their first frame contains
-        // only the trigger marker, copy the currently visible scientific series
-        // before the first paint instead of waiting for the user to touch a filter.
         Platform.runLater(() -> ensureScientificSeries(chart));
         chart.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) Platform.runLater(() -> ensureScientificSeries(chart));
