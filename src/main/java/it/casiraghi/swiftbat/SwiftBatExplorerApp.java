@@ -2,6 +2,7 @@ package it.casiraghi.swiftbat;
 
 import it.casiraghi.swiftbat.ui.AdaptiveChromeEnhancer;
 import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
+import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerVisualStabilityFixes;
 import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
@@ -67,6 +68,7 @@ public final class SwiftBatExplorerApp extends Application {
         SkyMap3DInteractionGuard.install(mainView.getRoot());
         InteractionPolishEnhancer.install(mainView.getRoot());
         ChartInteractionEnhancer.install(mainView.getRoot());
+        CurveInteractionLinkEnhancer.install(mainView.getRoot());
         UiBugFixes.install(mainView.getRoot());
 
         AdaptiveChromeEnhancer.install(mainView.getRoot());
