@@ -61,10 +61,10 @@ public final class PageScopedPolishRouter {
         if (workspace == null) return;
         page.getProperties().put(EXPLORER_BRIDGE, Boolean.TRUE);
 
-        // One initial pass covers the sidebar/catalog and all already materialised
-        // controls. The workspace listener below only processes genuinely new
-        // detail children; it never rescans the whole Explorer after that.
+        // Both are Explorer-scoped and installed once. Neither descends into
+        // virtualized table/list skins or chart point internals anymore.
         ExplorerScrollbarFix.install(page);
+        ExplorerVisualFastFixes.install(page);
 
         for (Node child : List.copyOf(workspace.getChildren())) polishExplorerWorkspaceChild(page, child);
         workspace.getChildren().addListener((ListChangeListener<Node>) change -> {
@@ -76,8 +76,6 @@ public final class PageScopedPolishRouter {
     }
 
     private static void polishExplorerWorkspaceChild(ExplorerPage page, Node node) {
-        // New workspace child only. This subtree-scoped install is cheap and also
-        // catches lazily-created ScrollPane/ListView/TableView skins.
         ExplorerScrollbarFix.install(node);
 
         Node content = node instanceof ScrollPane scroll && scroll.getContent() != null
@@ -89,8 +87,6 @@ public final class PageScopedPolishRouter {
             ExplorerOverflowFix.apply(content);
             ExplorerChoiceBoxEllipsisFix.install(content);
 
-            // One post-layout geometry correction is enough; installers above
-            // own their listeners/skins and must not be reinstalled each pulse.
             Platform.runLater(() -> {
                 FinalExpertUiPolish.polishExplorer(content);
                 ExplorerOverflowFix.apply(content);
