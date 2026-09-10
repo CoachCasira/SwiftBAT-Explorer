@@ -1,32 +1,33 @@
 /* SwiftBAT Explorer 1.3.0 — last visual stability layer. */
 
-/* ---------- Tables: keep the vertical scrollbar visually lightweight ---------- */
-.reference-redesign .stable-table-scroll {
-    -fx-background-insets: 0;
-}
-
-.reference-redesign .stable-table-scroll .scroll-bar:vertical {
+/* ---------- Tables: scrollbar in a real external gutter ---------- */
+.reference-redesign .external-table-scroll-shell {
     -fx-background-color: transparent;
-    -fx-pref-width: 5.5px;
-    -fx-min-width: 5.5px;
-    -fx-max-width: 5.5px;
     -fx-padding: 0;
 }
 
-.reference-redesign .stable-table-scroll .scroll-bar:vertical .track,
-.reference-redesign .stable-table-scroll .scroll-bar:vertical .track-background {
+.reference-redesign .table-external-scrollbar {
+    -fx-background-color: transparent;
+    -fx-pref-width: 7px;
+    -fx-min-width: 7px;
+    -fx-max-width: 7px;
+    -fx-padding: 0;
+}
+
+.reference-redesign .table-external-scrollbar .track,
+.reference-redesign .table-external-scrollbar .track-background {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
 }
 
-.reference-redesign .stable-table-scroll .scroll-bar:vertical .thumb {
-    -fx-background-color: linear-gradient(to bottom, rgba(200, 62, 239, 0.82), rgba(37, 177, 247, 0.86));
+.reference-redesign .table-external-scrollbar .thumb {
+    -fx-background-color: linear-gradient(to bottom, rgba(200, 62, 239, 0.90), rgba(37, 177, 247, 0.92));
     -fx-background-radius: 999px;
     -fx-background-insets: 0;
 }
 
-.reference-redesign .stable-table-scroll .scroll-bar:vertical .increment-button,
-.reference-redesign .stable-table-scroll .scroll-bar:vertical .decrement-button {
+.reference-redesign .table-external-scrollbar .increment-button,
+.reference-redesign .table-external-scrollbar .decrement-button {
     -fx-background-color: transparent;
     -fx-padding: 0;
     -fx-pref-height: 0;
@@ -34,34 +35,18 @@
     -fx-max-height: 0;
 }
 
-.reference-redesign .stable-table-scroll .scroll-bar:vertical .increment-arrow,
-.reference-redesign .stable-table-scroll .scroll-bar:vertical .decrement-arrow {
+.reference-redesign .table-external-scrollbar .increment-arrow,
+.reference-redesign .table-external-scrollbar .decrement-arrow {
     -fx-padding: 0;
     -fx-shape: "";
 }
 
-.reference-redesign .stable-table-scroll .corner {
-    -fx-background-color: transparent;
-}
-
-/* Header and body keep the same clean right edge even when scrolling is needed. */
-.reference-redesign .stable-table-scroll .column-header-background,
-.reference-redesign .stable-table-scroll .virtual-flow,
-.reference-redesign .stable-table-scroll .clipped-container,
-.reference-redesign .stable-table-scroll .sheet {
-    -fx-background-insets: 0;
-}
-
 /* ---------- Explorer side cards ---------- */
-/* JavaFX CSS is intentionally simpler than browser CSS: do not use the
-   unsupported adjacent-sibling selector here. Width is finalized in Java. */
 .reference-redesign .overview-action-card {
     -fx-max-width: Infinity;
 }
 
 /* ---------- Population distributions ---------- */
-/* Dynamic min/pref/max geometry belongs to the JavaFX layout controller.
-   Keeping it out of CSS prevents CSS and Java from fighting on every relayout. */
 .reference-redesign .population-histogram-card .chart-plot-background {
     -fx-background-insets: 0;
 }
