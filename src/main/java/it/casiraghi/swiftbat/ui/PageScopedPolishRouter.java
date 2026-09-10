@@ -18,12 +18,6 @@ import java.util.List;
 /**
  * Routes the lightweight page-specific polish when MainView swaps a page into
  * the page host. Only that direct children list is observed: no global scans.
- *
- * <p>JavaFX controls such as ScrollPane, SplitPane and TabPane do not expose
- * their logical content reliably through getChildrenUnmodifiable() before the
- * skin has been laid out. The activation bridge below therefore enters those
- * content properties explicitly. This makes the final compact layout effective
- * on the first page opening as well as on macOS.</p>
  */
 public final class PageScopedPolishRouter {
     private static final String DONE = PageScopedPolishRouter.class.getName() + ".done";
@@ -50,9 +44,6 @@ public final class PageScopedPolishRouter {
         if (!(node instanceof Parent parent)) return;
         FinalMacAndPopulationPolish.install(parent);
         DefinitiveLayoutAndManualSelectionFix.install(parent);
-
-        // Final table geometry owner. It deliberately stops at TableView nodes,
-        // so VirtualFlow/skin internals are never scanned while scrolling.
         FinalTableAlignmentFix.install(parent);
 
         if (parent instanceof ExplorerPage explorer) activateExplorer(explorer);
@@ -86,11 +77,11 @@ public final class PageScopedPolishRouter {
             FinalExpertUiPolish.polishExplorer(content);
             ExplorerOverflowFix.apply(content);
             FinalTableAlignmentFix.install(content);
-            MetadataSelectorRestoreFix.install(content);
+            MetadataFieldSearchFix.install(content);
             Platform.runLater(() -> {
                 FinalExpertUiPolish.polishExplorer(content);
                 ExplorerOverflowFix.apply(content);
-                MetadataSelectorRestoreFix.install(content);
+                MetadataFieldSearchFix.install(content);
             });
             return;
         }
@@ -104,20 +95,15 @@ public final class PageScopedPolishRouter {
             }
         }
 
-        // Run on the complete dashboard: fixes the 2D toolbar, all Explorer
-        // tables and deterministically restores the searchable/grouped A-Z
-        // metadata selector regardless of the active UI language.
         FinalExpertUiPolish.polishExplorer(content);
         ExplorerOverflowFix.apply(content);
         FinalTableAlignmentFix.install(content);
-        MetadataSelectorRestoreFix.install(content);
+        MetadataFieldSearchFix.install(content);
 
-        // Older compatibility passes schedule a post-CSS correction. Reapply the
-        // final geometry one pulse later so the laptop layout cannot regress.
         Platform.runLater(() -> {
             FinalExpertUiPolish.polishExplorer(content);
             ExplorerOverflowFix.apply(content);
-            MetadataSelectorRestoreFix.install(content);
+            MetadataFieldSearchFix.install(content);
         });
     }
 
@@ -130,10 +116,7 @@ public final class PageScopedPolishRouter {
         }
         page.getProperties().put(POPULATION_BRIDGE, Boolean.TRUE);
 
-        // The watcher remains on the page so result tables created only after
-        // Analyze group receive the same header/cell geometry automatically.
         FinalTableAlignmentFix.install(page);
-
         invokeDefinitive("alignPopulationFilters", new Class<?>[]{VBox.class}, filterCard);
         invokeDefinitive("installManualSelector", new Class<?>[]{PopulationPage.class, VBox.class}, page, filterCard);
         PopulationResetStabilityFix.install(page, filterCard);
@@ -173,7 +156,6 @@ public final class PageScopedPolishRouter {
                 && (styleClass == null || node.getStyleClass().contains(styleClass))) {
             return type.cast(node);
         }
-
         if (node instanceof ScrollPane scroll && scroll.getContent() != null) {
             T found = findLogical(scroll.getContent(), type, styleClass);
             if (found != null) return found;
