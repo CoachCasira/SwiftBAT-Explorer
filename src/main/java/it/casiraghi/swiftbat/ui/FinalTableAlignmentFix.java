@@ -2,13 +2,10 @@ package it.casiraghi.swiftbat.ui;
 
 import javafx.application.Platform;
 import javafx.collections.ListChangeListener;
-import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
-import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.OverrunStyle;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
@@ -16,21 +13,17 @@ import javafx.scene.control.TabPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
-import javafx.scene.layout.Region;
 
 import java.net.URL;
 import java.util.List;
 
 /**
- * Makes every TableView use the same visual origin for headers and cells.
- * The watcher is page-scoped and stops at TableView itself, so it never walks
- * JavaFX VirtualFlow/skin nodes while the user scrolls.
+ * Final table geometry owner. Every table uses native TableColumn headers and
+ * a single left-aligned origin for both header text and cell text.
  */
 public final class FinalTableAlignmentFix {
     private static final String WATCHED = FinalTableAlignmentFix.class.getName() + ".watched";
     private static final String TABLE_DONE = FinalTableAlignmentFix.class.getName() + ".tableDone";
-    private static final String COLUMN_DONE = FinalTableAlignmentFix.class.getName() + ".columnDone";
     private static final String CSS = stylesheet();
 
     private FinalTableAlignmentFix() { }
@@ -43,7 +36,7 @@ public final class FinalTableAlignmentFix {
         if (node == null) return;
         if (node instanceof TableView<?> table) {
             normalizeTable(table);
-            return; // never descend into VirtualFlow/skin internals
+            return; // do not traverse VirtualFlow / skin internals
         }
 
         if (node instanceof ScrollPane scroll) {
@@ -100,6 +93,7 @@ public final class FinalTableAlignmentFix {
 
         Runnable normalize = () -> {
             for (TableColumn<?, ?> column : List.copyOf(table.getColumns())) normalizeColumn(column);
+            table.refresh();
             table.requestLayout();
         };
         normalize.run();
@@ -114,44 +108,25 @@ public final class FinalTableAlignmentFix {
 
     private static void normalizeColumn(TableColumn<?, ?> column) {
         if (column == null) return;
+
+        // Compatibility with tables already created by the old layout: extract
+        // the actual title from the graphic header, then remove the entire HBox/X
+        // structure. Native TableColumn text is laid out by the same skin that
+        // owns the column boundary, so it cannot drift into the neighbouring cell.
         Node graphic = column.getGraphic();
         if (graphic instanceof HBox header && header.getStyleClass().contains("closable-column-header")) {
-            header.setAlignment(Pos.CENTER_LEFT);
-            header.setPadding(new Insets(0, 2, 0, 9));
-            header.setSpacing(4);
-            header.setMinWidth(0);
-            header.setMaxWidth(Double.MAX_VALUE);
-            fitHeader(header, column.getWidth());
-
+            String title = null;
             for (Node child : header.getChildren()) {
-                if (child instanceof Label label) {
-                    label.setAlignment(Pos.CENTER_LEFT);
-                    label.setPadding(Insets.EMPTY);
-                    label.setMinWidth(0);
-                    label.setMaxWidth(Double.MAX_VALUE);
-                    label.setTextOverrun(OverrunStyle.ELLIPSIS);
-                    label.setEllipsisString("…");
-                    HBox.setHgrow(label, Priority.ALWAYS);
-                } else if (child instanceof Button close) {
-                    close.setMinWidth(18);
-                    close.setPrefWidth(18);
-                    close.setMaxWidth(18);
-                    HBox.setHgrow(close, Priority.NEVER);
+                if (child instanceof Label label && label.getText() != null && !label.getText().isBlank()) {
+                    title = label.getText();
+                    break;
                 }
             }
-
-            if (!Boolean.TRUE.equals(column.getProperties().get(COLUMN_DONE))) {
-                column.getProperties().put(COLUMN_DONE, Boolean.TRUE);
-                column.widthProperty().addListener((obs, oldValue, newValue) ->
-                        fitHeader(header, newValue.doubleValue()));
-            }
+            if (title != null) column.setText(title);
+            column.setGraphic(null);
         }
-        for (TableColumn<?, ?> child : column.getColumns()) normalizeColumn(child);
-    }
 
-    private static void fitHeader(HBox header, double columnWidth) {
-        // Account for the small padding used by the JavaFX ColumnHeader skin.
-        header.setPrefWidth(Math.max(0, columnWidth - 10));
+        for (TableColumn<?, ?> child : column.getColumns()) normalizeColumn(child);
     }
 
     private static String stylesheet() {
