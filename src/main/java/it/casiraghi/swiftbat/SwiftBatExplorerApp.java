@@ -5,6 +5,7 @@ import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
 import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
 import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
 import it.casiraghi.swiftbat.ui.MainView;
+import it.casiraghi.swiftbat.ui.ResponsiveLayoutEnhancer;
 import it.casiraghi.swiftbat.ui.UiBugFixes;
 import it.casiraghi.swiftbat.ui.UiLocalizationWatcher;
 import it.casiraghi.swiftbat.ui.UiRefinements;
@@ -32,9 +33,12 @@ public final class SwiftBatExplorerApp extends Application {
                 SwiftBatExplorerApp.class.getResource("/reference-redesign.css").toExternalForm());
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/reference-redesign-final.css").toExternalForm());
-        // Ultimo override: geometria semplice e coerente per tutti i menu a tendina.
+        // Geometria semplice e coerente per tutti i menu a tendina.
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/dropdown-clean.css").toExternalForm());
+        // Ultimo layer: passa automaticamente dalla geometria laptop a quella desktop.
+        scene.getStylesheets().add(
+                SwiftBatExplorerApp.class.getResource("/responsive-layout.css").toExternalForm());
 
         stage.setTitle("SwiftBAT Explorer 1.3.0 — Reference UI Preview");
         stage.getIcons().setAll(BrandLogoAsset.image());
@@ -49,6 +53,9 @@ public final class SwiftBatExplorerApp extends Application {
         InteractionPolishEnhancer.install(mainView.getRoot());
         ChartInteractionEnhancer.install(mainView.getRoot());
         UiBugFixes.install(mainView.getRoot());
+        // Deve essere l'ultimo enhancer: rilassa i vincoli fissati dai layer precedenti
+        // e usa la dimensione effettiva della finestra per il layout finale.
+        ResponsiveLayoutEnhancer.install(mainView.getRoot());
         mainView.initialize();
     }
 
