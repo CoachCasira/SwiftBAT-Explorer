@@ -128,12 +128,19 @@ public final class ExplorerOverflowFix {
     }
 
     private static void installHardClip(HBox controls, VBox chartCard) {
-        if (controls.getClip() instanceof Rectangle clip) {
-            updateClip(clip, controls, chartCard);
-            return;
+        Rectangle clip;
+        if (controls.getClip() instanceof Rectangle existing) {
+            clip = existing;
+            // A previous compatibility pass used bound width/height properties.
+            // Setting a bound Rectangle caused RuntimeException on macOS. The
+            // final owner uses ordinary values and one lightweight listener only.
+            if (clip.widthProperty().isBound()) clip.widthProperty().unbind();
+            if (clip.heightProperty().isBound()) clip.heightProperty().unbind();
+        } else {
+            clip = new Rectangle();
+            controls.setClip(clip);
         }
-        Rectangle clip = new Rectangle();
-        controls.setClip(clip);
+
         updateClip(clip, controls, chartCard);
         if (!Boolean.TRUE.equals(controls.getProperties().get(WIDTH_LISTENER))) {
             controls.getProperties().put(WIDTH_LISTENER, Boolean.TRUE);
@@ -144,6 +151,8 @@ public final class ExplorerOverflowFix {
     }
 
     private static void updateClip(Rectangle clip, HBox controls, VBox chartCard) {
+        if (clip.widthProperty().isBound()) clip.widthProperty().unbind();
+        if (clip.heightProperty().isBound()) clip.heightProperty().unbind();
         double available = Math.max(0, Math.min(controls.getWidth(), chartCard.getWidth() - 24));
         clip.setWidth(available);
         clip.setHeight(Math.max(0, controls.getHeight()));
