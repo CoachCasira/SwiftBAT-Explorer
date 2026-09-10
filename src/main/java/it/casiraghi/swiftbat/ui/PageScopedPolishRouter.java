@@ -86,9 +86,11 @@ public final class PageScopedPolishRouter {
             FinalExpertUiPolish.polishExplorer(content);
             ExplorerOverflowFix.apply(content);
             FinalTableAlignmentFix.install(content);
+            MetadataSelectorRestoreFix.install(content);
             Platform.runLater(() -> {
                 FinalExpertUiPolish.polishExplorer(content);
                 ExplorerOverflowFix.apply(content);
+                MetadataSelectorRestoreFix.install(content);
             });
             return;
         }
@@ -103,16 +105,19 @@ public final class PageScopedPolishRouter {
         }
 
         // Run on the complete dashboard: fixes the 2D toolbar, all Explorer
-        // tables and restores the searchable/grouped A-Z metadata selector.
+        // tables and deterministically restores the searchable/grouped A-Z
+        // metadata selector regardless of the active UI language.
         FinalExpertUiPolish.polishExplorer(content);
         ExplorerOverflowFix.apply(content);
         FinalTableAlignmentFix.install(content);
+        MetadataSelectorRestoreFix.install(content);
 
         // Older compatibility passes schedule a post-CSS correction. Reapply the
         // final geometry one pulse later so the laptop layout cannot regress.
         Platform.runLater(() -> {
             FinalExpertUiPolish.polishExplorer(content);
             ExplorerOverflowFix.apply(content);
+            MetadataSelectorRestoreFix.install(content);
         });
     }
 
