@@ -12,6 +12,7 @@ import it.casiraghi.swiftbat.ui.UiBugFixes;
 import it.casiraghi.swiftbat.ui.UiLastMileFixes;
 import it.casiraghi.swiftbat.ui.UiLocalizationWatcher;
 import it.casiraghi.swiftbat.ui.UiRefinements;
+import it.casiraghi.swiftbat.ui.UiTableAndStartupFixes;
 import it.casiraghi.swiftbat.ui.components.BrandLogoAsset;
 import javafx.application.Application;
 import javafx.scene.Scene;
@@ -42,8 +43,6 @@ public final class SwiftBatExplorerApp extends Application {
                 SwiftBatExplorerApp.class.getResource("/responsive-layout.css").toExternalForm());
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/interactive-layout-final.css").toExternalForm());
-        // Ultimissimo layer: scrollbar delle tabelle, distribuzioni Population e
-        // geometria di stabilità non possono essere sovrascritte dai temi precedenti.
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/stability-final.css").toExternalForm());
 
@@ -65,11 +64,15 @@ public final class SwiftBatExplorerApp extends Application {
 
         AdaptiveChromeEnhancer.install(mainView.getRoot());
 
-        // Dynamic Population geometry now has one Java controller only. Mark the
-        // old stability hooks before installing their non-layout safety passes.
+        // Register the table owner first. Future Explorer/Population pages are
+        // marked before the legacy passes see them, so only one component is
+        // allowed to re-parent a TableView or size its vertical scrollbar.
+        UiTableAndStartupFixes.prepare(mainView.getRoot());
         UiLastMileFixes.prepare(mainView.getRoot());
         FinalUiStabilityEnhancer.install(mainView.getRoot());
         UiLastMileFixes.install(mainView.getRoot());
+        UiTableAndStartupFixes.install(mainView.getRoot());
+
         mainView.initialize();
     }
 
