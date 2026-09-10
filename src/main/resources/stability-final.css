@@ -1,41 +1,555 @@
-/* SwiftBAT Explorer 1.3.0 — last visual stability layer. */
+/* SwiftBAT Explorer 1.3.0 — consolidated final UI layer.
+   This file replaces five separate late-stage stylesheets while preserving
+   their original cascade order. Keeping one parsed stylesheet substantially
+   reduces JavaFX CSS bookkeeping during Explorer layout/scrolling. */
 
-/* ---------- Tables: one external vertical scrollbar ---------- */
+/* ===== reference-redesign-final.css ===== */
+.reference-redesign .top-bar {
+    -fx-min-height: 74px;
+    -fx-pref-height: 74px;
+    -fx-spacing: 8px;
+}
+.reference-redesign .top-brand {
+    -fx-min-width: 220px;
+    -fx-pref-width: 232px;
+    -fx-max-width: 242px;
+    -fx-padding: 0 4px 0 0;
+}
+.reference-redesign .orbit-logo-pane {
+    -fx-effect: dropshadow(gaussian, rgba(101, 84, 255, 0.55), 13, 0.35, 0, 0);
+}
+.reference-redesign .top-brand-title { -fx-font-size: 16px; }
+.reference-redesign .top-brand-subtitle { -fx-font-size: 8px; }
+.reference-redesign .global-search-field {
+    -fx-min-width: 245px;
+    -fx-pref-width: 410px;
+    -fx-max-width: 520px;
+    -fx-min-height: 38px;
+    -fx-pref-height: 38px;
+    -fx-padding: 0 11px;
+}
+.reference-redesign .top-nav-button {
+    -fx-font-size: 10px;
+    -fx-padding: 9px 7px;
+    -fx-content-display: left;
+}
+.reference-redesign .top-telemetry { -fx-spacing: 3px; }
+.reference-redesign .top-telemetry .top-info,
+.reference-redesign .top-telemetry .status-pill {
+    -fx-font-size: 7px;
+    -fx-padding: 4px 6px;
+}
+.reference-redesign .language-switch {
+    -fx-padding: 2px 3px;
+    -fx-spacing: 4px;
+    -fx-alignment: center;
+    -fx-background-color: rgba(5, 17, 38, 0.94);
+    -fx-border-color: rgba(60, 132, 194, 0.34);
+    -fx-border-radius: 9px;
+    -fx-background-radius: 9px;
+}
+.reference-redesign .language-choice {
+    -fx-alignment: center;
+    -fx-spacing: 1px;
+    -fx-padding: 1px 2px;
+}
+.reference-redesign .language-toggle {
+    -fx-min-width: 28px;
+    -fx-pref-width: 28px;
+    -fx-min-height: 23px;
+    -fx-pref-height: 23px;
+    -fx-padding: 2px 4px;
+    -fx-font-size: 9px;
+    -fx-font-weight: 800;
+}
+.reference-redesign .language-flag-icon { -fx-opacity: 0.96; }
+.reference-redesign .top-square-action {
+    -fx-min-width: 37px;
+    -fx-pref-width: 37px;
+    -fx-max-width: 37px;
+    -fx-min-height: 37px;
+    -fx-pref-height: 37px;
+    -fx-padding: 0;
+}
+.reference-redesign .three-d-panel,
+.reference-redesign .sky-map-surface {
+    -fx-background-color:
+        radial-gradient(center 78% 18%, radius 62%, rgba(107, 54, 217, 0.13), transparent),
+        linear-gradient(to bottom right, rgba(3, 14, 32, 0.98), rgba(2, 9, 23, 0.99));
+    -fx-background-radius: 11px;
+    -fx-border-radius: 11px;
+    -fx-border-width: 1px;
+    -fx-border-color: rgba(31, 194, 238, 0.58) rgba(122, 73, 239, 0.58) rgba(226, 63, 215, 0.46) rgba(31, 194, 238, 0.58);
+    -fx-effect: dropshadow(gaussian, rgba(41, 84, 196, 0.24), 18, 0.20, 0, 5);
+}
+.reference-redesign .three-d-viewer {
+    -fx-background-color: linear-gradient(to bottom, #060d1d, #091730);
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-border-color: rgba(47, 126, 202, 0.32);
+}
+.reference-redesign .three-d-header,
+.reference-redesign .three-d-footer {
+    -fx-background-color: rgba(3, 16, 36, 0.91);
+    -fx-border-color: rgba(45, 136, 207, 0.32);
+}
+.reference-redesign .three-d-header {
+    -fx-background-radius: 10px 10px 0 0;
+    -fx-border-width: 0 0 1px 0;
+}
+.reference-redesign .three-d-footer {
+    -fx-background-radius: 0 0 10px 10px;
+    -fx-border-width: 1px 0 0 0;
+    -fx-padding: 9px 12px;
+}
+.reference-redesign .three-d-context,
+.reference-redesign .three-d-zoom-inline,
+.reference-redesign .sky-zoom-label {
+    -fx-background-color: rgba(9, 30, 59, 0.92);
+    -fx-background-radius: 999px;
+    -fx-border-color: rgba(44, 207, 242, 0.42);
+    -fx-border-radius: 999px;
+    -fx-text-fill: #bfefff;
+    -fx-padding: 5px 9px;
+}
+.reference-redesign .three-d-panel .choice-box-modern,
+.reference-redesign .three-d-panel .secondary-button,
+.reference-redesign .sky-map-surface .secondary-button {
+    -fx-background-color: rgba(5, 20, 43, 0.94);
+    -fx-border-color: rgba(51, 178, 232, 0.50);
+    -fx-text-fill: #e5f4ff;
+}
+.reference-redesign .spectral-model-chart .chart-series-line {
+    -fx-stroke: #12dff7;
+    -fx-stroke-width: 3px;
+    -fx-effect: dropshadow(gaussian, rgba(18, 223, 247, 0.50), 9, 0.34, 0, 0);
+}
+.reference-redesign .spectral-model-chart .chart-line-symbol {
+    -fx-background-color: #12dff7, #12dff7;
+}
+.reference-redesign .spectral-flux-chart .chart-bar,
+.reference-redesign .bar-chart .chart-bar {
+    -fx-bar-fill: linear-gradient(to top, #11cfe9 0%, #287ff2 55%, #ae5df4 100%);
+}
+.reference-redesign .population-legend-single { -fx-background-color: #54d7ff; }
+.reference-redesign .population-legend-median { -fx-background-color: #f247d3; }
+.reference-redesign .population-legend-quartile { -fx-background-color: #8b6bff; }
+.reference-redesign .choice-box,
+.reference-redesign .choice-box.choice-box-modern,
+.reference-redesign .combo-box-base,
+.reference-redesign .menu-button.choice-box-modern {
+    -fx-background-color: rgba(3, 14, 33, 0.96);
+    -fx-border-color: rgba(42, 150, 211, 0.52);
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+    -fx-padding: 0;
+}
+.reference-redesign .choice-box > .label,
+.reference-redesign .choice-box.choice-box-modern > .label,
+.reference-redesign .menu-button.choice-box-modern > .label,
+.reference-redesign .combo-box-base > .list-cell,
+.reference-redesign .combo-box > .list-cell {
+    -fx-text-fill: #f1f6ff;
+    -fx-font-weight: 600;
+    -fx-background-color: linear-gradient(to right, rgba(203, 45, 218, 0.34), rgba(43, 105, 236, 0.34));
+    -fx-background-radius: 9px 0 0 9px;
+    -fx-padding: 8px 12px;
+    -fx-alignment: center-left;
+    -fx-text-overrun: ellipsis;
+}
+.reference-redesign .choice-box .open-button,
+.reference-redesign .choice-box.choice-box-modern .open-button,
+.reference-redesign .menu-button.choice-box-modern > .arrow-button,
+.reference-redesign .combo-box-base .arrow-button {
+    -fx-background-color: #061832;
+    -fx-background-radius: 0 9px 9px 0;
+    -fx-min-width: 38px;
+    -fx-pref-width: 38px;
+    -fx-max-width: 38px;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+    -fx-alignment: center;
+}
+.reference-redesign .choice-box .arrow,
+.reference-redesign .choice-box.choice-box-modern .arrow,
+.reference-redesign .menu-button.choice-box-modern > .arrow-button > .arrow,
+.reference-redesign .combo-box-base .arrow {
+    -fx-background-color: #dceaff;
+    -fx-padding: 4px 5px;
+}
+.reference-redesign .combo-box-base:editable > .text-field,
+.reference-redesign .combo-box:editable > .text-field,
+.reference-redesign .compare-combo:editable > .text-field,
+.reference-redesign .metadata-search-combo:editable > .text-field {
+    -fx-padding: 8px 12px;
+    -fx-background-insets: 0;
+}
+.reference-redesign .choice-box:disabled > .label,
+.reference-redesign .choice-box.choice-box-modern:disabled > .label,
+.reference-redesign .combo-box-base:disabled > .list-cell {
+    -fx-text-fill: #8192af;
+    -fx-background-color: rgba(28, 40, 65, 0.42);
+}
+.reference-redesign .main-navigation { -fx-spacing: 7px; }
+
+/* ===== dropdown-clean.css ===== */
+.reference-redesign .choice-box,
+.reference-redesign .choice-box.choice-box-modern,
+.reference-redesign .combo-box-base,
+.reference-redesign .combo-box,
+.reference-redesign .menu-button.choice-box-modern {
+    -fx-min-height: 38px;
+    -fx-pref-height: 38px;
+    -fx-max-height: 38px;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+    -fx-background-color: linear-gradient(to bottom, rgba(8, 24, 47, 0.98), rgba(5, 17, 36, 0.98));
+    -fx-background-radius: 10px;
+    -fx-border-color: rgba(24, 166, 218, 0.72);
+    -fx-border-width: 1px;
+    -fx-border-radius: 10px;
+    -fx-effect: none;
+}
+.reference-redesign .choice-box:hover,
+.reference-redesign .choice-box.choice-box-modern:hover,
+.reference-redesign .combo-box-base:hover,
+.reference-redesign .combo-box:hover,
+.reference-redesign .menu-button.choice-box-modern:hover {
+    -fx-border-color: rgba(44, 211, 242, 0.92);
+    -fx-background-color: linear-gradient(to bottom, rgba(10, 31, 58, 0.99), rgba(6, 21, 43, 0.99));
+}
+.reference-redesign .choice-box:focused,
+.reference-redesign .choice-box:showing,
+.reference-redesign .combo-box-base:focused,
+.reference-redesign .combo-box-base:showing,
+.reference-redesign .menu-button.choice-box-modern:focused,
+.reference-redesign .menu-button.choice-box-modern:showing {
+    -fx-border-color: #27d8f3;
+    -fx-effect: dropshadow(gaussian, rgba(39, 216, 243, 0.18), 8, 0.15, 0, 0);
+}
+.reference-redesign .choice-box > .label,
+.reference-redesign .choice-box.choice-box-modern > .label,
+.reference-redesign .menu-button.choice-box-modern > .label,
+.reference-redesign .combo-box-base > .list-cell,
+.reference-redesign .combo-box > .list-cell {
+    -fx-min-width: 0;
+    -fx-max-width: infinity;
+    -fx-padding: 0 11px 0 12px;
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-background-radius: 9px 0 0 9px;
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-border-insets: 0;
+    -fx-effect: none;
+    -fx-text-fill: #edf6ff;
+    -fx-font-weight: 600;
+    -fx-alignment: center-left;
+    -fx-text-overrun: ellipsis;
+}
+.reference-redesign .choice-box:focused > .label,
+.reference-redesign .choice-box:showing > .label,
+.reference-redesign .combo-box-base:focused > .list-cell,
+.reference-redesign .combo-box-base:showing > .list-cell,
+.reference-redesign .combo-box:focused > .list-cell,
+.reference-redesign .combo-box:showing > .list-cell {
+    -fx-border-color: transparent;
+    -fx-border-width: 0;
+    -fx-border-insets: 0;
+    -fx-background-insets: 0;
+    -fx-effect: none;
+}
+.reference-redesign .choice-box > .open-button,
+.reference-redesign .choice-box.choice-box-modern > .open-button,
+.reference-redesign .combo-box-base > .arrow-button,
+.reference-redesign .combo-box > .arrow-button,
+.reference-redesign .menu-button.choice-box-modern > .arrow-button {
+    -fx-min-width: 32px;
+    -fx-pref-width: 32px;
+    -fx-max-width: 32px;
+    -fx-min-height: 36px;
+    -fx-pref-height: 36px;
+    -fx-max-height: 36px;
+    -fx-padding: 0;
+    -fx-background-insets: 0;
+    -fx-background-color: rgba(9, 29, 55, 0.98);
+    -fx-background-radius: 0 9px 9px 0;
+    -fx-border-color: transparent transparent transparent rgba(45, 137, 191, 0.46);
+    -fx-border-width: 0 0 0 1px;
+    -fx-alignment: center;
+}
+.reference-redesign .choice-box > .open-button > .arrow,
+.reference-redesign .choice-box.choice-box-modern > .open-button > .arrow,
+.reference-redesign .combo-box-base > .arrow-button > .arrow,
+.reference-redesign .combo-box > .arrow-button > .arrow,
+.reference-redesign .menu-button.choice-box-modern > .arrow-button > .arrow {
+    -fx-padding: 0;
+    -fx-min-width: 8px;
+    -fx-pref-width: 8px;
+    -fx-max-width: 8px;
+    -fx-min-height: 5px;
+    -fx-pref-height: 5px;
+    -fx-max-height: 5px;
+    -fx-shape: "M 0 0 L 8 0 L 4 5 Z";
+    -fx-scale-shape: false;
+    -fx-background-color: #bcd8ef;
+    -fx-effect: none;
+}
+.reference-redesign .choice-box:hover > .open-button > .arrow,
+.reference-redesign .combo-box-base:hover > .arrow-button > .arrow,
+.reference-redesign .menu-button.choice-box-modern:hover > .arrow-button > .arrow {
+    -fx-background-color: #eff9ff;
+}
+.reference-redesign .combo-box-base:editable > .text-field,
+.reference-redesign .combo-box:editable > .text-field,
+.reference-redesign .compare-combo:editable > .text-field,
+.reference-redesign .metadata-search-combo:editable > .text-field {
+    -fx-padding: 0 10px 0 12px;
+    -fx-background-insets: 0;
+    -fx-background-color: transparent;
+    -fx-text-fill: #edf6ff;
+    -fx-prompt-text-fill: #7890ad;
+}
+.reference-redesign .choice-box:disabled,
+.reference-redesign .combo-box-base:disabled,
+.reference-redesign .menu-button.choice-box-modern:disabled { -fx-opacity: 0.62; }
+.reference-redesign .population-filter-group .choice-box-modern,
+.reference-redesign .explorer-filter-card .choice-box-modern,
+.reference-redesign .metadata-field-toolbar .choice-box-modern,
+.reference-redesign .compare-control-bar .choice-box-modern { -fx-font-size: 12px; }
+.reference-redesign .sky-fullscreen-stable,
+.reference-redesign .sky-fullscreen-stable:hover,
+.reference-redesign .sky-fullscreen-stable:focused,
+.reference-redesign .sky-fullscreen-stable:pressed { -fx-effect: none; }
+
+/* ===== responsive-layout.css ===== */
+.reference-redesign.layout-wide .top-bar {
+    -fx-min-height: 84px;
+    -fx-pref-height: 84px;
+    -fx-spacing: 11px;
+    -fx-padding: 9px 18px;
+}
+.reference-redesign.layout-wide .top-brand-title { -fx-font-size: 20px; }
+.reference-redesign.layout-wide .top-brand-subtitle { -fx-font-size: 10px; }
+.reference-redesign.layout-wide .global-search-field {
+    -fx-min-height: 44px;
+    -fx-pref-height: 44px;
+    -fx-font-size: 13px;
+    -fx-padding: 0 15px;
+}
+.reference-redesign.layout-wide .top-nav-button {
+    -fx-font-size: 13px;
+    -fx-padding: 11px 12px;
+}
+.reference-redesign.layout-wide .top-telemetry { -fx-spacing: 5px; }
+.reference-redesign.layout-wide .top-telemetry .top-info,
+.reference-redesign.layout-wide .top-telemetry .status-pill {
+    -fx-font-size: 9px;
+    -fx-padding: 6px 9px;
+}
+.reference-redesign.layout-wide .language-switch {
+    -fx-padding: 4px 5px;
+    -fx-spacing: 5px;
+}
+.reference-redesign.layout-wide .language-toggle {
+    -fx-min-width: 33px;
+    -fx-pref-width: 33px;
+    -fx-min-height: 27px;
+    -fx-pref-height: 27px;
+    -fx-font-size: 10px;
+}
+.reference-redesign.layout-wide .top-square-action {
+    -fx-min-width: 42px;
+    -fx-pref-width: 42px;
+    -fx-max-width: 42px;
+    -fx-min-height: 42px;
+    -fx-pref-height: 42px;
+}
+.reference-redesign.layout-wide .nav-button {
+    -fx-min-height: 56px;
+    -fx-font-size: 15px;
+    -fx-padding: 15px 17px;
+}
+.reference-redesign.layout-wide .nav-footer-title { -fx-font-size: 13px; }
+.reference-redesign.layout-wide .nav-footer-version,
+.reference-redesign.layout-wide .nav-footer-line,
+.reference-redesign.layout-wide .nav-source { -fx-font-size: 10px; }
+.reference-redesign.layout-wide .nav-source-button {
+    -fx-min-height: 39px;
+    -fx-font-size: 11px;
+}
+.reference-redesign.layout-wide .page-title { -fx-font-size: 30px; }
+.reference-redesign.layout-wide .page-subtitle { -fx-font-size: 13px; }
+.responsive-top-spacer { -fx-background-color: transparent; }
+.reference-redesign .population-chart-card,
+.reference-redesign .population-histogram-card { -fx-max-height: Infinity; }
+.reference-redesign .population-chart,
+.reference-redesign .population-histogram-card .bar-chart { -fx-max-height: Infinity; }
+.reference-redesign .population-simple-export-row {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 3px 0 3px 0;
+    -fx-spacing: 0;
+    -fx-alignment: center-left;
+}
+.reference-redesign .population-table-export { -fx-padding: 9px 15px; }
+.reference-redesign .population-result-table {
+    -fx-padding: 0;
+    -fx-table-cell-border-color: rgba(65, 129, 196, 0.22);
+}
+.reference-redesign .population-result-table .column-header-background { -fx-padding: 0; }
+.reference-redesign .population-result-table .column-header,
+.reference-redesign .population-result-table .filler {
+    -fx-border-color: transparent rgba(65, 129, 196, 0.22) rgba(65, 129, 196, 0.18) transparent;
+    -fx-border-width: 0 1px 1px 0;
+    -fx-padding: 4px 0;
+}
+.reference-redesign .population-result-table .closable-column-header {
+    -fx-padding: 0 9px 0 14px;
+    -fx-spacing: 6px;
+    -fx-alignment: center-left;
+}
+.reference-redesign .population-result-table .table-header-label {
+    -fx-padding: 0;
+    -fx-font-size: 11px;
+    -fx-text-overrun: ellipsis;
+}
+.reference-redesign .population-result-table .column-close-button {
+    -fx-min-width: 19px;
+    -fx-pref-width: 19px;
+    -fx-max-width: 19px;
+    -fx-min-height: 19px;
+    -fx-pref-height: 19px;
+    -fx-padding: 0;
+}
+.reference-redesign .population-result-table .table-cell {
+    -fx-padding: 8px 14px;
+    -fx-alignment: center-left;
+}
+.reference-redesign.layout-wide .population-result-table .table-cell {
+    -fx-font-size: 13px;
+    -fx-padding: 9px 14px;
+}
+.reference-redesign.layout-wide .population-result-table .table-header-label { -fx-font-size: 12px; }
+.reference-redesign .population-result-table .table-row-cell { -fx-background-insets: 0; }
+.reference-redesign .population-result-table .virtual-flow,
+.reference-redesign .population-result-table .clipped-container,
+.reference-redesign .population-result-table .sheet { -fx-padding: 0; }
+
+/* ===== interactive-layout-final.css ===== */
+.reference-redesign .interactive-visual-card { -fx-cursor: hand; }
+.reference-redesign .interactive-visual-card:hover {
+    -fx-border-color: rgba(52, 205, 246, 0.72) rgba(120, 87, 244, 0.68) rgba(224, 67, 219, 0.54) rgba(52, 205, 246, 0.72);
+    -fx-effect: dropshadow(gaussian, rgba(35, 171, 238, 0.24), 20, 0.22, 0, 4);
+}
+.reference-redesign .interactive-plot { -fx-cursor: hand; }
+.reference-redesign .population-chart-card > .hbox,
+.reference-redesign .population-chart-card .spectroscopy-chart-actions { -fx-alignment: center-left; }
+.reference-redesign.layout-roomy .top-bar {
+    -fx-min-height: 80px;
+    -fx-pref-height: 80px;
+    -fx-spacing: 10px;
+}
+.reference-redesign.layout-roomy .top-brand-title { -fx-font-size: 18px; }
+.reference-redesign.layout-roomy .top-brand-subtitle { -fx-font-size: 9.5px; }
+.reference-redesign.layout-roomy .global-search-field {
+    -fx-min-height: 42px;
+    -fx-pref-height: 42px;
+    -fx-font-size: 12.5px;
+    -fx-padding: 0 14px;
+}
+.reference-redesign.layout-roomy .top-nav-button {
+    -fx-font-size: 12.5px;
+    -fx-padding: 10px 10px;
+}
+.reference-redesign.layout-roomy .top-telemetry { -fx-spacing: 4px; }
+.reference-redesign.layout-roomy .top-telemetry .top-info,
+.reference-redesign.layout-roomy .top-telemetry .status-pill {
+    -fx-font-size: 8.5px;
+    -fx-padding: 5px 8px;
+}
+.reference-redesign.layout-roomy .language-switch {
+    -fx-padding: 3px 4px;
+    -fx-spacing: 4px;
+}
+.reference-redesign.layout-roomy .language-toggle {
+    -fx-min-width: 31px;
+    -fx-pref-width: 31px;
+    -fx-min-height: 26px;
+    -fx-pref-height: 26px;
+    -fx-font-size: 10px;
+}
+.reference-redesign.layout-roomy .top-square-action {
+    -fx-min-width: 40px;
+    -fx-pref-width: 40px;
+    -fx-max-width: 40px;
+    -fx-min-height: 40px;
+    -fx-pref-height: 40px;
+}
+.reference-redesign.layout-roomy .nav-button {
+    -fx-min-height: 53px;
+    -fx-font-size: 14px;
+    -fx-padding: 14px 16px;
+}
+.reference-redesign.layout-roomy .nav-footer-title { -fx-font-size: 12px; }
+.reference-redesign.layout-roomy .nav-footer-version,
+.reference-redesign.layout-roomy .nav-footer-line,
+.reference-redesign.layout-roomy .nav-source { -fx-font-size: 9.5px; }
+.reference-redesign.layout-roomy .nav-source-button {
+    -fx-min-height: 37px;
+    -fx-font-size: 10.5px;
+}
+.reference-redesign.layout-very-wide .top-bar {
+    -fx-min-height: 86px;
+    -fx-pref-height: 86px;
+    -fx-spacing: 12px;
+}
+.reference-redesign.layout-very-wide .top-brand-title { -fx-font-size: 20px; }
+.reference-redesign.layout-very-wide .top-brand-subtitle { -fx-font-size: 10px; }
+.reference-redesign.layout-very-wide .global-search-field {
+    -fx-min-height: 45px;
+    -fx-pref-height: 45px;
+    -fx-font-size: 13.5px;
+}
+.reference-redesign.layout-very-wide .top-nav-button {
+    -fx-font-size: 13.5px;
+    -fx-padding: 11px 12px;
+}
+.reference-redesign.layout-very-wide .top-telemetry .top-info,
+.reference-redesign.layout-very-wide .top-telemetry .status-pill {
+    -fx-font-size: 9px;
+    -fx-padding: 6px 9px;
+}
+.reference-redesign.layout-very-wide .nav-button {
+    -fx-min-height: 57px;
+    -fx-font-size: 15px;
+    -fx-padding: 15px 17px;
+}
+.reference-redesign.layout-very-wide .nav-footer-title { -fx-font-size: 13px; }
+.reference-redesign.layout-very-wide .nav-footer-version,
+.reference-redesign.layout-very-wide .nav-footer-line,
+.reference-redesign.layout-very-wide .nav-source { -fx-font-size: 10px; }
+.reference-redesign .spectroscopy-chart-card .spectral-flux-chart { -fx-padding: 4px 4px 18px 4px; }
+.reference-redesign .spectroscopy-chart-card .spectral-flux-chart .chart-plot-background { -fx-background-insets: 0; }
+
+/* ===== original stability-final.css ===== */
 .reference-redesign .external-table-scroll-shell {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
     -fx-padding: 0;
 }
-
-/*
- * Keep header and body on the exact same JavaFX column geometry.
- * Do not translate nested-column-header: TableView already lays the header out
- * from the TableColumn widths, and any manual translation makes the separators
- * diverge from the body (especially on Windows/HiDPI).
- */
-.reference-redesign .data-table {
-    -fx-table-cell-border-color: transparent;
-}
-
+.reference-redesign .data-table { -fx-table-cell-border-color: transparent; }
 .reference-redesign .data-table .column-header,
 .reference-redesign .data-table .table-cell {
     -fx-border-color: transparent rgba(116, 141, 190, 0.18) transparent transparent;
     -fx-border-width: 0 1 0 0;
     -fx-border-insets: 0;
 }
-
-.reference-redesign .data-table .filler {
-    -fx-border-color: transparent;
-}
-
+.reference-redesign .data-table .filler { -fx-border-color: transparent; }
 .reference-redesign .data-table .column-header-background,
 .reference-redesign .data-table .virtual-flow,
 .reference-redesign .data-table .clipped-container,
-.reference-redesign .data-table .sheet {
-    -fx-background-insets: 0;
-}
-
-/* The visible table scrollbar is the external sibling created by Java code. */
+.reference-redesign .data-table .sheet { -fx-background-insets: 0; }
 .reference-redesign .table-external-scrollbar {
     -fx-background-color: transparent;
     -fx-pref-width: 12px;
@@ -43,20 +557,17 @@
     -fx-max-width: 12px;
     -fx-padding: 0;
 }
-
 .reference-redesign .table-external-scrollbar .track,
 .reference-redesign .table-external-scrollbar .track-background {
     -fx-background-color: transparent;
     -fx-background-insets: 0;
 }
-
 .reference-redesign .table-external-scrollbar .thumb {
     -fx-background-color: linear-gradient(to bottom, rgba(200, 62, 239, 0.88), rgba(37, 177, 247, 0.92));
     -fx-background-radius: 999px;
     -fx-background-insets: 0;
     -fx-min-height: 46px;
 }
-
 .reference-redesign .table-external-scrollbar .increment-button,
 .reference-redesign .table-external-scrollbar .decrement-button {
     -fx-background-color: transparent;
@@ -65,28 +576,22 @@
     -fx-min-height: 0;
     -fx-max-height: 0;
 }
-
 .reference-redesign .table-external-scrollbar .increment-arrow,
 .reference-redesign .table-external-scrollbar .decrement-arrow {
     -fx-padding: 0;
     -fx-shape: "";
 }
-
-/* Explorer GRB catalog: same thickness and a usable minimum thumb length. */
 .reference-redesign .catalog-list .scroll-bar:vertical {
     -fx-pref-width: 12px;
     -fx-min-width: 12px;
     -fx-max-width: 12px;
     -fx-background-color: transparent;
 }
-
 .reference-redesign .catalog-list .scroll-bar:vertical .thumb {
     -fx-background-color: linear-gradient(to bottom, rgba(200, 62, 239, 0.88), rgba(37, 177, 247, 0.92));
     -fx-background-radius: 999px;
     -fx-min-height: 46px;
 }
-
-/* Population focus lock: compact icon button, visually consistent in every view. */
 .reference-redesign .population-curve-lock {
     -fx-min-width: 44px;
     -fx-pref-width: 44px;
@@ -94,23 +599,97 @@
     -fx-font-size: 16px;
     -fx-padding: 7px 9px;
 }
-
 .reference-redesign .population-curve-lock:selected {
     -fx-background-color: linear-gradient(to right, rgba(200, 62, 239, 0.92), rgba(37, 177, 247, 0.92));
     -fx-border-color: rgba(132, 223, 255, 0.90);
 }
+.reference-redesign .overview-action-card { -fx-max-width: Infinity; }
+.reference-redesign .population-histogram-card .chart-plot-background { -fx-background-insets: 0; }
+.reference-redesign .catalog-list .list-cell { -fx-cell-size: 68px; }
 
-/* ---------- Explorer side cards ---------- */
-.reference-redesign .overview-action-card {
-    -fx-max-width: Infinity;
+/* ===== metadata-field-selector.css (formerly attached per control) ===== */
+.reference-redesign .metadata-field-selector-v2 { -fx-spacing: 7px; }
+.reference-redesign .metadata-field-toolbar-v2 { -fx-alignment: center-left; }
+.reference-redesign .metadata-field-search-v2 {
+    -fx-background-color: #06182b;
+    -fx-border-color: #00b8f0;
+    -fx-border-width: 1.4px;
+    -fx-border-radius: 10px;
+    -fx-background-radius: 10px;
+    -fx-text-fill: #e7f2ff;
+    -fx-prompt-text-fill: #7894b3;
+    -fx-padding: 9px 12px;
+    -fx-font-size: 13px;
+}
+.reference-redesign .metadata-field-search-v2:focused {
+    -fx-border-color: #19d8ff;
+    -fx-effect: dropshadow(gaussian, rgba(0,216,255,0.18), 8, 0.2, 0, 0);
+}
+.reference-redesign .metadata-sort-v2 {
+    -fx-min-height: 38px;
+    -fx-pref-height: 38px;
+    -fx-max-height: 38px;
+}
+.reference-redesign .metadata-field-results-v2 {
+    -fx-background-color: #031326;
+    -fx-border-color: #006b9a;
+    -fx-border-width: 1px;
+    -fx-border-radius: 9px;
+    -fx-background-radius: 9px;
+    -fx-padding: 4px;
+}
+.reference-redesign .metadata-field-results-v2 .list-cell {
+    -fx-background-color: transparent;
+    -fx-text-fill: #d9eaff;
+    -fx-font-size: 13px;
+}
+.reference-redesign .metadata-field-results-v2 .metadata-result-header {
+    -fx-text-fill: #7fa5c6;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-background-color: #07192b;
+}
+.reference-redesign .metadata-field-results-v2 .metadata-result-value:hover,
+.reference-redesign .metadata-field-results-v2 .metadata-result-value:selected {
+    -fx-background-color: linear-gradient(to right, rgba(167,30,211,0.42), rgba(29,105,255,0.38));
+    -fx-text-fill: white;
+}
+.reference-redesign .metadata-field-results-v2 .scroll-bar:vertical {
+    -fx-pref-width: 11px;
+    -fx-min-width: 11px;
+    -fx-max-width: 11px;
+}
+.reference-redesign .metadata-field-results-v2 .scroll-bar:vertical .thumb {
+    -fx-background-radius: 6px;
+    -fx-min-height: 34px;
 }
 
-/* ---------- Population distributions ---------- */
-.reference-redesign .population-histogram-card .chart-plot-background {
-    -fx-background-insets: 0;
+/* ===== final-table-alignment.css (formerly attached per TableView) ===== */
+.reference-redesign .final-aligned-table .column-header,
+.reference-redesign .final-aligned-table .filler {
+    -fx-padding: 0;
+    -fx-alignment: CENTER-LEFT;
 }
-
-/* ---------- Catalog virtualization ---------- */
-.reference-redesign .catalog-list .list-cell {
-    -fx-cell-size: 68px;
+.reference-redesign .final-aligned-table .column-header .label,
+.reference-redesign .final-aligned-table .final-table-header-label {
+    -fx-alignment: CENTER-LEFT;
+    -fx-text-alignment: left;
+    -fx-padding: 0 9 0 5;
+}
+.reference-redesign .final-aligned-table .table-cell {
+    -fx-alignment: CENTER-LEFT;
+    -fx-text-alignment: left;
+    -fx-padding: 7 9 7 9;
+}
+.reference-redesign .final-aligned-table .table-row-cell { -fx-cell-size: 34px; }
+.reference-redesign .final-aligned-table .closable-column-header {
+    -fx-padding: 0;
+    -fx-spacing: 0;
+}
+.reference-redesign .final-aligned-table .column-close-button {
+    -fx-min-width: 0;
+    -fx-pref-width: 0;
+    -fx-max-width: 0;
+    -fx-opacity: 0;
+    -fx-padding: 0;
 }
