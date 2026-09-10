@@ -1,275 +1,93 @@
 package it.casiraghi.swiftbat.ui;
 
-import javafx.application.Platform;
-import javafx.collections.FXCollections;
-import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
-import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
-import javafx.scene.control.ComboBox;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListCell;
 import javafx.scene.control.ScrollPane;
-import javafx.scene.control.Separator;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
-import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
 /**
- * Replaces the legacy FITS-keyword ChoiceBox with the searchable metadata
- * selector requested for the Explorer Metadata tab.
- *
- * <p>The legacy ChoiceBox is removed from the scene graph, not merely hidden.
- * It is kept alive only as the model/control bridge because ExplorerPage's
- * existing listeners already synchronize it with the table and explanation.
- * This guarantees that the old giant popup cannot reappear on macOS.</p>
+ * Installs the rebuilt MetadataFieldSelector in place of ExplorerPage's legacy
+ * FITS-keyword ChoiceBox. The old ChoiceBox remains only as a data bridge for
+ * the listeners already defined by ExplorerPage; it is physically removed from
+ * the visible scene graph, so its platform popup can never be shown.
  */
 public final class MetadataFieldSearchFix {
-    private static final String INSTALLED = MetadataFieldSearchFix.class.getName() + ".installed";
+    private static final String INSTALLED = MetadataFieldSearchFix.class.getName() + ".v2Installed";
 
     private MetadataFieldSearchFix() { }
 
     public static void install(Node root) {
         if (root == null) return;
         for (ChoiceBox<?> raw : findAll(root, ChoiceBox.class)) {
-            if (looksLikeMetadataKeywordChoice(raw)) installOn(raw);
+            if (looksLikeMetadataKeywordChoice(raw)) replace(raw);
         }
     }
 
     @SuppressWarnings("unchecked")
-    private static void installOn(ChoiceBox<?> raw) {
+    private static void replace(ChoiceBox<?> raw) {
         ChoiceBox<String> original = (ChoiceBox<String>) raw;
         if (Boolean.TRUE.equals(original.getProperties().get(INSTALLED))) return;
         if (!(original.getParent() instanceof VBox parent)) return;
 
-        List<String> master = original.getItems().stream()
+        List<String> values = original.getItems().stream()
                 .filter(value -> value != null && !value.isBlank())
                 .distinct()
                 .toList();
-        if (master.isEmpty()) return;
+        if (values.isEmpty()) return;
+
+        int index = parent.getChildren().indexOf(original);
+        if (index < 0) return;
 
         original.getProperties().put(INSTALLED, Boolean.TRUE);
-        int index = parent.getChildren().indexOf(original);
 
-        // Remove any compatibility toolbar that may have been installed by an
-        // older polish pass, then physically remove the old ChoiceBox.
-        parent.getChildren().removeIf(node -> node.getStyleClass().contains("metadata-field-toolbar"));
-        parent.getChildren().remove(original);
+        MetadataFieldSelector selector = new MetadataFieldSelector(
+                values,
+                original.getValue(),
+                original::setValue);
+        selector.setMinWidth(0);
+        selector.setMaxWidth(Double.MAX_VALUE);
 
-        ComboBox<String> search = new ComboBox<>();
-        search.setEditable(true);
-        search.setVisibleRowCount(14);
-        search.getStyleClass().addAll("choice-box-modern", "metadata-search-combo");
-        search.setMinWidth(0);
-        search.setPrefWidth(245);
-        search.setMaxWidth(Double.MAX_VALUE);
-        search.setPromptText(I18n.dynamic("Cerca un campo metadata…", "Search a metadata field…"));
-        HBox.setHgrow(search, Priority.ALWAYS);
-
-        Button sort = UiFactory.button("A → Z", "ghost-button");
-        sort.getStyleClass().add("metadata-sort-button");
-        sort.setMinWidth(68);
-        sort.setPrefWidth(72);
-        sort.setMaxWidth(76);
-        sort.setFocusTraversable(false);
-
-        State state = new State(original, search, sort, master);
-        search.setCellFactory(list -> state.groupedCell());
-        search.setButtonCell(state.buttonCell());
-        sort.setOnAction(event -> state.toggleSort());
-
-        search.getEditor().textProperty().addListener((obs, oldValue, newValue) -> state.filter(newValue));
-        search.getEditor().focusedProperty().addListener((obs, oldValue, focused) -> {
-            if (focused) {
-                Platform.runLater(() -> {
-                    search.getEditor().selectAll();
-                    state.filter(search.getEditor().getText());
-                });
-            } else if (!state.isKnown(search.getEditor().getText())) {
-                state.syncFromOriginal(original.getValue());
+        // Synchronize row -> selector. ExplorerPage already performs row ->
+        // original ChoiceBox, so this listener closes the bridge in the other
+        // direction without duplicating metadata/explanation logic.
+        original.valueProperty().addListener((obs, oldValue, newValue) -> {
+            if (newValue != null && !newValue.isBlank()
+                    && !newValue.equals(selector.selectedValue())) {
+                selector.setSelectedValue(newValue, false);
             }
         });
-        search.setOnAction(event -> {
-            if (state.syncing) return;
-            String selected = search.getSelectionModel().getSelectedItem();
-            if (state.isKnown(selected)) state.commit(selected);
-        });
 
-        // ExplorerPage already listens to this old ChoiceBox. Keeping the bridge
-        // means no duplicate table/explanation logic is introduced here.
-        original.valueProperty().addListener((obs, oldValue, newValue) -> state.syncFromOriginal(newValue));
-        I18n.languageProperty().addListener((obs, oldValue, newValue) ->
-                search.setPromptText(I18n.dynamic("Cerca un campo metadata…", "Search a metadata field…")));
+        // Remove every legacy compatibility control around the old selector.
+        parent.getChildren().removeIf(node -> node != original && (
+                node.getStyleClass().contains("metadata-field-toolbar")
+                        || node.getStyleClass().contains("metadata-field-selector-v2")));
 
-        HBox toolbar = new HBox(8, search, sort);
-        toolbar.getStyleClass().add("metadata-field-toolbar");
-        toolbar.setAlignment(Pos.CENTER_LEFT);
-        toolbar.setMaxWidth(Double.MAX_VALUE);
-        parent.getChildren().add(Math.max(0, Math.min(index, parent.getChildren().size())), toolbar);
-
-        state.rebuild("");
-        state.syncFromOriginal(original.getValue());
-        Platform.runLater(() -> {
-            toolbar.setVisible(true);
-            toolbar.setManaged(true);
-            toolbar.requestLayout();
-        });
+        // Replace the actual node, not its skin. This is the important difference
+        // from the previous attempts: there is no ChoiceBox/ComboBox popup left
+        // in the visible hierarchy at all.
+        parent.getChildren().set(index, selector);
     }
 
     private static boolean looksLikeMetadataKeywordChoice(ChoiceBox<?> choice) {
-        if (choice == null || choice.getItems() == null || choice.getItems().isEmpty()) return false;
+        if (choice == null || choice.getItems() == null || choice.getItems().size() < 3) return false;
         boolean simple = false;
         boolean bitpix = false;
         boolean naxis = false;
         for (Object value : choice.getItems()) {
             String text = value == null ? "" : value.toString().trim().toUpperCase(Locale.ROOT);
             if ("SIMPLE".equals(text)) simple = true;
-            if ("BITPIX".equals(text)) bitpix = true;
-            if ("NAXIS".equals(text)) naxis = true;
+            else if ("BITPIX".equals(text)) bitpix = true;
+            else if ("NAXIS".equals(text)) naxis = true;
         }
         return simple && bitpix && naxis;
-    }
-
-    private static final class State {
-        private final ChoiceBox<String> original;
-        private final ComboBox<String> search;
-        private final Button sort;
-        private final List<String> master;
-        private boolean descending;
-        private boolean syncing;
-
-        State(ChoiceBox<String> original, ComboBox<String> search, Button sort, List<String> master) {
-            this.original = original;
-            this.search = search;
-            this.sort = sort;
-            this.master = new ArrayList<>(master);
-        }
-
-        void toggleSort() {
-            descending = !descending;
-            sort.setText(descending ? "Z → A" : "A → Z");
-            rebuild(search.getEditor().getText());
-        }
-
-        void filter(String raw) {
-            if (!syncing) rebuild(raw);
-        }
-
-        void rebuild(String raw) {
-            String query = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
-            Comparator<String> comparator = Comparator.comparing(value -> value.toUpperCase(Locale.ROOT));
-            if (descending) comparator = comparator.reversed();
-            List<String> values = master.stream()
-                    .filter(value -> query.isBlank() || value.toUpperCase(Locale.ROOT).contains(query))
-                    .sorted(comparator)
-                    .toList();
-
-            String editorText = search.getEditor().getText();
-            syncing = true;
-            try {
-                search.setItems(FXCollections.observableArrayList(values));
-                search.getEditor().setText(editorText == null ? "" : editorText);
-                search.getEditor().positionCaret(search.getEditor().getText().length());
-            } finally {
-                syncing = false;
-            }
-            if (search.getEditor().isFocused() && !values.isEmpty()) Platform.runLater(search::show);
-            else if (values.isEmpty()) search.hide();
-        }
-
-        void commit(String value) {
-            if (!isKnown(value)) return;
-            syncing = true;
-            try {
-                original.setValue(value);
-                search.setValue(value);
-                search.getEditor().setText(value);
-                search.getEditor().positionCaret(value.length());
-                search.hide();
-            } finally {
-                syncing = false;
-            }
-        }
-
-        void syncFromOriginal(String value) {
-            if (value == null || value.isBlank()) return;
-            syncing = true;
-            try {
-                search.setItems(FXCollections.observableArrayList(sortedMaster()));
-                search.setValue(value);
-                search.getEditor().setText(value);
-                search.getEditor().positionCaret(value.length());
-            } finally {
-                syncing = false;
-            }
-        }
-
-        boolean isKnown(String value) {
-            return value != null && master.stream().anyMatch(item -> item.equalsIgnoreCase(value.trim()));
-        }
-
-        List<String> sortedMaster() {
-            Comparator<String> comparator = Comparator.comparing(value -> value.toUpperCase(Locale.ROOT));
-            if (descending) comparator = comparator.reversed();
-            return master.stream().sorted(comparator).toList();
-        }
-
-        ListCell<String> buttonCell() {
-            return new ListCell<>() {
-                @Override protected void updateItem(String item, boolean empty) {
-                    super.updateItem(item, empty);
-                    setGraphic(null);
-                    setText(empty || item == null ? null : item);
-                }
-            };
-        }
-
-        ListCell<String> groupedCell() {
-            return new ListCell<>() {
-                @Override protected void updateItem(String item, boolean empty) {
-                    super.updateItem(item, empty);
-                    setText(null);
-                    setGraphic(null);
-                    if (empty || item == null) return;
-
-                    VBox content = new VBox(2);
-                    int index = getIndex();
-                    String current = group(item);
-                    String previous = index > 0 && index - 1 < getListView().getItems().size()
-                            ? group(getListView().getItems().get(index - 1)) : "";
-                    if (!current.equals(previous)) {
-                        Label letter = new Label(current + " —");
-                        letter.getStyleClass().add("metadata-alpha-header");
-                        Separator line = new Separator();
-                        line.getStyleClass().add("metadata-alpha-separator");
-                        line.setMaxWidth(Double.MAX_VALUE);
-                        HBox.setHgrow(line, Priority.ALWAYS);
-                        HBox header = new HBox(7, letter, line);
-                        header.setAlignment(Pos.CENTER_LEFT);
-                        content.getChildren().add(header);
-                    }
-                    Label field = new Label(item);
-                    field.getStyleClass().add("metadata-field-name");
-                    content.getChildren().add(field);
-                    setGraphic(content);
-                }
-            };
-        }
-
-        private String group(String value) {
-            if (value == null || value.isBlank()) return "#";
-            char first = Character.toUpperCase(value.charAt(0));
-            return Character.isLetter(first) ? String.valueOf(first) : "#";
-        }
     }
 
     private static <T extends Node> List<T> findAll(Node root, Class<T> type) {
