@@ -5,8 +5,10 @@ import javafx.geometry.Bounds;
 import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.Parent;
+import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollBar;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TableView;
 import javafx.scene.control.skin.ScrollBarSkin;
 import javafx.scene.layout.Region;
 
@@ -15,65 +17,126 @@ import java.util.Set;
 /**
  * Stable Explorer scrollbar geometry for macOS and Windows.
  *
- * <p>The stock JavaFX macOS skin can collapse the ScrollPane thumb to a tiny
- * dot on very long pages. CSS min-size values are not sufficient because the
- * skin resizes the thumb explicitly during layout. Explorer therefore installs
- * a small ScrollBarSkin subclass that performs the normal JavaFX layout first
- * and then enforces a real minimum thumb length while preserving the current
- * scroll position.</p>
+ * <p>The Explorer has two different scrollbar sources: ordinary ScrollPane
+ * controls in the detail/dashboard area and VirtualFlow scrollbars generated
+ * lazily by ListView/TableView (notably the GRB catalog on the left). On macOS
+ * those VirtualFlow bars do not exist when the page is first constructed, so a
+ * one-shot lookup misses them and the thumb remains the native tiny dot. This
+ * class listens to the owning control's skin/scene lifecycle and installs the
+ * same stable scrollbar skin as soon as the internal bar is created.</p>
  */
 public final class ExplorerScrollbarFix {
     private static final String INSTALLED = ExplorerScrollbarFix.class.getName() + ".installed";
+    private static final String VIRTUAL_INSTALLED = ExplorerScrollbarFix.class.getName() + ".virtualInstalled";
     private static final String BAR_INSTALLED = ExplorerScrollbarFix.class.getName() + ".barInstalled";
 
-    private static final double BAR_THICKNESS = 14.0;
-    private static final double THUMB_THICKNESS = 10.0;
-    private static final double MIN_THUMB_LENGTH = 52.0;
+    private static final double BAR_THICKNESS = 16.0;
+    private static final double THUMB_THICKNESS = 11.0;
+    private static final double MIN_THUMB_LENGTH = 64.0;
 
     private ExplorerScrollbarFix() { }
 
     public static void install(Node root) {
         if (root == null) return;
+        installRecursively(root);
         if (root instanceof Parent parent) schedule(parent);
-        installOnScrollPanes(root);
     }
 
-    private static void installOnScrollPanes(Node node) {
+    private static void installRecursively(Node node) {
         if (node == null) return;
+
         if (node instanceof ScrollPane scroll) {
-            if (!Boolean.TRUE.equals(scroll.getProperties().get(INSTALLED))) {
-                scroll.getProperties().put(INSTALLED, Boolean.TRUE);
-                scroll.skinProperty().addListener((obs, oldSkin, newSkin) -> schedule(scroll));
-                scroll.viewportBoundsProperty().addListener((obs, oldBounds, newBounds) -> schedule(scroll));
-                scroll.contentProperty().addListener((obs, oldContent, newContent) -> schedule(scroll));
-            }
-            schedule(scroll);
-            if (scroll.getContent() != null) installOnScrollPanes(scroll.getContent());
+            installScrollPane(scroll);
+            if (scroll.getContent() != null) installRecursively(scroll.getContent());
             return;
         }
-        if (node instanceof Parent parent) {
-            for (Node child : parent.getChildrenUnmodifiable()) installOnScrollPanes(child);
+
+        // ListView/TableView create their vertical bars only when their skin and
+        // VirtualFlow are materialised. Hook those lifecycle points explicitly so
+        // the Explorer is correct on the very first opening, not only after a tab
+        // switch or a later layout pass.
+        if (node instanceof ListView<?> list) {
+            installVirtualControl(list);
+            return;
         }
+        if (node instanceof TableView<?> table) {
+            installVirtualControl(table);
+            return;
+        }
+
+        if (node instanceof Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable()) installRecursively(child);
+        }
+    }
+
+    private static void installScrollPane(ScrollPane scroll) {
+        if (!Boolean.TRUE.equals(scroll.getProperties().get(INSTALLED))) {
+            scroll.getProperties().put(INSTALLED, Boolean.TRUE);
+            scroll.skinProperty().addListener((obs, oldSkin, newSkin) -> schedule(scroll));
+            scroll.sceneProperty().addListener((obs, oldScene, newScene) -> {
+                if (newScene != null) schedule(scroll);
+            });
+            scroll.viewportBoundsProperty().addListener((obs, oldBounds, newBounds) -> schedule(scroll));
+            scroll.contentProperty().addListener((obs, oldContent, newContent) -> {
+                if (newContent != null) installRecursively(newContent);
+                schedule(scroll);
+            });
+        }
+        schedule(scroll);
+    }
+
+    private static void installVirtualControl(Parent control) {
+        if (Boolean.TRUE.equals(control.getProperties().get(VIRTUAL_INSTALLED))) {
+            schedule(control);
+            return;
+        }
+        control.getProperties().put(VIRTUAL_INSTALLED, Boolean.TRUE);
+
+        if (control instanceof ListView<?> list) {
+            list.skinProperty().addListener((obs, oldSkin, newSkin) -> schedule(list));
+            list.sceneProperty().addListener((obs, oldScene, newScene) -> {
+                if (newScene != null) schedule(list);
+            });
+            list.itemsProperty().addListener((obs, oldItems, newItems) -> schedule(list));
+            list.heightProperty().addListener((obs, oldValue, newValue) -> schedule(list));
+        } else if (control instanceof TableView<?> table) {
+            table.skinProperty().addListener((obs, oldSkin, newSkin) -> schedule(table));
+            table.sceneProperty().addListener((obs, oldScene, newScene) -> {
+                if (newScene != null) schedule(table);
+            });
+            table.itemsProperty().addListener((obs, oldItems, newItems) -> schedule(table));
+            table.heightProperty().addListener((obs, oldValue, newValue) -> schedule(table));
+        }
+
+        schedule(control);
     }
 
     private static void schedule(Parent root) {
+        if (root == null) return;
+        // Three pulses intentionally cover: attach to Scene -> CSS -> VirtualFlow
+        // creation. No timer and no global observer are left running afterwards.
         Platform.runLater(() -> {
             fixNow(root);
-            Platform.runLater(() -> fixNow(root));
+            Platform.runLater(() -> {
+                fixNow(root);
+                Platform.runLater(() -> fixNow(root));
+            });
         });
     }
 
     private static void fixNow(Parent root) {
         try {
             root.applyCss();
+            root.layout();
             Set<Node> bars = root.lookupAll(".scroll-bar");
             for (Node node : bars) {
                 if (!(node instanceof ScrollBar bar)) continue;
                 installStableSkin(bar);
                 styleBar(bar);
+                bar.requestLayout();
             }
         } catch (RuntimeException ignored) {
-            // A ScrollPane may briefly be between skins during a tab replacement.
+            // A control may briefly be between skins during a tab replacement.
         }
     }
 
@@ -83,7 +146,7 @@ public final class ExplorerScrollbarFix {
             try {
                 bar.setSkin(new StableScrollBarSkin(bar));
             } catch (RuntimeException ignored) {
-                // Keep the platform skin if replacement is temporarily unavailable.
+                return;
             }
         }
         if (!Boolean.TRUE.equals(bar.getProperties().get(BAR_INSTALLED))) {
@@ -93,6 +156,8 @@ public final class ExplorerScrollbarFix {
             bar.maxProperty().addListener((obs, oldValue, newValue) -> bar.requestLayout());
             bar.visibleAmountProperty().addListener((obs, oldValue, newValue) -> bar.requestLayout());
             bar.orientationProperty().addListener((obs, oldValue, newValue) -> bar.requestLayout());
+            bar.heightProperty().addListener((obs, oldValue, newValue) -> bar.requestLayout());
+            bar.widthProperty().addListener((obs, oldValue, newValue) -> bar.requestLayout());
         }
     }
 
@@ -152,22 +217,24 @@ public final class ExplorerScrollbarFix {
 
                 double nativeLength = thumb.getHeight();
                 double length = Math.min(trackLength, Math.max(MIN_THUMB_LENGTH, nativeLength));
-                double thickness = Math.min(THUMB_THICKNESS, Math.max(4.0, trackBounds.getWidth() - 2.0));
+                double thickness = Math.min(THUMB_THICKNESS, Math.max(5.0, trackBounds.getWidth() - 2.0));
                 double px = trackBounds.getMinX() + (trackBounds.getWidth() - thickness) / 2.0;
                 double py = trackBounds.getMinY() + ratio * Math.max(0.0, trackLength - length);
                 thumb.resizeRelocate(px, py, thickness, length);
                 thumb.setMinHeight(MIN_THUMB_LENGTH);
+                thumb.setPrefHeight(length);
             } else {
                 double trackLength = Math.max(0.0, trackBounds.getWidth());
                 if (trackLength <= 0.0) return;
 
                 double nativeLength = thumb.getWidth();
                 double length = Math.min(trackLength, Math.max(MIN_THUMB_LENGTH, nativeLength));
-                double thickness = Math.min(THUMB_THICKNESS, Math.max(4.0, trackBounds.getHeight() - 2.0));
+                double thickness = Math.min(THUMB_THICKNESS, Math.max(5.0, trackBounds.getHeight() - 2.0));
                 double px = trackBounds.getMinX() + ratio * Math.max(0.0, trackLength - length);
                 double py = trackBounds.getMinY() + (trackBounds.getHeight() - thickness) / 2.0;
                 thumb.resizeRelocate(px, py, length, thickness);
                 thumb.setMinWidth(MIN_THUMB_LENGTH);
+                thumb.setPrefWidth(length);
             }
         }
     }
