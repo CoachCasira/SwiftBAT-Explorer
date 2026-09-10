@@ -4,8 +4,7 @@ import it.casiraghi.swiftbat.ui.AdaptiveChromeEnhancer;
 import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
-import it.casiraghi.swiftbat.ui.ExplorerCurveInteractionEnhancer;
-import it.casiraghi.swiftbat.ui.ExplorerSidebarLayoutFix;
+import it.casiraghi.swiftbat.ui.ExplorerCurveInteractionFastEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerVisualStabilityFixes;
 import it.casiraghi.swiftbat.ui.FinalRequestedUiFixes;
 import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
@@ -16,7 +15,7 @@ import it.casiraghi.swiftbat.ui.MainView;
 import it.casiraghi.swiftbat.ui.SkyMap3DInteractionGuard;
 import it.casiraghi.swiftbat.ui.SpectroscopyStartupLayoutFix;
 import it.casiraghi.swiftbat.ui.UiBugFixes;
-import it.casiraghi.swiftbat.ui.UiCrossPlatformPolishEnhancer;
+import it.casiraghi.swiftbat.ui.UiCrossPlatformFastEnhancer;
 import it.casiraghi.swiftbat.ui.UiLastMileFixes;
 import it.casiraghi.swiftbat.ui.UiLocalizationWatcher;
 import it.casiraghi.swiftbat.ui.UiRefinements;
@@ -76,9 +75,10 @@ public final class SwiftBatExplorerApp extends Application {
          * Specialized line interactions must be installed before the generic
          * chart enhancer. Population owns lock/spotlight; Explorer owns the
          * continuous segment hover, tooltip and synchronized 2D/fullscreen focus.
+         * The Explorer implementation is deliberately low-overhead on macOS.
          */
         CurveInteractionLinkEnhancer.install(mainView.getRoot());
-        ExplorerCurveInteractionEnhancer.install(mainView.getRoot());
+        ExplorerCurveInteractionFastEnhancer.install(mainView.getRoot());
         ChartInteractionEnhancer.install(mainView.getRoot());
         UiBugFixes.install(mainView.getRoot());
 
@@ -99,13 +99,11 @@ public final class SwiftBatExplorerApp extends Application {
         UiLastMileFixes.install(mainView.getRoot());
 
         // Deliberately last: normalize skin-dependent scrollbar geometry first,
-        // then apply the final cross-platform icon, translation and laptop-layout
-        // polish after every legacy pass has created its dynamic controls.
+        // then apply the lightweight cross-platform icon/translation/layout pass.
+        // There is now a single owner for the Explorer right sidebar, so it can
+        // never jump to the bottom after the first layout pulse.
         FinalRequestedUiFixes.install(mainView.getRoot());
-        UiCrossPlatformPolishEnhancer.install(mainView.getRoot());
-        // The Explorer overview keeps its supporting cards on the right at every
-        // window size; only their width changes on laptop-sized workspaces.
-        ExplorerSidebarLayoutFix.install(mainView.getRoot());
+        UiCrossPlatformFastEnhancer.install(mainView.getRoot());
 
         mainView.initialize();
     }
