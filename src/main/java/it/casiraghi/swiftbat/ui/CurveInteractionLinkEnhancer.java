@@ -9,7 +9,9 @@ import javafx.scene.Scene;
 import javafx.scene.chart.Axis;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.XYChart;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.control.Tooltip;
+import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.util.Duration;
 
@@ -26,22 +28,26 @@ import java.util.WeakHashMap;
  * Keeps line-curve interaction coherent across embedded and in-place fullscreen
  * views. When a chart already has a focused subset, hovering a dimmed curve
  * temporarily restores its visibility so it can be identified before clicking.
- * Population selections are stored by series name so the same selection can be
- * applied to the 3D population renderer and back again.
+ * Population selections and the optional focus lock are stored globally by
+ * series name so normal 2D, fullscreen 2D and population 3D stay coherent.
  */
 public final class CurveInteractionLinkEnhancer {
     private static final String WATCHED = CurveInteractionLinkEnhancer.class.getName() + ".watched";
     private static final String LINE_DONE = CurveInteractionLinkEnhancer.class.getName() + ".lineDone";
     private static final String HOVER = CurveInteractionLinkEnhancer.class.getName() + ".hover";
+    private static final String LOCK_DONE = CurveInteractionLinkEnhancer.class.getName() + ".lockDone";
+    private static final String LOCK_SYNC = CurveInteractionLinkEnhancer.class.getName() + ".lockSync";
     private static final String CHART_FOCUS = ChartInteractionEnhancer.class.getName() + ".focus";
     private static final String CHART_LINE_DONE = ChartInteractionEnhancer.class.getName() + ".lineDone";
     private static final double HIT_RADIUS = 18.0;
     private static final DecimalFormat NUMBER_FORMAT;
     private static final Set<Scene> WATCHED_SCENES = Collections.newSetFromMap(new WeakHashMap<>());
     private static final LinkedHashSet<String> POPULATION_FOCUS = new LinkedHashSet<>();
+    private static final Set<ToggleButton> POPULATION_LOCK_TOGGLES = Collections.newSetFromMap(new WeakHashMap<>());
 
     private static Parent installedRoot;
     private static Scene installedScene;
+    private static boolean populationLocked;
 
     static {
         DecimalFormatSymbols symbols = DecimalFormatSymbols.getInstance(Locale.US);
@@ -64,6 +70,12 @@ public final class CurveInteractionLinkEnhancer {
         }
     }
 
+    public static boolean populationFocusLocked() {
+        synchronized (POPULATION_FOCUS) {
+            return populationLocked;
+        }
+    }
+
     public static void setPopulationFocusedNames(Set<String> names) {
         LinkedHashSet<String> normalized = new LinkedHashSet<>();
         if (names != null) {
@@ -75,8 +87,83 @@ public final class CurveInteractionLinkEnhancer {
         synchronized (POPULATION_FOCUS) {
             POPULATION_FOCUS.clear();
             POPULATION_FOCUS.addAll(normalized);
+            if (POPULATION_FOCUS.isEmpty()) populationLocked = false;
         }
-        Platform.runLater(CurveInteractionLinkEnhancer::refreshPopulationCharts);
+        Platform.runLater(() -> {
+            refreshPopulationCharts();
+            syncPopulationLockToggles();
+        });
+    }
+
+    public static void setPopulationFocusLocked(boolean locked) {
+        synchronized (POPULATION_FOCUS) {
+            populationLocked = locked && !POPULATION_FOCUS.isEmpty();
+        }
+        Platform.runLater(() -> {
+            refreshPopulationCharts();
+            syncPopulationLockToggles();
+        });
+    }
+
+    /** Creates one UI endpoint for the shared Population focus lock. */
+    public static void bindPopulationLockToggle(ToggleButton toggle) {
+        if (toggle == null) return;
+        if (!Platform.isFxApplicationThread()) {
+            Platform.runLater(() -> bindPopulationLockToggle(toggle));
+            return;
+        }
+        synchronized (POPULATION_LOCK_TOGGLES) {
+            POPULATION_LOCK_TOGGLES.add(toggle);
+        }
+        if (!toggle.getStyleClass().contains("population-curve-lock")) {
+            toggle.getStyleClass().addAll("ghost-button", "population-curve-lock");
+        }
+        toggle.setFocusTraversable(false);
+        if (!Boolean.TRUE.equals(toggle.getProperties().get(LOCK_DONE))) {
+            toggle.getProperties().put(LOCK_DONE, Boolean.TRUE);
+            toggle.selectedProperty().addListener((obs, oldValue, selected) -> {
+                if (Boolean.TRUE.equals(toggle.getProperties().get(LOCK_SYNC))) return;
+                setPopulationFocusLocked(selected);
+            });
+            I18n.languageProperty().addListener((obs, oldLanguage, newLanguage) -> syncPopulationLockToggle(toggle));
+        }
+        syncPopulationLockToggle(toggle);
+    }
+
+    private static void syncPopulationLockToggles() {
+        if (!Platform.isFxApplicationThread()) {
+            Platform.runLater(CurveInteractionLinkEnhancer::syncPopulationLockToggles);
+            return;
+        }
+        synchronized (POPULATION_LOCK_TOGGLES) {
+            for (ToggleButton toggle : List.copyOf(POPULATION_LOCK_TOGGLES)) {
+                if (toggle != null) syncPopulationLockToggle(toggle);
+            }
+        }
+    }
+
+    private static void syncPopulationLockToggle(ToggleButton toggle) {
+        boolean locked = populationFocusLocked();
+        boolean hasSelection = !populationFocusedNames().isEmpty();
+        toggle.getProperties().put(LOCK_SYNC, Boolean.TRUE);
+        try {
+            toggle.setSelected(locked);
+            toggle.setDisable(!hasSelection && !locked);
+            toggle.setText(locked ? "🔒" : "🔓");
+            String hint = locked
+                    ? I18n.dynamic("Sblocca la selezione delle curve", "Unlock curve selection")
+                    : I18n.dynamic("Blocca le curve selezionate", "Lock selected curves");
+            toggle.setAccessibleText(hint);
+            Tooltip tooltip = toggle.getTooltip();
+            if (tooltip == null) {
+                tooltip = UiFactory.quickTooltip(hint);
+                toggle.setTooltip(tooltip);
+            } else {
+                tooltip.setText(hint);
+            }
+        } finally {
+            toggle.getProperties().remove(LOCK_SYNC);
+        }
     }
 
     private static void observeScene(Parent root) {
@@ -96,6 +183,7 @@ public final class CurveInteractionLinkEnhancer {
                 watch(newRoot);
                 scan(newRoot);
                 refreshPopulationCharts();
+                syncPopulationLockToggles();
             });
         });
         Parent current = scene.getRoot();
@@ -147,7 +235,8 @@ public final class CurveInteractionLinkEnhancer {
         }
 
         chart.addEventHandler(MouseEvent.MOUSE_MOVED, event -> {
-            SeriesHit hit = nearest(chart, event.getX(), event.getY());
+            boolean lockedPopulation = isPopulationChart(chart) && populationFocusLocked();
+            SeriesHit hit = nearest(chart, event.getX(), event.getY(), lockedPopulation);
             Set<XYChart.Series> focus = focusedSeries(chart);
             XYChart.Series hovered = hit == null || !selectable(hit.series()) || focus.isEmpty() ? null : hit.series();
             chart.getProperties().put(HOVER, hovered);
@@ -179,10 +268,25 @@ public final class CurveInteractionLinkEnhancer {
             if (standaloneTooltip != null) standaloneTooltip.hide();
         });
 
-        chart.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> Platform.runLater(() -> {
-            if (isPopulationChart(chart)) capturePopulationFocus(chart);
-            applyVisualState(chart);
-        }));
+        /*
+         * Capture phase is intentional for the Population lock: it must stop the
+         * generic ChartInteractionEnhancer click before that handler can mutate the
+         * focused set. Other charts keep their previous interaction semantics.
+         */
+        chart.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
+            if (isPopulationChart(chart) && populationFocusLocked()
+                    && event.getButton() == MouseButton.PRIMARY) {
+                chart.getProperties().remove(HOVER);
+                applyVisualState(chart);
+                if (standaloneTooltip != null) standaloneTooltip.hide();
+                event.consume();
+                return;
+            }
+            Platform.runLater(() -> {
+                if (isPopulationChart(chart)) capturePopulationFocus(chart);
+                applyVisualState(chart);
+            });
+        });
 
         chart.getData().addListener((ListChangeListener<XYChart.Series>) change -> Platform.runLater(() -> {
             if (isPopulationChart(chart)) restorePopulationFocus(chart);
@@ -196,14 +300,16 @@ public final class CurveInteractionLinkEnhancer {
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private static SeriesHit nearest(LineChart chart, double mouseX, double mouseY) {
+    private static SeriesHit nearest(LineChart chart, double mouseX, double mouseY, boolean focusedOnly) {
         if (chart.getScene() == null) return null;
         Axis xAxis = chart.getXAxis();
         Axis yAxis = chart.getYAxis();
+        Set<XYChart.Series> focus = focusedOnly ? focusedSeries(chart) : Set.of();
         double best = HIT_RADIUS * HIT_RADIUS;
         SeriesHit result = null;
         for (Object rawSeries : chart.getData()) {
             XYChart.Series series = (XYChart.Series) rawSeries;
+            if (focusedOnly && !focus.contains(series)) continue;
             if (series.getData() == null || series.getData().isEmpty()) continue;
             for (Object rawData : series.getData()) {
                 XYChart.Data data = (XYChart.Data) rawData;
@@ -255,12 +361,14 @@ public final class CurveInteractionLinkEnhancer {
         Set<XYChart.Series> focus = focusedSeries(chart);
         Object hoverRaw = chart.getProperties().get(HOVER);
         XYChart.Series hovered = hoverRaw instanceof XYChart.Series series ? series : null;
+        boolean lockedPopulation = isPopulationChart(chart) && populationFocusLocked();
         for (Object raw : chart.getData()) {
             XYChart.Series series = (XYChart.Series) raw;
             Node node = series.getNode();
             if (node == null) continue;
             String name = series.getName();
-            boolean active = focus.isEmpty() || focus.contains(series) || series == hovered;
+            boolean active = focus.isEmpty() || focus.contains(series)
+                    || (!lockedPopulation && series == hovered);
             node.setOpacity(active ? 1.0 : isTrigger(name) ? 0.50 : 0.09);
         }
     }
@@ -278,8 +386,11 @@ public final class CurveInteractionLinkEnhancer {
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static void restorePopulationFocus(LineChart chart) {
         Set<String> desired = populationFocusedNames();
-        if (desired.isEmpty()) return;
         Set<XYChart.Series> focus = focusedSeries(chart);
+        if (desired.isEmpty()) {
+            focus.clear();
+            return;
+        }
         LinkedHashSet<XYChart.Series> matched = new LinkedHashSet<>();
         for (Object raw : chart.getData()) {
             XYChart.Series series = (XYChart.Series) raw;
@@ -314,6 +425,7 @@ public final class CurveInteractionLinkEnhancer {
                     if (name != null && desired.contains(name)) focus.add(series);
                 }
             }
+            chart.getProperties().remove(HOVER);
             applyVisualState(chart);
         }
         if (node instanceof Parent parent) {
