@@ -8,6 +8,7 @@ import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
 import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
 import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
 import it.casiraghi.swiftbat.ui.MainView;
+import it.casiraghi.swiftbat.ui.SpectroscopyStartupLayoutFix;
 import it.casiraghi.swiftbat.ui.UiBugFixes;
 import it.casiraghi.swiftbat.ui.UiLastMileFixes;
 import it.casiraghi.swiftbat.ui.UiLocalizationWatcher;
@@ -72,6 +73,7 @@ public final class SwiftBatExplorerApp extends Application {
          */
         UiTableAndStartupFixes.prepare(mainView.getRoot());
         UiTableAndStartupFixes.install(mainView.getRoot());
+        SpectroscopyStartupLayoutFix.install(mainView.getRoot());
 
         UiLastMileFixes.prepare(mainView.getRoot());
         FinalUiStabilityEnhancer.install(mainView.getRoot());
