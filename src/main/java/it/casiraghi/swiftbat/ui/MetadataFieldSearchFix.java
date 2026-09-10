@@ -10,7 +10,9 @@ import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Separator;
+import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.layout.HBox;
@@ -23,9 +25,13 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Deterministic restoration of the metadata selector used before the late UI
- * polish passes. It identifies the real FITS keyword ChoiceBox by its contents,
- * so it is independent of language, tab timing and label text.
+ * Replaces the legacy FITS-keyword ChoiceBox with the searchable metadata
+ * selector requested for the Explorer Metadata tab.
+ *
+ * <p>The legacy ChoiceBox is removed from the scene graph, not merely hidden.
+ * It is kept alive only as the model/control bridge because ExplorerPage's
+ * existing listeners already synchronize it with the table and explanation.
+ * This guarantees that the old giant popup cannot reappear on macOS.</p>
  */
 public final class MetadataFieldSearchFix {
     private static final String INSTALLED = MetadataFieldSearchFix.class.getName() + ".installed";
@@ -35,8 +41,7 @@ public final class MetadataFieldSearchFix {
     public static void install(Node root) {
         if (root == null) return;
         for (ChoiceBox<?> raw : findAll(root, ChoiceBox.class)) {
-            if (!looksLikeMetadataKeywordChoice(raw)) continue;
-            installOn(raw);
+            if (looksLikeMetadataKeywordChoice(raw)) installOn(raw);
         }
     }
 
@@ -46,15 +51,19 @@ public final class MetadataFieldSearchFix {
         if (Boolean.TRUE.equals(original.getProperties().get(INSTALLED))) return;
         if (!(original.getParent() instanceof VBox parent)) return;
 
-        original.getProperties().put(INSTALLED, Boolean.TRUE);
         List<String> master = original.getItems().stream()
                 .filter(value -> value != null && !value.isBlank())
-                .distinct().toList();
+                .distinct()
+                .toList();
         if (master.isEmpty()) return;
 
+        original.getProperties().put(INSTALLED, Boolean.TRUE);
         int index = parent.getChildren().indexOf(original);
-        original.setVisible(false);
-        original.setManaged(false);
+
+        // Remove any compatibility toolbar that may have been installed by an
+        // older polish pass, then physically remove the old ChoiceBox.
+        parent.getChildren().removeIf(node -> node.getStyleClass().contains("metadata-field-toolbar"));
+        parent.getChildren().remove(original);
 
         ComboBox<String> search = new ComboBox<>();
         search.setEditable(true);
@@ -68,20 +77,23 @@ public final class MetadataFieldSearchFix {
 
         Button sort = UiFactory.button("A → Z", "ghost-button");
         sort.getStyleClass().add("metadata-sort-button");
-        sort.setMinWidth(66);
-        sort.setPrefWidth(66);
-        sort.setMaxWidth(66);
+        sort.setMinWidth(68);
+        sort.setPrefWidth(72);
+        sort.setMaxWidth(76);
         sort.setFocusTraversable(false);
 
         State state = new State(original, search, sort, master);
         search.setCellFactory(list -> state.groupedCell());
         search.setButtonCell(state.buttonCell());
         sort.setOnAction(event -> state.toggleSort());
+
         search.getEditor().textProperty().addListener((obs, oldValue, newValue) -> state.filter(newValue));
         search.getEditor().focusedProperty().addListener((obs, oldValue, focused) -> {
             if (focused) {
-                Platform.runLater(search.getEditor()::selectAll);
-                state.filter(search.getEditor().getText());
+                Platform.runLater(() -> {
+                    search.getEditor().selectAll();
+                    state.filter(search.getEditor().getText());
+                });
             } else if (!state.isKnown(search.getEditor().getText())) {
                 state.syncFromOriginal(original.getValue());
             }
@@ -91,6 +103,9 @@ public final class MetadataFieldSearchFix {
             String selected = search.getSelectionModel().getSelectedItem();
             if (state.isKnown(selected)) state.commit(selected);
         });
+
+        // ExplorerPage already listens to this old ChoiceBox. Keeping the bridge
+        // means no duplicate table/explanation logic is introduced here.
         original.valueProperty().addListener((obs, oldValue, newValue) -> state.syncFromOriginal(newValue));
         I18n.languageProperty().addListener((obs, oldValue, newValue) ->
                 search.setPromptText(I18n.dynamic("Cerca un campo metadata…", "Search a metadata field…")));
@@ -99,17 +114,24 @@ public final class MetadataFieldSearchFix {
         toolbar.getStyleClass().add("metadata-field-toolbar");
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setMaxWidth(Double.MAX_VALUE);
-        parent.getChildren().add(Math.max(0, index), toolbar);
+        parent.getChildren().add(Math.max(0, Math.min(index, parent.getChildren().size())), toolbar);
 
         state.rebuild("");
         state.syncFromOriginal(original.getValue());
+        Platform.runLater(() -> {
+            toolbar.setVisible(true);
+            toolbar.setManaged(true);
+            toolbar.requestLayout();
+        });
     }
 
     private static boolean looksLikeMetadataKeywordChoice(ChoiceBox<?> choice) {
         if (choice == null || choice.getItems() == null || choice.getItems().isEmpty()) return false;
-        boolean simple = false, bitpix = false, naxis = false;
+        boolean simple = false;
+        boolean bitpix = false;
+        boolean naxis = false;
         for (Object value : choice.getItems()) {
-            String text = value == null ? "" : value.toString().toUpperCase(Locale.ROOT);
+            String text = value == null ? "" : value.toString().trim().toUpperCase(Locale.ROOT);
             if ("SIMPLE".equals(text)) simple = true;
             if ("BITPIX".equals(text)) bitpix = true;
             if ("NAXIS".equals(text)) naxis = true;
@@ -139,8 +161,7 @@ public final class MetadataFieldSearchFix {
         }
 
         void filter(String raw) {
-            if (syncing) return;
-            rebuild(raw);
+            if (!syncing) rebuild(raw);
         }
 
         void rebuild(String raw) {
@@ -183,8 +204,7 @@ public final class MetadataFieldSearchFix {
             if (value == null || value.isBlank()) return;
             syncing = true;
             try {
-                List<String> values = sortedMaster();
-                search.setItems(FXCollections.observableArrayList(values));
+                search.setItems(FXCollections.observableArrayList(sortedMaster()));
                 search.setValue(value);
                 search.getEditor().setText(value);
                 search.getEditor().positionCaret(value.length());
@@ -227,7 +247,7 @@ public final class MetadataFieldSearchFix {
                     String previous = index > 0 && index - 1 < getListView().getItems().size()
                             ? group(getListView().getItems().get(index - 1)) : "";
                     if (!current.equals(previous)) {
-                        Label letter = new Label(current);
+                        Label letter = new Label(current + " —");
                         letter.getStyleClass().add("metadata-alpha-header");
                         Separator line = new Separator();
                         line.getStyleClass().add("metadata-alpha-separator");
@@ -261,6 +281,10 @@ public final class MetadataFieldSearchFix {
     private static <T extends Node> void collect(Node node, Class<T> type, List<T> result) {
         if (node == null) return;
         if (type.isInstance(node)) result.add(type.cast(node));
+        if (node instanceof ScrollPane scroll && scroll.getContent() != null) collect(scroll.getContent(), type, result);
+        if (node instanceof SplitPane split) {
+            for (Node item : split.getItems()) collect(item, type, result);
+        }
         if (node instanceof TabPane tabs) {
             for (Tab tab : tabs.getTabs()) collect(tab.getContent(), type, result);
         }
