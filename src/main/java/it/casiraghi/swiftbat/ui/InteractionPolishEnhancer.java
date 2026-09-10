@@ -108,8 +108,7 @@ public final class InteractionPolishEnhancer {
     }
 
     private static boolean hasNumberedGuideTitle(Region region) {
-        if (!(region instanceof Parent parent)) return false;
-        for (Node child : parent.getChildrenUnmodifiable()) {
+        for (Node child : region.getChildrenUnmodifiable()) {
             if (child instanceof Label label) {
                 String text = label.getText() == null ? "" : label.getText().trim();
                 if (text.matches("\\d+\\s*·.*")) return true;
@@ -267,7 +266,6 @@ public final class InteractionPolishEnhancer {
         if (!(table.getParent() instanceof VBox box)) return;
 
         table.getProperties().put(TABLE_DONE, Boolean.TRUE);
-        // Evita che il vecchio enhancer aggiunga un secondo pulsante alla stessa tabella.
         table.getProperties().put(CHART_ENHANCER_TABLE_DONE, Boolean.TRUE);
 
         Button export = UiFactory.button("", "ghost-button");
