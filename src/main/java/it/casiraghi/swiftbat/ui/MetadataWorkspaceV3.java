@@ -217,10 +217,9 @@ public final class MetadataWorkspaceV3 {
 
     private static void showIntro(VBox host) {
         host.getChildren().setAll(
-                UiFactory.wrappedLabel(I18n.dynamic("Come leggere i metadati", "How to read metadata"), "definition-title"),
-                UiFactory.wrappedLabel(I18n.dynamic(
-                        "Seleziona una keyword o una riga della tabella per vedere la spiegazione tecnica.",
-                        "Select a keyword or a table row to inspect its technical explanation."),
+                UiFactory.wrappedLabel("Come leggere i metadati", "definition-title"),
+                UiFactory.wrappedLabel(
+                        "Seleziona una riga. I metadati sono il registro tecnico del file FITS: descrivono provenienza, tempi, coordinate, struttura e passaggi di elaborazione.",
                         "explanation-text"));
     }
 
@@ -242,9 +241,8 @@ public final class MetadataWorkspaceV3 {
                     miniExplanation(I18n.dynamic("Perché serve", "Why it matters"), definition.whyItMatters()),
                     miniExplanation(I18n.dynamic("Attenzione", "Caution"), definition.caution()));
         } else {
-            host.getChildren().add(UiFactory.wrappedLabel(I18n.dynamic(
-                    "Questa keyword non è ancora inclusa nel dizionario didattico. Il commento FITS originale rimane visibile.",
-                    "This keyword is not yet included in the learning dictionary. The original FITS comment remains visible."),
+            host.getChildren().add(UiFactory.wrappedLabel(
+                    "Questa keyword non è ancora inclusa nel dizionario didattico. Il commento originale del FITS rimane comunque visibile.",
                     "subtle-text"));
         }
     }
