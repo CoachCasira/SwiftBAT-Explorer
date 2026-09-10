@@ -1,61 +1,6 @@
-/* SwiftBAT Explorer 1.3.0 — targeted UX refinements */
-
-.metadata-field-toolbar {
-    -fx-alignment: center-left;
-    -fx-spacing: 7px;
-}
-
-.metadata-search-combo {
-    -fx-background-color: rgba(20, 30, 54, 0.96);
-    -fx-background-radius: 12px;
-    -fx-border-color: rgba(117, 143, 194, 0.20);
-    -fx-border-radius: 12px;
-}
-
-.metadata-search-combo:focused {
-    -fx-border-color: #5fdaff;
-    -fx-effect: dropshadow(gaussian, rgba(69, 205, 255, 0.16), 14, 0.2, 0, 0);
-}
-
-.metadata-search-combo .text-field {
-    -fx-background-color: transparent;
-    -fx-text-fill: #eef3ff;
-    -fx-prompt-text-fill: #657391;
-}
-
-.metadata-search-combo .list-cell {
-    -fx-background-color: #111a2f;
-    -fx-text-fill: #e6edfb;
-    -fx-padding: 6px 9px;
-}
-
-.metadata-search-combo .list-cell:hover,
-.metadata-search-combo .list-cell:filled:selected {
-    -fx-background-color: rgba(54, 91, 145, 0.66);
-}
-
-.metadata-alpha-header {
-    -fx-text-fill: #69dcff;
-    -fx-font-size: 9px;
-    -fx-font-weight: bold;
-    -fx-padding: 3px 0 2px 0;
-}
-
-.metadata-field-name {
-    -fx-text-fill: #e9efff;
-    -fx-font-size: 12px;
-    -fx-padding: 2px 0 3px 3px;
-}
-
-.metadata-alpha-separator .line {
-    -fx-border-color: rgba(105, 220, 255, 0.22);
-    -fx-border-width: 1px 0 0 0;
-}
-
-.metadata-sort-button {
-    -fx-min-width: 64px;
-    -fx-padding: 9px 10px;
-}
+/* SwiftBAT Explorer 1.3.0 — compact targeted refinements.
+   Legacy metadata ComboBox rules were removed: MetadataWorkspaceV3 now owns a
+   dedicated TextField/ListView selector styled by stability-final.css. */
 
 .hidden-column-restore-all {
     -fx-font-weight: bold;
@@ -71,8 +16,7 @@
     -fx-alignment: center;
 }
 
-/* Il dizionario non deve scorrere orizzontalmente: i testi delle celle sono gia' wrappati.
-   Nascondere la barra elimina anche il quadratino/corner bianco mostrato da Windows. */
+/* Il dizionario non deve scorrere orizzontalmente: i testi sono wrappati. */
 .dictionary-list .scroll-bar:horizontal {
     -fx-opacity: 0;
     -fx-min-height: 0;
@@ -87,7 +31,7 @@
     -fx-padding: 0;
 }
 
-/* Population / Included GRBs: stesso inset per header e celle, senza lettere tagliate. */
+/* Population / Included GRBs. */
 .population-result-table {
     -fx-padding: 1px 2px 1px 2px;
 }
@@ -107,4 +51,21 @@
 
 .population-table-toolbar {
     -fx-padding: 1px 4px 2px 4px;
+}
+
+/* Explorer scrollbar styling is class-based: Java no longer mutates inline CSS
+   while the bar is laid out, avoiding parser work and the old heap-growth bug. */
+.reference-redesign .explorer-stable-scrollbar {
+    -fx-background-color: transparent;
+}
+
+.reference-redesign .explorer-stable-scrollbar .track,
+.reference-redesign .explorer-stable-scrollbar .track-background {
+    -fx-background-color: rgba(4,18,34,0.72);
+    -fx-background-radius: 8px;
+}
+
+.reference-redesign .explorer-stable-scrollbar .thumb {
+    -fx-background-color: linear-gradient(to bottom, #ed22e9, #0ba7ff);
+    -fx-background-radius: 8px;
 }
