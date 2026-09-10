@@ -5,7 +5,6 @@ import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerCurveInteractionFastEnhancer;
-import it.casiraghi.swiftbat.ui.ExplorerVisualFastFixes;
 import it.casiraghi.swiftbat.ui.FinalMacAndPopulationPolish;
 import it.casiraghi.swiftbat.ui.FinalRequestedUiFastFixes;
 import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
@@ -31,19 +30,15 @@ import javafx.stage.Stage;
 public final class SwiftBatExplorerApp extends Application {
     @Override
     public void start(Stage stage) {
-        // Rendiamo il dizionario supplementare disponibile anche ai renderer
-        // Java2D/Swing che usano ancora direttamente I18n.t(...).
         LegacyI18nBridge.install();
 
         MainView mainView = new MainView(getHostServices(), stage);
         Scene scene = new Scene(mainView.getRoot(), 1580, 960);
 
         /*
-         * CSS performance: keep only the four base/theme sheets plus one
-         * consolidated final layer. The previous startup registered nine
-         * scene-wide stylesheets, so every CSS pulse in Explorer had to walk
-         * five extra stylesheet objects containing late overrides. Their exact
-         * cascade is now preserved inside stability-final.css.
+         * CSS performance: four base/theme sheets plus one consolidated final
+         * layer. The late reference/dropdown/responsive/interactive sheets are
+         * bundled in stability-final.css in their original cascade order.
          */
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/app.css").toExternalForm());
@@ -66,20 +61,13 @@ public final class SwiftBatExplorerApp extends Application {
         UiLocalizationWatcher.install(mainView.getRoot());
         UiRefinements.install(mainView.getRoot());
         ExplorerBandSelectionEnhancer.install(mainView.getRoot());
-        ExplorerVisualFastFixes.install(mainView.getRoot());
+        // ExplorerVisualFastFixes is intentionally NOT global anymore. It is
+        // installed by PageScopedPolishRouter only when Explorer becomes active.
 
         InteractiveViewSyncEnhancer.install(mainView.getRoot());
-        // Must be registered before InteractionPolishEnhancer: an actual 3D GRB
-        // marker click is selection, not a request to open the whole sky card.
         SkyMap3DInteractionGuard.install(mainView.getRoot());
         InteractionPolishEnhancer.install(mainView.getRoot());
 
-        /*
-         * Specialized line interactions must be installed before the generic
-         * chart enhancer. Population owns lock/spotlight; Explorer owns the
-         * continuous segment hover, tooltip and synchronized 2D/fullscreen focus.
-         * The Explorer implementation is deliberately low-overhead on macOS.
-         */
         CurveInteractionLinkEnhancer.install(mainView.getRoot());
         ExplorerCurveInteractionFastEnhancer.install(mainView.getRoot());
         ChartInteractionEnhancer.install(mainView.getRoot());
@@ -87,12 +75,6 @@ public final class SwiftBatExplorerApp extends Application {
 
         AdaptiveChromeEnhancer.install(mainView.getRoot());
 
-        /*
-         * Table/first-layout ownership must be registered BEFORE the two legacy
-         * stability passes. This order is intentional: dynamically-created tables
-         * are marked and wrapped by UiTableAndStartupFixes first, so the older
-         * UiLastMileFixes wrapper can never re-parent the same TableView.
-         */
         UiTableAndStartupFixes.prepare(mainView.getRoot());
         UiTableAndStartupFixes.install(mainView.getRoot());
         SpectroscopyStartupLayoutFix.install(mainView.getRoot());
@@ -101,17 +83,12 @@ public final class SwiftBatExplorerApp extends Application {
         FinalUiStabilityEnhancer.install(mainView.getRoot());
         UiLastMileFixes.install(mainView.getRoot());
 
-        // Deliberately last: incremental skin fixes only. None of these passes
-        // performs whole-subtree rescans while lists, charts or tables are moving.
         FinalRequestedUiFastFixes.install(mainView.getRoot());
         UiCrossPlatformFastEnhancer.install(mainView.getRoot());
         TargetedLayoutPolish.install(mainView.getRoot());
 
         mainView.initialize();
 
-        // The pages are swapped into MainView's pageHost, so the final compact
-        // geometry is routed exactly when Explorer/Population becomes active.
-        // Only pageHost's direct children are observed: no global scene rescans.
         FinalMacAndPopulationPolish.install(mainView.getRoot());
         PageScopedPolishRouter.install(mainView.getRoot());
     }
