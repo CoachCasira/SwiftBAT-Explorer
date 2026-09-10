@@ -1,6 +1,7 @@
 package it.casiraghi.swiftbat.ui.components;
 
 import it.casiraghi.swiftbat.service.CumulativeAnalysisService;
+import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
 import it.casiraghi.swiftbat.ui.ExportSupport;
 import it.casiraghi.swiftbat.ui.I18n;
 import it.casiraghi.swiftbat.ui.UiFactory;
@@ -38,6 +39,7 @@ public final class Population3DChartPane extends BorderPane {
         getStyleClass().add("three-d-panel");
         setMinHeight(560);
         setPrefHeight(700);
+        renderer.setFocusListener(CurveInteractionLinkEnhancer::setPopulationFocusedNames);
         SwingUtilities.invokeLater(() -> {
             renderer.setPresentation(new Java2DWaterfallPanel.Presentation(
                     "Nessuna curva normalizzata disponibile per la vista 3D.",
@@ -71,7 +73,10 @@ public final class Population3DChartPane extends BorderPane {
                     curveCount + " GRB · mediana + fascia centrale",
                     curveCount + " GRBs · median + central band");
         }
-        SwingUtilities.invokeLater(() -> renderer.setDataset(dataset));
+        SwingUtilities.invokeLater(() -> {
+            renderer.setDataset(dataset);
+            renderer.setFocusedLabels(CurveInteractionLinkEnhancer.populationFocusedNames());
+        });
     }
 
     private Java2DWaterfallPanel.Dataset toDataset(List<CumulativeAnalysisService.NormalizedCurve> curves,
