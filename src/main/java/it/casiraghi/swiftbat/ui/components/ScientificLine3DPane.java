@@ -1,5 +1,7 @@
 package it.casiraghi.swiftbat.ui.components;
 
+import it.casiraghi.swiftbat.ui.ExportSupport;
+import it.casiraghi.swiftbat.ui.I18n;
 import it.casiraghi.swiftbat.ui.UiFactory;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingNode;
@@ -18,6 +20,7 @@ import javafx.scene.layout.VBox;
 import javax.swing.SwingUtilities;
 import java.awt.Color;
 import java.awt.Dimension;
+import java.util.Locale;
 
 /**
  * Contenitore riutilizzabile per una vista scientifica 3D a linee.
@@ -94,8 +97,12 @@ public final class ScientificLine3DPane extends BorderPane {
 
         Button reset = UiFactory.button("Centra vista", "secondary-button");
         reset.setOnAction(event -> SwingUtilities.invokeLater(renderer::resetView));
+        Button export = UiFactory.button("", "secondary-button");
+        I18n.setText(export, "Esporta PNG", "Export PNG");
+        export.setOnAction(event -> ExportSupport.exportSwingPng(
+                this, renderer, slug(title) + "_3d.png"));
 
-        HBox footer = new HBox(12, note, reset);
+        HBox footer = new HBox(12, note, export, reset);
         footer.setAlignment(Pos.CENTER_LEFT);
         footer.getStyleClass().add("three-d-footer");
         return footer;
@@ -115,5 +122,12 @@ public final class ScientificLine3DPane extends BorderPane {
 
     private String toHex(Color color) {
         return String.format("#%02X%02X%02X", color.getRed(), color.getGreen(), color.getBlue());
+    }
+
+    private String slug(String text) {
+        String value = text == null ? "chart" : text.toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "_")
+                .replaceAll("^_+|_+$", "");
+        return value.isBlank() ? "chart" : value;
     }
 }

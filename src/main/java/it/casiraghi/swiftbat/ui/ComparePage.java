@@ -14,6 +14,7 @@ import javafx.scene.Node;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
+import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -357,7 +358,17 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         chart.getData().add(seriesFor(b, normalize.isSelected()));
         VBox.setVgrow(chart, Priority.ALWAYS);
 
-        VBox chartCard = UiFactory.card("Confronto temporale", "", chart);
+        Button export = UiFactory.button("Esporta PNG", "ghost-button");
+        export.setOnAction(event -> ExportSupport.exportPng(export, chart,
+                "comparison_" + a.grbName() + "_" + b.grbName() + ".png"));
+        HBox chartActions = new HBox(export);
+        chartActions.setAlignment(Pos.CENTER_RIGHT);
+        VBox chartContent = new VBox(8, chartActions, chart);
+        chartContent.setMinWidth(0);
+        chartContent.setMaxWidth(Double.MAX_VALUE);
+        VBox.setVgrow(chart, Priority.ALWAYS);
+
+        VBox chartCard = UiFactory.card("Confronto temporale", "", chartContent);
         page.getChildren().addAll(cards, chartCard);
         return page;
     }

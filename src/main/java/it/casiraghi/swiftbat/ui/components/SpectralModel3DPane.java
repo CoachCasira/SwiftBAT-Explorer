@@ -1,6 +1,7 @@
 package it.casiraghi.swiftbat.ui.components;
 
 import it.casiraghi.swiftbat.ui.I18n;
+import it.casiraghi.swiftbat.ui.ExportSupport;
 import it.casiraghi.swiftbat.ui.UiFactory;
 import it.casiraghi.swiftbat.ui.UiTranslations;
 import javafx.application.Platform;
@@ -86,8 +87,12 @@ public final class SpectralModel3DPane extends BorderPane {
 
         Button reset = UiFactory.button("Centra vista", "secondary-button");
         reset.setOnAction(event -> SwingUtilities.invokeLater(renderer::resetView));
+        Button export = UiFactory.button("", "secondary-button");
+        I18n.setText(export, "Esporta PNG", "Export PNG");
+        export.setOnAction(event -> ExportSupport.exportSwingPng(
+                this, renderer, "spectral_model_" + (modelCode.isBlank() ? "NA" : modelCode) + "_3d.png"));
 
-        HBox footer = new HBox(12, legend, zoomLabel, interaction, reset);
+        HBox footer = new HBox(12, legend, zoomLabel, interaction, export, reset);
         footer.setAlignment(Pos.CENTER_LEFT);
         footer.getStyleClass().add("three-d-footer");
         return footer;
@@ -106,6 +111,7 @@ public final class SpectralModel3DPane extends BorderPane {
     }
 
     private static final class SpectralRenderer extends JPanel {
+        private static final long serialVersionUID = 1L;
         private static final Color BG_TOP = new Color(6, 13, 29);
         private static final Color BG_BOTTOM = new Color(9, 23, 48);
         private static final Color GRID = new Color(76, 104, 154, 80);

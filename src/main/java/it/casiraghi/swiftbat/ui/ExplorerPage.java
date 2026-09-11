@@ -17,12 +17,10 @@ import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
-import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.SnapshotParameters;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
@@ -46,7 +44,6 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
 import javafx.scene.control.ToggleButton;
-import javafx.scene.image.WritableImage;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
@@ -58,7 +55,6 @@ import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.util.Duration;
 
-import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
@@ -187,12 +183,13 @@ public final class ExplorerPage extends BorderPane {
         Label title = UiFactory.label(
                 I18n.dynamic("Dati non disponibili per " + entry.grbName(),
                         "Data unavailable for " + entry.grbName()), "empty-title");
-        Label message = UiFactory.wrappedLabel(
-                I18n.dynamic(readableError(error)
-                                + "\n\nL'evento rimane nel catalogo, ma la struttura online può essere incompleta o diversa da quella standard.",
-                        readableError(error)
-                                + "\n\nThe event remains in the catalog, but its online structure may be incomplete or differ from the standard layout."),
-                "empty-message");
+        String technicalError = readableError(error);
+        Label message = UiFactory.wrappedLabel("", "empty-message");
+        I18n.setText(message,
+                technicalError
+                        + "\n\nL'evento rimane nel catalogo, ma la struttura online può essere incompleta o diversa da quella standard.",
+                I18n.english(technicalError)
+                        + "\n\nThe event remains in the catalog, but its online structure may be incomplete or differ from the standard layout.");
         message.setMaxWidth(720);
         HBox actions = new HBox(10);
         actions.setAlignment(Pos.CENTER);
@@ -617,7 +614,8 @@ public final class ExplorerPage extends BorderPane {
         refresh.run();
 
         Button export = UiFactory.button("Esporta PNG", "ghost-button");
-        export.setOnAction(event -> exportNode(chart, data.grbName() + "_curva_1s.png"));
+        export.setOnAction(event -> exportNode(chart, data.grbName()
+                + I18n.dynamic("_curva_1s.png", "_1s_light_curve.png")));
         Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
         fullscreen.setOnAction(event -> openOverviewFullscreen(
                 data, channelChoice.getValue(), windowChoice.getValue(), smooth.isSelected()));
@@ -811,7 +809,7 @@ public final class ExplorerPage extends BorderPane {
         value.setMinWidth(165);
         TableColumn<MetadataItem, String> comment = metadataColumn("Commento originale", item -> item.comment(), 440);
         comment.setMinWidth(240);
-        table.getColumns().addAll(hdu, keyword, value, comment);
+        table.getColumns().addAll(List.of(hdu, keyword, value, comment));
 
         FilteredList<MetadataItem> filtered = new FilteredList<>(FXCollections.observableArrayList(data.metadata()), ignored -> true);
         table.setItems(filtered);
@@ -1183,28 +1181,17 @@ public final class ExplorerPage extends BorderPane {
     }
 
     private void exportNode(Node node, String suggestedName) {
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Esporta il grafico");
-        chooser.setInitialFileName(suggestedName);
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Immagine PNG", "*.png"));
-        File file = chooser.showSaveDialog(getScene().getWindow());
-        if (file == null) {
-            return;
-        }
-        try {
-            WritableImage image = node.snapshot(new SnapshotParameters(), null);
-            ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", file);
-        } catch (IOException error) {
-            Alert alert = new Alert(Alert.AlertType.ERROR, "Esportazione non riuscita: " + error.getMessage());
-            alert.showAndWait();
-        }
+        ExportSupport.exportPng(this, node, suggestedName);
     }
 
     private void exportExcel(GrbData data, boolean asciiOnly) {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle(asciiOnly ? "Esporta ASCII in Excel" : "Esporta FITS e metadati in Excel");
-        chooser.setInitialFileName(data.grbName() + (asciiOnly ? "_ASCII_4CH_1S.xlsx" : "_FITS_METADATI.xlsx"));
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Cartella Excel", "*.xlsx"));
+        chooser.setTitle(I18n.dynamic(
+                asciiOnly ? "Esporta ASCII in Excel" : "Esporta FITS e metadati in Excel",
+                asciiOnly ? "Export ASCII to Excel" : "Export FITS and metadata to Excel"));
+        chooser.setInitialFileName(data.grbName() + (asciiOnly ? "_ASCII_4CH_1S.xlsx" : "_FITS_METADATA.xlsx"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                I18n.dynamic("File Excel", "Excel file"), "*.xlsx"));
         File file = chooser.showSaveDialog(getScene().getWindow());
         if (file == null) {
             return;
@@ -1218,12 +1205,26 @@ public final class ExplorerPage extends BorderPane {
             } else {
                 excelExportService.exportFitsAndMetadata(data, file.toPath());
             }
-            new Alert(Alert.AlertType.INFORMATION,
-                    "File creato correttamente:\n" + file.getAbsolutePath()).showAndWait();
+            showExportAlert(Alert.AlertType.INFORMATION,
+                    I18n.dynamic("Esportazione completata", "Export completed"),
+                    I18n.dynamic("File creato correttamente:\n", "File created successfully:\n")
+                            + file.getAbsolutePath());
         } catch (IOException error) {
-            new Alert(Alert.AlertType.ERROR,
-                    "Esportazione Excel non riuscita: " + error.getMessage()).showAndWait();
+            showExportAlert(Alert.AlertType.ERROR,
+                    I18n.dynamic("Esportazione Excel non riuscita", "Excel export failed"),
+                    UiTranslations.t(error.getMessage()));
         }
+    }
+
+    private void showExportAlert(Alert.AlertType type, String title, String message) {
+        Alert alert = new Alert(type);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message == null ? "" : message);
+        if (getScene() != null && getScene().getWindow() != null) {
+            alert.initOwner(getScene().getWindow());
+        }
+        alert.showAndWait();
     }
 
     private void setWorkspace(Node node) {

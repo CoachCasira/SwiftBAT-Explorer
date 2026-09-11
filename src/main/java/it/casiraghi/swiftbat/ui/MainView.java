@@ -456,7 +456,7 @@ public final class MainView {
             String detail = error == null || error.getMessage() == null
                     ? "Coordinate celesti non disponibili"
                     : I18n.dynamic("Mappa non disponibile: " + error.getMessage(),
-                            "Map unavailable: " + error.getMessage());
+                            "Map unavailable: " + I18n.english(error.getMessage()));
             skyMapPage.showError(detail);
         });
         BACKGROUND_EXECUTOR.execute(task);

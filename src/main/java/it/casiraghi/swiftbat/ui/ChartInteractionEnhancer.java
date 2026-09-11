@@ -196,7 +196,7 @@ public final class ChartInteractionEnhancer {
     @SuppressWarnings("rawtypes") private static boolean selectable(XYChart.Series series) {
         String name = series.getName(); return name == null || !name.toLowerCase(Locale.ROOT).startsWith("trigger");
     }
-    @SuppressWarnings("rawtypes") private static Set<XYChart.Series> focusedSeries(LineChart chart) {
+    @SuppressWarnings({"rawtypes", "unchecked"}) private static Set<XYChart.Series> focusedSeries(LineChart chart) {
         Object stored = chart.getProperties().get(FOCUS);
         if (stored instanceof Set<?> set) return (Set<XYChart.Series>) set;
         Set<XYChart.Series> created = new LinkedHashSet<>(); chart.getProperties().put(FOCUS, created); return created;

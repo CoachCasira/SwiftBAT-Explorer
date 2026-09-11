@@ -71,8 +71,8 @@ jobs:
         with:
           name: SwiftBAT-Explorer-Windows-Installer
           path: |
-            dist/SwiftBAT-Explorer-Setup-1.2.0.exe
-            dist/SwiftBAT-Explorer-Setup-1.2.0.sha256.txt
+            dist/SwiftBAT-Explorer-Setup-1.3.0.exe
+            dist/SwiftBAT-Explorer-Setup-1.3.0.sha256.txt
           if-no-files-found: error
 
       - name: Pubblica il pacchetto Windows portabile

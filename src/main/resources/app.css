@@ -1080,7 +1080,7 @@
 }
 
 /* ========================================================================== */
-/* SwiftBAT Explorer 1.2.0 — Event Horizon UI                                */
+/* SwiftBAT Explorer 1.3.0                                                    */
 /* ========================================================================== */
 .root {
     -fx-font-family: "Avenir Next", "SF Pro Text", "Segoe UI", "Inter", sans-serif;
@@ -1887,7 +1887,7 @@
 }
 
 
-/* ---------- Refinements 1.2.0 ---------- */
+/* ---------- Refinements 1.3.0 ---------- */
 .fracexp-slider {
     -fx-background-color: transparent;
     -fx-padding: 0 2 0 2;

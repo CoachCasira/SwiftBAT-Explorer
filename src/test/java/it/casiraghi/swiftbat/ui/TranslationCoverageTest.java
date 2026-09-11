@@ -2,21 +2,24 @@ package it.casiraghi.swiftbat.ui;
 
 import org.junit.jupiter.api.Test;
 
+import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * Guardrail for the bilingual UI. The complete UI package is scanned, including
- * custom Java2D/3D renderers, so a new visible Italian literal cannot silently
- * remain untranslated.
+ * Guardrail for the bilingual application. UI, model and service sources are
+ * scanned, including custom Java2D/3D renderers and runtime status/error text,
+ * so a new visible Italian literal cannot silently remain untranslated.
  */
 class TranslationCoverageTest {
     private static final Pattern ITALIAN_WORD = Pattern.compile(
@@ -25,7 +28,7 @@ class TranslationCoverageTest {
                     + "spiegazione|intervallo|flusso|modello|energia|banda|tabella|righe|esposizione|guida|informazioni|"
                     + "evento|eventi|confronto|schermo|descrizione|caricamento|campione|celeste|sessione|lettura|"
                     + "risultati|errore|picco|durezza|fonte|ufficiale|filtro|filtri|nessun|nessuna|tutte|tutti|ripristina|"
-                    + "profilo|profondità|altezza|disponibilità|redshift|gradi|scelta|vincolato|incerto|visualizzati|"
+                    + "profilo|profondità|altezza|disponibilità|gradi|scelta|vincolato|incerto|visualizzati|"
                     + "caricati|ammesso|massimo|minimo|corrispondono|leggibili|sconosciuto|spettro|barre|asse|assi|"
                     + "trascina|rotella|centra|numero|secondo|secondi|estremo|scienza|strumenti|scorciatoie|"
                     + "catalogo|metadati|probabilità|frequenza|conteggi|limiti|unità|seleziona|punto|distribuzione)(?:$|[^\\p{L}])");
@@ -35,7 +38,7 @@ class TranslationCoverageTest {
         // Same dictionary configuration used by the real application startup.
         LegacyI18nBridge.install();
 
-        Path root = Path.of("src/main/java/it/casiraghi/swiftbat/ui");
+        Path root = Path.of("src/main/java/it/casiraghi/swiftbat");
         List<String> missing = new ArrayList<>();
 
         try (var files = Files.walk(root)) {
@@ -49,6 +52,79 @@ class TranslationCoverageTest {
 
         if (!missing.isEmpty()) {
             fail("Missing English translations in UI layer:\n" + String.join("\n", missing));
+        }
+    }
+
+    @Test
+    void criticalRuntimeTextsTranslateInBothDirections() {
+        LegacyI18nBridge.install();
+        Map<String, String> pairs = new LinkedHashMap<>();
+        pairs.put("Apri il catalogo ufficiale", "Open official catalog");
+        pairs.put("Dati pronti", "Data ready");
+        pairs.put("Evento", "Event");
+        pairs.put("Fonte", "Source");
+        pairs.put("Non disponibile", "Unavailable");
+        pairs.put("Flusso", "Flux");
+        pairs.put("Schermo intero", "Fullscreen");
+        pairs.put("Esporta PNG", "Export PNG");
+        pairs.put("Esporta Excel", "Export Excel");
+        pairs.put("Esportazione completata", "Export completed");
+        pairs.put("File creato correttamente:", "File created successfully:");
+        pairs.put("Prodotti 1 s non disponibili", "1-s products unavailable");
+        pairs.put("Intero intervallo spettroscopico T100", "Full T100 spectral interval");
+        pairs.put("Versione 1.3.0 · Java 17 · dati online", "Version 1.3.0 · Java 17 · online data");
+
+        I18n.Language previous = I18n.language();
+        try {
+            I18n.setLanguage(I18n.Language.EN);
+            pairs.forEach((italian, english) -> {
+                String actual = UiTranslations.t(italian);
+                if (!english.equals(actual)) {
+                    fail("Wrong IT→EN translation: " + italian + " -> " + actual + " (expected " + english + ")");
+                }
+            });
+
+            I18n.setLanguage(I18n.Language.IT);
+            pairs.forEach((italian, english) -> {
+                String actual = UiTranslations.t(english);
+                if (!italian.equals(actual)) {
+                    fail("Wrong EN→IT translation: " + english + " -> " + actual + " (expected " + italian + ")");
+                }
+            });
+        } finally {
+            I18n.setLanguage(previous);
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void everyRegisteredDictionaryEntryResolvesInBothLanguages() throws Exception {
+        LegacyI18nBridge.install();
+        Field dictionary = I18n.class.getDeclaredField("EN");
+        dictionary.setAccessible(true);
+        Map<String, String> entries = (Map<String, String>) dictionary.get(null);
+
+        I18n.Language previous = I18n.language();
+        try {
+            I18n.setLanguage(I18n.Language.EN);
+            for (Map.Entry<String, String> entry : entries.entrySet()) {
+                String actual = UiTranslations.t(entry.getKey());
+                if (!entry.getValue().equals(actual)) {
+                    fail("Dictionary IT→EN mismatch: " + entry.getKey() + " -> " + actual
+                            + " (expected " + entry.getValue() + ")");
+                }
+            }
+
+            I18n.setLanguage(I18n.Language.IT);
+            for (Map.Entry<String, String> entry : entries.entrySet()) {
+                if (entry.getKey().equals(entry.getValue())) continue;
+                String actual = UiTranslations.t(entry.getValue());
+                if (entry.getValue().equals(actual)) {
+                    fail("Dictionary EN→IT value remained untranslated: " + entry.getValue());
+                }
+            }
+        } finally {
+            I18n.setLanguage(previous);
         }
     }
 
@@ -72,22 +148,17 @@ class TranslationCoverageTest {
     private boolean looksItalian(String value) {
         if (value == null || value.isBlank()) return false;
         String lower = value.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("http") || lower.matches("[a-z0-9_./-]+\\.(png|xlsx|fits|dat|lc)")) return false;
+        if (lower.startsWith("among the four non-overlapping bands")) return false;
         if (lower.matches(".*[àèéìòù].*")) return true;
         return ITALIAN_WORD.matcher(value).find();
     }
 
     private boolean hasRuntimeEnglish(String value) {
-        if (UiTranslations.hasEnglish(value)) return true;
-        String legacy = I18n.english(value);
-        if (isTranslation(value, legacy)) return true;
-
-        String legacyColorSource = value
-                .replace("linea azzurra", "linea arancione")
-                .replace("curva azzurra", "curva arancione");
-        if (!legacyColorSource.equals(value)) {
-            String translated = I18n.english(legacyColorSource);
-            if (isTranslation(legacyColorSource, translated)) return true;
-        }
+        I18n.setLanguage(I18n.Language.EN);
+        String translated = UiTranslations.t(value);
+        if (!"[Missing English translation]".equals(translated) && !looksItalian(translated)) return true;
+        System.err.println("TRANSLATION_GAP: " + value.replace('\n', ' ') + " => " + translated.replace('\n', ' '));
         return false;
     }
 

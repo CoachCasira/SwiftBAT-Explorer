@@ -48,7 +48,7 @@ import java.util.regex.Pattern;
  * anche in una cache locale persistente.
  */
 public final class OnlineGrbService {
-    private static final String USER_AGENT = "SwiftBAT-Explorer/1.2.0 (academic thesis application; JavaFX)";
+    private static final String USER_AGENT = "SwiftBAT-Explorer/1.3.0 (academic thesis application; JavaFX)";
     private static final int HTML_TIMEOUT_MS = (int) Duration.ofSeconds(30).toMillis();
     private static final int FILE_TIMEOUT_MS = (int) Duration.ofSeconds(90).toMillis();
     private static final Pattern RESULTS_DIRECTORY = Pattern.compile("^\\d+-results/$", Pattern.CASE_INSENSITIVE);

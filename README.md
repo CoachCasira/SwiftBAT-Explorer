@@ -1,4 +1,4 @@
-# SwiftBAT Explorer 1.2.0 — Event Horizon
+# SwiftBAT Explorer 1.3.0
 
 Applicazione desktop JavaFX per esplorare **online** le curve di luce dei Gamma-Ray Burst pubblicate nel catalogo Swift/BAT.
 
@@ -18,7 +18,7 @@ Maven (`test` e `package`) e non pubblica installer o pacchetti. La creazione
 degli eseguibili standalone per macOS e Windows resta una fase finale separata,
 descritta in `BUILD_ESEGUIBILI.md`.
 
-## Interfaccia 1.2.0
+## Interfaccia 1.3.0
 
 La versione **Event Horizon** mantiene tutte le funzioni scientifiche della 1.1.1 ma presenta una UI più semplice:
 

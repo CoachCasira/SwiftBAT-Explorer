@@ -2,18 +2,16 @@ package it.casiraghi.swiftbat.ui.components;
 
 import it.casiraghi.swiftbat.model.TabularData;
 import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
+import it.casiraghi.swiftbat.ui.ExportSupport;
 import it.casiraghi.swiftbat.ui.I18n;
 import it.casiraghi.swiftbat.ui.InPlaceFullscreen;
 import it.casiraghi.swiftbat.ui.UiFactory;
 import it.casiraghi.swiftbat.ui.UiTranslations;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
-import javafx.embed.swing.SwingFXUtils;
 import javafx.embed.swing.SwingNode;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.SnapshotParameters;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
@@ -24,16 +22,11 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
-import javafx.scene.image.WritableImage;
 import javafx.scene.layout.VBox;
-import javafx.stage.FileChooser;
 
-import javax.imageio.ImageIO;
 import javax.swing.SwingUtilities;
 import java.awt.Color;
 import java.awt.Dimension;
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -278,22 +271,9 @@ public final class ThreeDChartPane extends BorderPane {
 
     private void exportViewerPng() {
         if (getScene() == null || viewer.getWidth() <= 1 || viewer.getHeight() <= 1) return;
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle(UiTranslations.t("Esporta vista 3D"));
-        chooser.setInitialFileName(contextName.replaceAll("[^A-Za-z0-9._-]", "_") + "_vista_3D.png");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(UiTranslations.t("Immagine PNG"), "*.png"));
-        File file = chooser.showSaveDialog(getScene().getWindow());
-        if (file == null) return;
-        if (!file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".png")) {
-            file = new File(file.getParentFile(), file.getName() + ".png");
-        }
-        try {
-            WritableImage image = viewer.snapshot(new SnapshotParameters(), null);
-            ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", file);
-        } catch (IOException | RuntimeException error) {
-            new Alert(Alert.AlertType.ERROR,
-                    UiTranslations.t("Esportazione PNG non riuscita:") + " " + error.getMessage()).showAndWait();
-        }
+        String suffix = I18n.dynamic("_vista_3D.png", "_3D_view.png");
+        ExportSupport.exportPng(this, viewer,
+                contextName.replaceAll("[^A-Za-z0-9._-]", "_") + suffix);
     }
 
     private void syncRendererSize(StackPane viewer) {

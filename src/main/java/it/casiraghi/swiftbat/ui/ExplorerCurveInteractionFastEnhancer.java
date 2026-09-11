@@ -276,7 +276,7 @@ public final class ExplorerCurveInteractionFastEnhancer {
         return result;
     }
 
-    @SuppressWarnings("rawtypes")
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private static Point2D plotPoint(Axis xAxis, Axis yAxis, XYChart.Data data) {
         Object xValue = data.getXValue();
         Object yValue = data.getYValue();

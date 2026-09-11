@@ -159,7 +159,9 @@
 
 .reference-redesign .spectral-flux-chart .chart-bar,
 .reference-redesign .bar-chart .chart-bar {
-    -fx-bar-fill: linear-gradient(to top, #11cfe9 0%, #287ff2 55%, #ae5df4 100%);
+    /* Modena usa -fx-bar-fill come Color in una derive(): qui deve restare un colore solido. */
+    -fx-bar-fill: #287ff2;
+    -fx-background-color: linear-gradient(to top, #11cfe9 0%, #287ff2 55%, #ae5df4 100%);
 }
 
 .reference-redesign .population-legend-single {

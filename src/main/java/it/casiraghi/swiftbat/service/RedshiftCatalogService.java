@@ -22,7 +22,7 @@ public final class RedshiftCatalogService {
             "https://swift.gsfc.nasa.gov/results/batgrbcat/summary_cflux/summary_general_info/GRBlist_redshift_BAT.txt";
 
     private static final String USER_AGENT =
-            "SwiftBAT-Explorer/1.2.0 (academic thesis application; redshift-catalog)";
+            "SwiftBAT-Explorer/1.3.0 (academic thesis application; redshift-catalog)";
     private static final Pattern NUMBER = Pattern.compile("(?<![A-Za-z])([0-9]+(?:[.,][0-9]+)?)");
 
     private final HttpClient client = HttpClient.newBuilder()

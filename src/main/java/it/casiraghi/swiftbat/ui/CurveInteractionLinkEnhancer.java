@@ -534,7 +534,7 @@ public final class CurveInteractionLinkEnhancer {
         return result;
     }
 
-    @SuppressWarnings("rawtypes")
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private static Point2D chartPoint(LineChart chart, Axis xAxis, Axis yAxis, XYChart.Data data) {
         Object xValue = data.getXValue();
         Object yValue = data.getYValue();
@@ -738,6 +738,7 @@ public final class CurveInteractionLinkEnhancer {
         return value == null ? "—" : String.valueOf(value);
     }
 
+    @SuppressWarnings("rawtypes")
     private record SeriesHit(XYChart.Series series, Object xValue, Object yValue) { }
     private record SegmentProjection(double fraction, double distanceSquared) { }
 }

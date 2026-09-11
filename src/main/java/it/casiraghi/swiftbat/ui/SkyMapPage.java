@@ -7,12 +7,9 @@ import it.casiraghi.swiftbat.ui.components.CelestialSpherePane;
 import it.casiraghi.swiftbat.ui.components.MollweideSkyPane;
 import javafx.animation.PauseTransition;
 import javafx.collections.FXCollections;
-import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.SnapshotParameters;
-import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
@@ -21,19 +18,14 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TextField;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
-import javafx.scene.image.WritableImage;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.stage.FileChooser;
 import javafx.util.Duration;
 
-import javax.imageio.ImageIO;
-import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -175,7 +167,9 @@ public final class SkyMapPage extends BorderPane {
         Button exportPng = UiFactory.button("Esporta PNG", "ghost-button");
         exportPng.setOnAction(event -> exportMapNode(
                 sphereView ? sphere : mollweide,
-                sphereView ? "mappa_celeste_sfera_3D.png" : "mappa_celeste_mollweide_2D.png"));
+                sphereView
+                        ? I18n.dynamic("mappa_celeste_sfera_3D.png", "sky_map_3D_sphere.png")
+                        : I18n.dynamic("mappa_celeste_mollweide_2D.png", "sky_map_2D_mollweide.png")));
         Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
         fullscreen.setOnAction(event -> openMapFullscreen());
         HBox mapHead = new HBox(10,
@@ -365,7 +359,8 @@ public final class SkyMapPage extends BorderPane {
             enlarged.setMinSize(520, 420);
             enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
             HBox.setHgrow(enlarged, Priority.ALWAYS);
-            details.export().setOnAction(event -> exportMapNode(enlarged, "mappa_celeste_sfera_3D.png"));
+            details.export().setOnAction(event -> exportMapNode(enlarged,
+                    I18n.dynamic("mappa_celeste_sfera_3D.png", "sky_map_3D_sphere.png")));
             layout.getChildren().addAll(enlarged, details.node());
             InPlaceFullscreen.show(this, "Mappa celeste · Sfera 3D", layout);
         } else {
@@ -381,7 +376,8 @@ public final class SkyMapPage extends BorderPane {
             enlarged.setMinSize(520, 420);
             enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
             HBox.setHgrow(enlarged, Priority.ALWAYS);
-            details.export().setOnAction(event -> exportMapNode(enlarged, "mappa_celeste_mollweide_2D.png"));
+            details.export().setOnAction(event -> exportMapNode(enlarged,
+                    I18n.dynamic("mappa_celeste_mollweide_2D.png", "sky_map_2D_mollweide.png")));
             layout.getChildren().addAll(enlarged, details.node());
             InPlaceFullscreen.show(this, "Mappa celeste · Mollweide 2D", layout);
         }
@@ -475,24 +471,7 @@ public final class SkyMapPage extends BorderPane {
                 || node.getBoundsInLocal().getHeight() <= 1) {
             return;
         }
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Esporta mappa celeste");
-        chooser.setInitialFileName(suggestedName);
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Immagine PNG", "*.png"));
-        File file = chooser.showSaveDialog(getScene().getWindow());
-        if (file == null) {
-            return;
-        }
-        if (!file.getName().toLowerCase(Locale.ROOT).endsWith(".png")) {
-            file = new File(file.getParentFile(), file.getName() + ".png");
-        }
-        try {
-            WritableImage image = node.snapshot(new SnapshotParameters(), null);
-            ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", file);
-        } catch (IOException | RuntimeException error) {
-            new Alert(Alert.AlertType.ERROR,
-                    "Esportazione PNG non riuscita: " + error.getMessage()).showAndWait();
-        }
+        ExportSupport.exportPng(this, node, suggestedName);
     }
 
     private VBox buildDetailsPanel() {

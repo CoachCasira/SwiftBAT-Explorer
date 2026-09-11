@@ -4,7 +4,7 @@ cd /d "%~dp0"
 title SwiftBAT Explorer - Avvio
 
 echo ============================================================
-echo   SwiftBAT Explorer 1.2.0 - Event Horizon
+echo   SwiftBAT Explorer 1.3.0
 echo ============================================================
 echo.
 echo Verifica Java...

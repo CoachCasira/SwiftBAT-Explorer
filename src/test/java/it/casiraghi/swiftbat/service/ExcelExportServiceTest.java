@@ -38,7 +38,7 @@ class ExcelExportServiceTest {
         try (XSSFWorkbook workbook = new XSSFWorkbook(Files.newInputStream(output))) {
             assertEquals(2, workbook.getNumberOfSheets());
             assertNotNull(workbook.getSheet("FITS_1CH_1S"));
-            assertEquals("TRIGTIME", workbook.getSheet("METADATI_FITS").getRow(1).getCell(2).getStringCellValue());
+            assertEquals("TRIGTIME", workbook.getSheet("FITS_METADATA").getRow(1).getCell(2).getStringCellValue());
         }
     }
 

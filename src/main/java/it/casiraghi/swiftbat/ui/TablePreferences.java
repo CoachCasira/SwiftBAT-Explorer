@@ -224,12 +224,23 @@ public final class TablePreferences {
 
     public static boolean isNumeric(String text) {
         if (text == null || text.isBlank()) return false;
-        String clean = text.trim().replace(',', '.').replace("%", "");
-        return clean.matches("[-+]?((\\d+(\\.\\d*)?)|(\\.\\d+))([eE][-+]?\\d+)?")
-                || clean.matches("[-+]?\\d+(\\.\\d+)?\\s*[×x]\\s*10\\^?[-+]?\\d+");
+        String clean = text.trim()
+                .replace('−', '-')
+                .replace(',', '.')
+                .replaceFirst("(?i)^z\\s*=\\s*", "")
+                .replaceFirst("(?i)\\s*(?:%|s|ms|ks|deg|kev)$", "")
+                .trim();
+        String number = "[-+]?(?:(?:\\d+(?:\\.\\d*)?)|(?:\\.\\d+))(?:[eE][-+]?\\d+)?";
+        String qualified = "[<>≤≥≈~]?\\s*" + number + "\\??";
+        return clean.matches(qualified)
+                || clean.matches(qualified + "\\s*±\\s*" + number)
+                || clean.matches(qualified + "\\s*(?:–|—|\\.\\.|/|(?i:or))\\s*" + qualified)
+                || clean.matches("[-+]?\\d+(?:\\.\\d+)?\\s*[×x]\\s*10(?:\\^?[-+]?\\d+|[⁻⁺]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+)");
     }
 
     public static void alignCell(TableCell<?, ?> cell, String value) {
-        if (cell != null) cell.setAlignment(Pos.CENTER_LEFT);
+        if (cell != null) {
+            cell.setAlignment(isNumeric(value) ? Pos.CENTER_RIGHT : Pos.CENTER_LEFT);
+        }
     }
 }

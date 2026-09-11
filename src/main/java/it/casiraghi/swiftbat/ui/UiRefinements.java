@@ -509,6 +509,11 @@ public final class UiRefinements {
 
     private static String englishFor(String italian) {
         if (italian == null || italian.isBlank()) return italian;
+        String unified = UiTranslations.t(italian);
+        if (unified != null && !unified.isBlank()
+                && !MISSING.equals(unified) && !unified.equals(italian)) {
+            return unified;
+        }
         String direct = ENGLISH.get(italian);
         if (direct != null) return direct;
 

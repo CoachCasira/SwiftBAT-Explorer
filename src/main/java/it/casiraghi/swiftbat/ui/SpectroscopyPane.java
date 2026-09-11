@@ -364,17 +364,21 @@ public final class SpectroscopyPane extends BorderPane {
         }
 
         card.getChildren().add(UiFactory.label("Modello spettrale ricostruito", "card-title"));
+        Button export = UiFactory.button("Esporta PNG", "ghost-button");
+        export.setOnAction(event -> ExportSupport.exportPng(export, chart,
+                grbData.grbName() + "_spectral_model_" + (fit == null ? "NA" : fit.model().code()) + ".png"));
+        FlowPane actions = new FlowPane(8, 8);
+        actions.getStyleClass().add("spectroscopy-chart-actions");
+        actions.getChildren().add(export);
         if (showActions) {
             Button threeD = UiFactory.button("Vista 3D", "secondary-button");
             threeD.setDisable(fit == null || fit.normalization() == null || fit.alpha() == null);
             threeD.setOnAction(event -> openModel3D(fit));
             Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
             fullscreen.setOnAction(event -> openModelFullscreen(fit));
-            FlowPane actions = new FlowPane(8, 8);
-            actions.getStyleClass().add("spectroscopy-chart-actions");
             actions.getChildren().addAll(threeD, fullscreen);
-            card.getChildren().add(actions);
         }
+        card.getChildren().add(actions);
         card.getChildren().add(chart);
         return card;
     }
@@ -427,17 +431,21 @@ public final class SpectroscopyPane extends BorderPane {
         VBox.setVgrow(chart, Priority.ALWAYS);
 
         card.getChildren().add(UiFactory.label("Flusso energetico", "card-title"));
+        Button export = UiFactory.button("Esporta PNG", "ghost-button");
+        export.setOnAction(event -> ExportSupport.exportPng(export, chart,
+                grbData.grbName() + "_energy_flux_" + model.code() + ".png"));
+        FlowPane actions = new FlowPane(8, 8);
+        actions.getStyleClass().add("spectroscopy-chart-actions");
+        actions.getChildren().add(export);
         if (showActions) {
             Button threeD = UiFactory.button("Vista 3D", "secondary-button");
             threeD.setDisable(fluxes.stream().noneMatch(EnergyFluxBand::available));
             threeD.setOnAction(event -> openFlux3D(fluxes, model));
             Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
             fullscreen.setOnAction(event -> openFluxFullscreen(fluxes, model));
-            FlowPane actions = new FlowPane(8, 8);
-            actions.getStyleClass().add("spectroscopy-chart-actions");
             actions.getChildren().addAll(threeD, fullscreen);
-            card.getChildren().add(actions);
         }
+        card.getChildren().add(actions);
         card.getChildren().add(chart);
         return card;
     }
@@ -623,6 +631,10 @@ public final class SpectroscopyPane extends BorderPane {
         Button threeD = UiFactory.button("Apri vista 3D dei rate", "primary-button");
         threeD.setDisable(grbData.asciiData().isEmpty());
         threeD.setOnAction(event -> openTimeEnergy3D());
+        Button export = UiFactory.button("Esporta PNG", "ghost-button");
+        export.setDisable(grbData.asciiData().isEmpty());
+        export.setOnAction(event -> ExportSupport.exportPng(export, heatmap,
+                grbData.grbName() + "_time_energy_map.png"));
 
         FlowPane controls = new FlowPane(10, 10);
         controls.getChildren().add(controlBox("Finestra temporale", window, "", 620));
@@ -630,7 +642,7 @@ public final class SpectroscopyPane extends BorderPane {
 
         FlowPane chartActions = new FlowPane(8, 8);
         chartActions.getStyleClass().add("spectroscopy-chart-actions");
-        chartActions.getChildren().addAll(fullscreen, threeD);
+        chartActions.getChildren().addAll(export, fullscreen, threeD);
         VBox chartCard = new VBox(9,
                 UiFactory.label("Mappa tempo–energia dei rate", "card-title"),
                 chartActions,
@@ -659,7 +671,16 @@ public final class SpectroscopyPane extends BorderPane {
         enlarged.setPrefHeight(760);
         enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
-        InPlaceFullscreen.show(this, grbData.grbName() + " · Mappa tempo–energia dei rate", enlarged);
+        Button export = UiFactory.button("Esporta PNG", "ghost-button");
+        export.setOnAction(event -> ExportSupport.exportPng(export, enlarged,
+                grbData.grbName() + "_time_energy_map.png"));
+        FlowPane actions = new FlowPane(8, 8, export);
+        actions.getStyleClass().add("spectroscopy-chart-actions");
+        VBox content = new VBox(8, actions, enlarged);
+        content.setMinSize(0, 0);
+        VBox.setVgrow(enlarged, Priority.ALWAYS);
+
+        InPlaceFullscreen.show(this, grbData.grbName() + " · Mappa tempo–energia dei rate", content);
     }
 
     private Label fullscreenReading(String text) {

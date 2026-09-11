@@ -73,7 +73,7 @@ public final class ExcelExportService {
     }
 
     private void writeMetadata(Workbook workbook, List<MetadataItem> metadata, String tableKey) {
-        Sheet sheet = workbook.createSheet("METADATI_FITS");
+        Sheet sheet = workbook.createSheet("FITS_METADATA");
         CellStyle headerStyle = headerStyle(workbook);
         boolean showHdu = TablePreferences.isColumnVisible(tableKey, "HDU");
         boolean showKeyword = TablePreferences.isColumnVisible(tableKey, "Keyword");

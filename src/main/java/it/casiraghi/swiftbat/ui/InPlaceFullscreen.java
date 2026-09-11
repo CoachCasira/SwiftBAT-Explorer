@@ -120,7 +120,7 @@ public final class InPlaceFullscreen {
         private Node wrapSpectralModel2D(Node content) {
             VBox reading = spectroscopyReadingCard(
                     "Come leggere il modello 2D",
-                    "Curva — la linea azzurra rappresenta la funzione spettrale ricostruita dal fit ufficiale BAT selezionato. Non è una successione di punti grezzi misurati dal rivelatore.",
+                    "Curva — la linea arancione rappresenta la funzione spettrale ricostruita dal fit ufficiale BAT selezionato. Non è una successione di punti grezzi misurati dal rivelatore.",
                     "Asse X — mostra l'energia dei fotoni in keV, da 15 a 150 keV nella vista corrente.",
                     "Asse Y — mostra log₁₀ N(E), cioè il logaritmo del flusso fotonico differenziale. Valori negativi sono perfettamente normali e indicano N(E) < 1 nelle unità riportate.",
                     "Forma — la pendenza della curva descrive come il contributo previsto dal modello cambia con l'energia. Un andamento più ripido indica una diminuzione più rapida verso le energie elevate.",
@@ -133,7 +133,7 @@ public final class InPlaceFullscreen {
         private Node wrapSpectralModel3D(Node content) {
             VBox reading = spectroscopyReadingCard(
                     "Come leggere la vista 3D",
-                    "Modello — la curva azzurra rappresenta la stessa funzione spettrale ricostruita mostrata nella vista 2D. Non sono aggiunti nuovi punti osservativi.",
+                    "Modello — la curva arancione rappresenta la stessa funzione spettrale ricostruita mostrata nella vista 2D. Non sono aggiunti nuovi punti osservativi.",
                     "Assi — X indica l'energia dei fotoni in keV; Y indica log₁₀ N(E), il logaritmo del flusso fotonico differenziale previsto dal fit.",
                     "Forma della curva — la pendenza mostra come il contributo del modello diminuisce o varia passando verso energie più elevate.",
                     "Profondità — il piano arretrato e i collegamenti servono soltanto alla prospettiva. Non rappresentano tempo, distanza, intensità o una terza variabile fisica.",

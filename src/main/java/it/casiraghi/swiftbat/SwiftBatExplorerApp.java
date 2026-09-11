@@ -53,7 +53,7 @@ public final class SwiftBatExplorerApp extends Application {
         scene.getStylesheets().add(
                 SwiftBatExplorerApp.class.getResource("/stability-final.css").toExternalForm());
 
-        stage.setTitle("SwiftBAT Explorer 1.3.0 — Reference UI Preview");
+        stage.setTitle("SwiftBAT Explorer 1.3.0");
         stage.getIcons().setAll(BrandLogoAsset.image());
         stage.setMinWidth(1240);
         stage.setMinHeight(790);

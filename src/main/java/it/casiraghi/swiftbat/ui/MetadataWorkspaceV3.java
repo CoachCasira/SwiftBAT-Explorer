@@ -64,7 +64,7 @@ public final class MetadataWorkspaceV3 {
                 I18n.dynamic("Valore", "Value"), MetadataItem::value, 245, 170);
         TableColumn<MetadataItem, String> comment = column(
                 I18n.dynamic("Commento originale", "Original comment"), MetadataItem::comment, 420, 245);
-        table.getColumns().setAll(hdu, keyword, value, comment);
+        table.getColumns().setAll(List.of(hdu, keyword, value, comment));
 
         FilteredList<MetadataItem> filtered = new FilteredList<>(
                 FXCollections.observableArrayList(data.metadata()), ignored -> true);

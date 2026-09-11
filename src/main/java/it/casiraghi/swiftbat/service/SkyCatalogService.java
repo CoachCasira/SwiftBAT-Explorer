@@ -23,7 +23,7 @@ public final class SkyCatalogService {
             "https://swift.gsfc.nasa.gov/results/batgrbcat/summary_cflux/summary_general_info/summary_general.txt";
 
     private static final String USER_AGENT =
-            "SwiftBAT-Explorer/1.2.0 (academic thesis application; celestial-map)";
+            "SwiftBAT-Explorer/1.3.0 (academic thesis application; celestial-map)";
     private static final Pattern GRB_PATTERN = Pattern.compile("(?i)(?:GRB)?\\d{6}[A-Z]?");
 
     private final HttpClient client = HttpClient.newBuilder()

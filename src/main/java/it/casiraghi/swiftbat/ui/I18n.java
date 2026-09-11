@@ -165,7 +165,7 @@ public final class I18n {
         put("Flusso energetico per banda", "Energy flux by band");
         put("Banda energetica (keV)", "Energy band (keV)");
         put("Apri vista 3D dei rate", "Open 3D rate view");
-        put("Mappa tempo–energia dei rate", "Rate time–energy map");
+        put("Mappa tempo–energia dei rate", "Time–energy rate map");
         put("Intera osservazione", "Full observation");
         put("Centra vista", "Center view");
         put("Curva", "Curve");
@@ -347,7 +347,7 @@ public final class I18n {
         put("Le schermate mantengono il dato originale e affiancano spiegazioni brevi per trigger, rate, errori, FRACEXP, FITS, RA, DEC e T90.", "Screens preserve the original data and provide short explanations for trigger, rate, errors, FRACEXP, FITS, RA, DEC and T90.");
         put("Apri info e guida", "Open info and guide");
         put("SwiftBAT Explorer è l'applicazione sviluppata per la tesi di Matteo Casiraghi per consultare e comprendere i prodotti pubblici Swift/BAT dei Gamma-Ray Burst.", "SwiftBAT Explorer is the application developed for Matteo Casiraghi's thesis to inspect and understand public Swift/BAT Gamma-Ray Burst products.");
-        put("Versione 1.2.0 · Java 17 · dati online", "Version 1.2.0 · Java 17 · online data");
+        put("Versione 1.3.0 · Java 17 · dati online", "Version 1.3.0 · Java 17 · online data");
         put("Apri guida ai dati  →", "Open data guide  →");
         put("Catalogo ufficiale NASA/GSFC Swift/BAT e prodotti DAT/FITS a binning di 1 secondo. I valori restano riconducibili alle sorgenti pubbliche usate dall'app.", "Official NASA/GSFC Swift/BAT catalog and 1-second-binned DAT/FITS products. Values remain traceable to the public sources used by the app.");
         put("Curve", "Curves");
@@ -466,6 +466,8 @@ public final class I18n {
                 "Small sample: median and percentiles may change substantially when only a few events are added.");
         put("eventi esaminati non sono stati letti e non contribuiscono al profilo.",
                 "examined events could not be read and do not contribute to the profile.");
+        put(" dei ", " of ");
+        put(" e ", " and ");
         put("Il redshift è disponibile solo per il", "Redshift is available for only");
         put("del campione: la distribuzione z non è completa.", "of the sample: the z distribution is incomplete.");
         put("Le curve sono divise per il proprio picco: il confronto riguarda la forma relativa, non la luminosità assoluta.",

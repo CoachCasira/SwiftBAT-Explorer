@@ -375,7 +375,7 @@ public final class InteractiveViewSyncEnhancer {
         apply(fullscreen, source.kind(), state, true);
         if (fullscreen instanceof LineChart<?, ?> line) installFullscreenLineSelection(line);
 
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings({"rawtypes", "unchecked"})
         ChangeListener<Parent>[] holder = new ChangeListener[1];
         holder[0] = (obs, oldRoot, newRoot) -> {
             if (newRoot != originalRoot) return;

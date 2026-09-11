@@ -34,6 +34,8 @@ import java.util.function.DoubleConsumer;
 
 /** Renderer scientifico 2.5D basato su Java2D. */
 public final class Java2DWaterfallPanel extends JPanel {
+    private static final long serialVersionUID = 1L;
+
     private static final Color BACKGROUND_TOP = new Color(6, 13, 29);
     private static final Color BACKGROUND_BOTTOM = new Color(9, 23, 48);
     private static final Color GRID = new Color(78, 103, 151, 65);

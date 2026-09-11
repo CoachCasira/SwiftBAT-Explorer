@@ -16,8 +16,6 @@ import javafx.scene.control.TableView;
 import javafx.scene.control.TextInputControl;
 import javafx.util.StringConverter;
 
-import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -271,23 +269,28 @@ public final class UiTranslations {
 
     public static String t(String text) {
         if (text == null || text.isBlank()) return text;
+        /*
+         * LegacyI18nBridge merges this supplemental dictionary into I18n at
+         * application startup. Delegating first to the unified dictionary is
+         * important: I18n checks complete sentences before composing dynamic
+         * fragments. The previous order composed short entries such as
+         * "Apri"/"Dati" too early and produced mixed-language captions even
+         * when an exact translation was already available.
+         */
+        String translated = I18n.t(text);
+        if (!"[Missing English translation]".equals(translated)) return translated;
+
+        // Defensive fallback for callers used before application bootstrap.
         Map<String, String> direct = I18n.language() == I18n.Language.EN ? EN : IT;
-        String translated = directWithWhitespace(text, direct);
+        translated = directWithWhitespace(text, direct);
         if (!translated.equals(text)) return translated;
-
-        translated = compose(text, direct);
-        if (!translated.equals(text)) return translated;
-
-        String legacy = I18n.t(text);
-        if (!"[Missing English translation]".equals(legacy)) return legacy;
         return text;
     }
 
     public static boolean hasEnglish(String italian) {
         if (italian == null || italian.isBlank()) return true;
         String trimmed = italian.trim();
-        if (EN.containsKey(trimmed) || I18n.hasEnglish(italian)) return true;
-        return !compose(italian, EN).equals(italian);
+        return EN.containsKey(trimmed) || I18n.hasEnglish(italian);
     }
 
     public static <T> void installChoiceBox(javafx.scene.control.ChoiceBox<T> choice) {
@@ -396,14 +399,4 @@ public final class UiTranslations {
         return text.substring(0, start) + direct + text.substring(start + trimmed.length());
     }
 
-    private static String compose(String text, Map<String, String> map) {
-        String result = text;
-        List<Map.Entry<String, String>> entries = new ArrayList<>(map.entrySet());
-        entries.sort(Comparator.comparingInt((Map.Entry<String, String> entry) -> entry.getKey().length()).reversed());
-        for (Map.Entry<String, String> entry : entries) {
-            if (entry.getKey().length() < 3 || entry.getKey().equals(entry.getValue())) continue;
-            if (result.contains(entry.getKey())) result = result.replace(entry.getKey(), entry.getValue());
-        }
-        return result;
-    }
 }

@@ -33,13 +33,13 @@ sull'app, scegliere **Apri** e confermare una sola volta.
 ### Installer EXE autosufficiente
 
 1. Estrarre l'artefatto `SwiftBAT-Explorer-Windows-Installer` scaricato da GitHub.
-2. Fare doppio clic su `SwiftBAT-Explorer-Setup-1.2.0.exe`.
+2. Fare doppio clic su `SwiftBAT-Explorer-Setup-1.3.0.exe`.
 3. Completare l'installazione e avviare SwiftBAT Explorer dal collegamento creato.
 
 L'installer ingloba l'applicazione, Java 17, JavaFX e tutte le dipendenze. Non
 scarica Java o Maven e non richiede che siano gia installati sul computer.
 
-Il file `SwiftBAT-Explorer-Setup-1.2.0.sha256.txt` contiene l'impronta SHA-256
+Il file `SwiftBAT-Explorer-Setup-1.3.0.sha256.txt` contiene l'impronta SHA-256
 con cui verificare che l'installer non sia stato modificato durante il
 trasferimento.
 

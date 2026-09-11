@@ -417,7 +417,8 @@ public final class PopulationPage extends BorderPane {
         List<String> observations = lastNarrative == null ? List.of() : lastNarrative.observations();
         List<String> cautions = lastNarrative == null ? List.of() : lastNarrative.cautions();
 
-        Label headline = UiFactory.wrappedLabel(headlineText, "population-insight-headline");
+        Label headline = UiFactory.wrappedLabel("", "population-insight-headline");
+        I18n.setText(headline, headlineText, englishNarrative(headlineText));
         headline.setMinWidth(0);
         headline.setMaxWidth(Double.MAX_VALUE);
         headline.setTextOverrun(OverrunStyle.CLIP);
@@ -679,13 +680,13 @@ public final class PopulationPage extends BorderPane {
                 "Nessun GRB incluso. Controlla i filtri oppure esegui una nuova analisi.",
                 "empty-message"));
         resultTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
-        resultTable.getColumns().addAll(
+        resultTable.getColumns().addAll(List.of(
                 column("GRB", PopulationEvent::grbName),
                 column("T90", event -> event.burst().formattedT90()),
                 column("Classe", event -> event.burst().durationClass()),
                 column("Redshift", event -> event.burst().redshift().displayValue()),
                 column("Copertura", event -> String.format(Locale.ITALY, "%.2f%%", event.exposurePercent())),
-                column("Flag qualità", PopulationEvent::qualityFlag));
+                column("Flag qualità", PopulationEvent::qualityFlag)));
     }
 
     private TableColumn<PopulationEvent, String> column(String title,
@@ -931,7 +932,7 @@ public final class PopulationPage extends BorderPane {
         XYChart.Series<Number, Number> lower = series("25° percentile", result.profile().lowerQuartile());
         XYChart.Series<Number, Number> upper = series("75° percentile", result.profile().upperQuartile());
         XYChart.Series<Number, Number> median = series("Mediana", result.profile().median());
-        curveChart.getData().addAll(lower, upper, median);
+        curveChart.getData().addAll(List.of(lower, upper, median));
         styleSeries(lower, "-fx-stroke: #aa78db; -fx-stroke-width: 2px; -fx-stroke-dash-array: 7 5;");
         styleSeries(upper, "-fx-stroke: #aa78db; -fx-stroke-width: 2px; -fx-stroke-dash-array: 7 5;");
         styleSeries(median, "-fx-stroke: #ffae4a; -fx-stroke-width: 4px;");
@@ -955,7 +956,7 @@ public final class PopulationPage extends BorderPane {
         PopulationInsightService.Narrative narrative = insightService.analyze(
                 result.curves(), result.profile(), facts, result.examined(), result.failures(), result.halfWindow());
         lastNarrative = narrative;
-        I18n.setText(insightHeadline, narrative.headline(), I18n.english(narrative.headline()));
+        I18n.setText(insightHeadline, narrative.headline(), englishNarrative(narrative.headline()));
         insightObservations.getChildren().setAll(narrative.observations().stream()
                 .map(text -> insightLine("●", text, "population-insight-dot"))
                 .toList());
@@ -979,7 +980,7 @@ public final class PopulationPage extends BorderPane {
         Label copy = expanded
                 ? UiFactory.wrappedLabel("", "population-insight-text")
                 : UiFactory.label("", "population-insight-text");
-        I18n.setText(copy, text, I18n.english(text));
+        I18n.setText(copy, text, englishNarrative(text));
         copy.setWrapText(expanded);
         copy.setMinWidth(0);
         copy.setMaxWidth(Double.MAX_VALUE);
@@ -991,6 +992,12 @@ public final class PopulationPage extends BorderPane {
         row.setMaxWidth(Double.MAX_VALUE);
         row.setAlignment(expanded ? Pos.TOP_LEFT : Pos.CENTER_LEFT);
         return row;
+    }
+
+    /** English scientific copy uses a decimal point even when generated from the Italian narrative. */
+    private String englishNarrative(String italian) {
+        String translated = I18n.english(italian);
+        return translated == null ? "" : translated.replaceAll("(?<=\\d),(?=\\d)", ".");
     }
 
     private XYChart.Series<Number, Number> series(String name, List<CumulativeAnalysisService.Point> points) {
@@ -1111,7 +1118,7 @@ public final class PopulationPage extends BorderPane {
             });
             series.getData().add(bar);
         });
-        chart.getData().setAll(series);
+        chart.getData().setAll(List.of(series));
     }
 
     private Map<String, Integer> bins(List<Double> values, double[] edges, String suffix) {
