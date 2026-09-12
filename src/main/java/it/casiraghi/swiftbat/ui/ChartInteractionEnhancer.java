@@ -97,6 +97,7 @@ public final class ChartInteractionEnhancer {
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static void enhanceLineChart(LineChart<?, ?> rawChart) {
+        if (rawChart.getStyleClass().contains("compare-chart")) return;
         if (Boolean.TRUE.equals(rawChart.getProperties().get(LINE_DONE))) return;
         rawChart.getProperties().put(LINE_DONE, Boolean.TRUE);
         LineChart chart = rawChart;

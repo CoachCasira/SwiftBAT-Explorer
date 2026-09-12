@@ -20,6 +20,29 @@ public final class TablePreferences {
 
     private TablePreferences() {}
 
+    /** Visible access to the same persistent column choices as the context menu. */
+    public static MenuButton columnsButton(TableView<?> table) {
+        MenuButton button = new MenuButton();
+        button.getStyleClass().addAll("ghost-button", "included-columns-button");
+        button.textProperty().bind(javafx.beans.binding.Bindings.createStringBinding(
+                () -> I18n.dynamic("Colonne", "Columns"), I18n.languageProperty()));
+        button.setOnShowing(event -> {
+            List<TableColumn<?, ?>> leaves = new ArrayList<>();
+            for (TableColumn<?, ?> column : table.getColumns()) collectLeaves(column, leaves);
+            button.getItems().clear();
+            for (TableColumn<?, ?> column : leaves) {
+                CheckMenuItem item = new CheckMenuItem(I18n.t(columnName(column)));
+                item.setSelected(column.isVisible());
+                item.setOnAction(action -> column.setVisible(item.isSelected()));
+                button.getItems().add(item);
+            }
+            MenuItem restore = new MenuItem(I18n.dynamic("Ripristina tutte", "Restore all"));
+            restore.setOnAction(action -> leaves.forEach(column -> column.setVisible(true)));
+            button.getItems().addAll(new SeparatorMenuItem(), restore);
+        });
+        return button;
+    }
+
     /**
      * Installa intestazioni native e una gestione colonne nel menu contestuale.
      *

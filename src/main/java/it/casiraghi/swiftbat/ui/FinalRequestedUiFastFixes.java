@@ -38,7 +38,7 @@ public final class FinalRequestedUiFastFixes {
     private static final String INTERNAL_BAR_KEY = UiTableAndStartupFixes.class.getName() + ".internalBar";
     private static final Set<Scene> WATCHED_SCENES = Collections.newSetFromMap(new WeakHashMap<>());
 
-    private static final double BAR_WIDTH = 12.0;
+    private static final double BAR_WIDTH = 9.0;
     private static final double MIN_THUMB_PIXELS = 46.0;
     private static final double MAX_MIN_THUMB_PIXELS = 92.0;
 
@@ -145,8 +145,8 @@ public final class FinalRequestedUiFastFixes {
             Node thumb = bar.lookup(".thumb");
             if (thumb instanceof javafx.scene.layout.Region region) {
                 region.setMinHeight(targetThumbPixels(bar));
-                region.setPrefWidth(10);
-                region.setMinWidth(10);
+                region.setPrefWidth(BAR_WIDTH);
+                region.setMinWidth(BAR_WIDTH);
             }
             bar.requestLayout();
         } finally {
@@ -207,7 +207,7 @@ public final class FinalRequestedUiFastFixes {
                 container.getChildren().remove(oldDirectChild);
             }
 
-            HBox toolbar = new HBox(8, export);
+            HBox toolbar = new HBox(8, export, TablePreferences.columnsButton(table));
             toolbar.setAlignment(Pos.CENTER_LEFT);
             toolbar.setMinWidth(0);
             toolbar.setMaxWidth(Double.MAX_VALUE);

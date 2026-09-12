@@ -43,7 +43,7 @@ public final class UiTableAndStartupFixes {
     private static final String INTERNAL_BAR = UiTableAndStartupFixes.class.getName() + ".internalBar";
     private static final String SKY_GUARD = UiTableAndStartupFixes.class.getName() + ".skyGuard";
     private static final String SKY_BUTTON_OLD_DISABLE = UiTableAndStartupFixes.class.getName() + ".skyButtonOldDisable";
-    private static final double TABLE_SCROLLBAR_WIDTH = 12.0;
+    private static final double TABLE_SCROLLBAR_WIDTH = 9.0;
     private static final double TABLE_THUMB_MIN_LENGTH = 46.0;
 
     /* Exact keys used by the two legacy table passes. Setting them before those
@@ -243,8 +243,8 @@ public final class UiTableAndStartupFixes {
         Node thumb = external.lookup(".thumb");
         if (thumb instanceof Region region) {
             region.setMinHeight(TABLE_THUMB_MIN_LENGTH);
-            region.setPrefWidth(10);
-            region.setMinWidth(10);
+            region.setPrefWidth(TABLE_SCROLLBAR_WIDTH);
+            region.setMinWidth(TABLE_SCROLLBAR_WIDTH);
         }
         external.requestLayout();
     }

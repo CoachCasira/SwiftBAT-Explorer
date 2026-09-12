@@ -1,18 +1,31 @@
 package it.casiraghi.swiftbat.ui;
 
 import it.casiraghi.swiftbat.model.CatalogEntry;
+import it.casiraghi.swiftbat.model.GrbData;
+import it.casiraghi.swiftbat.model.TabularData;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleStringProperty;
+import javafx.collections.FXCollections;
+import javafx.geometry.Point2D;
 import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.chart.LineChart;
+import javafx.scene.chart.XYChart;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollBar;
 import javafx.scene.control.TextField;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.CheckMenuItem;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.MenuButton;
+import javafx.scene.control.TableColumn;
+import javafx.scene.control.TableView;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
@@ -22,6 +35,7 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
+import javafx.stage.Window;
 import javafx.util.Duration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -29,6 +43,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -163,7 +178,7 @@ class ExplorerUiLifecycleTest {
             Region thumb = (Region) bar.lookup(".thumb");
             Region track = (Region) bar.lookup(".track");
             assertEquals("javafx.scene.control.skin.ScrollBarSkin", bar.getSkin().getClass().getName());
-            assertEquals(20.0, bar.getWidth(), 0.5);
+            assertEquals(9.0, bar.getWidth(), 0.5);
             assertTrue(thumb.getHeight() >= 71.5, "Handle must be at least 72px, not a dot");
             double handleHeight = thumb.getHeight();
             double travel = track.getHeight() - handleHeight;
@@ -178,6 +193,220 @@ class ExplorerUiLifecycleTest {
             assertEquals(bar.getMin(), bar.getValue());
             return null;
         });
+    }
+
+    @Test
+    void compareSelectionControlsTooltipsAndSurvivesFullscreenAndNormalization() throws Exception {
+        ComparePage page = fx(() -> {
+            I18n.setLanguage(I18n.Language.EN);
+            var data = FXCollections.<String, GrbData>observableHashMap();
+            data.put("GRB250605A", compareData("GRB250605A", 3));
+            data.put("GRB250603A", compareData("GRB250603A", 1));
+            return new ComparePage(data, entry -> { });
+        });
+        Stage stage = fx(() -> {
+            Stage result = showStyled(page, 1240, 860);
+            UiLocalizationWatcher.install(page);
+            UiRefinements.install(page);
+            InteractiveViewSyncEnhancer.install(page);
+            InteractionPolishEnhancer.install(page);
+            CurveInteractionLinkEnhancer.install(page);
+            ChartInteractionEnhancer.install(page);
+            @SuppressWarnings("unchecked") ComboBox<String> first = (ComboBox<String>) field(page, "first");
+            @SuppressWarnings("unchecked") ComboBox<String> second = (ComboBox<String>) field(page, "second");
+            first.setValue("GRB250605A");
+            second.setValue("GRB250603A");
+            return result;
+        });
+        try {
+            pulse();
+            fx(() -> {
+                LineChart<Number, Number> chart = compareChart(page);
+                pointEvent(chart, 0, MouseEvent.MOUSE_MOVED);
+                assertTrue(shownTooltip().getText().contains("GRB250605A"));
+                assertTrue(shownTooltip().getText().contains("Original rate error"));
+                pointEvent(chart, 0, MouseEvent.MOUSE_CLICKED);
+                pointEvent(chart, 1, MouseEvent.MOUSE_MOVED);
+                assertNoTooltip();
+                assertEquals(1.0, chart.getData().get(1).getNode().getOpacity()); // Hover still lights B.
+                pointEvent(chart, 1, MouseEvent.MOUSE_CLICKED);
+                assertTrue(shownTooltip().getText().startsWith("GRB250603A"));
+                pointEvent(chart, 0, MouseEvent.MOUSE_MOVED);
+                assertNoTooltip();
+                ((Button) page.lookup(".compare-fullscreen-button")).fire();
+                return null;
+            });
+            pulse();
+            fx(() -> {
+                assertNotSame(page, stage.getScene().getRoot());
+                LineChart<Number, Number> enlarged = compareChart(stage.getScene().getRoot());
+                assertEquals(1, stage.getScene().getRoot().lookupAll(".compare-chart").size());
+                assertTrue(stage.getScene().getRoot().lookupAll(".compare-control-bar").isEmpty());
+                pointEvent(enlarged, 0, MouseEvent.MOUSE_MOVED);
+                assertNoTooltip(); // B selection copied into fullscreen.
+                pointEvent(enlarged, 0, MouseEvent.MOUSE_CLICKED);
+                assertTrue(shownTooltip().getText().startsWith("GRB250605A"));
+                back(stage.getScene().getRoot()).fire();
+                return null;
+            });
+            pulse();
+            awaitCompareChart(page);
+            fx(() -> {
+                assertSame(page, stage.getScene().getRoot());
+                assertNoTooltip();
+                LineChart<Number, Number> chart = compareChart(page);
+                pointEvent(chart, 1, MouseEvent.MOUSE_MOVED);
+                assertNoTooltip(); // A selection returned from fullscreen.
+                ((CheckBox) field(page, "normalize")).setSelected(true);
+                return null;
+            });
+            pulse();
+            fx(() -> {
+                LineChart<Number, Number> chart = compareChart(page);
+                assertEquals(1.0, chart.getData().get(0).getData().get(1).getYValue().doubleValue());
+                pointEvent(chart, 0, MouseEvent.MOUSE_MOVED);
+                assertTrue(shownTooltip().getText().contains("Original rate:"));
+                pointEvent(chart, 0, MouseEvent.MOUSE_CLICKED); // Release A.
+                // Separate the samples after testing normalized values (both peaks are now 1).
+                ((CheckBox) field(page, "normalize")).setSelected(false);
+                return null;
+            });
+            pulse();
+            fx(() -> {
+                pointEvent(compareChart(page), 1, MouseEvent.MOUSE_MOVED);
+                assertTrue(shownTooltip().getText().startsWith("GRB250603A"));
+                return null;
+            });
+        } finally {
+            fx(() -> { stage.close(); return null; });
+        }
+    }
+
+    @Test
+    void includedColumnsCanAllBeHiddenRestoredAndRememberedWithThinScrollbar() throws Exception {
+        String key = "test.included." + System.nanoTime();
+        TableView<String> table = fx(() -> {
+            TableView<String> result = new TableView<>();
+            for (String name : List.of("GRB", "T90", "Classe", "Redshift", "Copertura", "Flag qualità")) {
+                TableColumn<String, String> column = new TableColumn<>(name);
+                column.setCellValueFactory(value -> new SimpleStringProperty(value.getValue()));
+                result.getColumns().add(column);
+            }
+            result.getItems().setAll(IntStream.range(0, 500).mapToObj(i -> "GRB" + i).toList());
+            return result;
+        });
+        Stage stage = fx(() -> {
+            I18n.setLanguage(I18n.Language.EN);
+            VBox host = new VBox(6, TablePreferences.install(table, key), table);
+            VBox.setVgrow(table, javafx.scene.layout.Priority.ALWAYS);
+            Stage result = showStyled(host, 1000, 450);
+            InteractionPolishEnhancer.install(host);
+            ChartInteractionEnhancer.install(host);
+            UiTableAndStartupFixes.prepare(host);
+            UiTableAndStartupFixes.install(host);
+            UiLastMileFixes.prepare(host);
+            FinalUiStabilityEnhancer.install(host);
+            UiLastMileFixes.install(host);
+            FinalRequestedUiFastFixes.install(host);
+            return result;
+        });
+        try {
+            pulse();
+            fx(() -> {
+                MenuButton columns = (MenuButton) stage.getScene().getRoot().lookup(".included-columns-button");
+                assertNotNull(columns);
+                assertEquals("Columns", columns.getText());
+                ScrollBar bar = (ScrollBar) stage.getScene().getRoot().lookup(".table-external-scrollbar");
+                assertEquals(9, bar.getWidth(), 0.5);
+                bar.setValue(bar.getMax());
+                ScrollBar internal = table.lookupAll(".scroll-bar").stream().filter(ScrollBar.class::isInstance)
+                        .map(ScrollBar.class::cast).filter(b -> b.getOrientation() == Orientation.VERTICAL)
+                        .findFirst().orElseThrow();
+                assertEquals(internal.getMax(), internal.getValue(), 0.001);
+                columns.show();
+                for (var item : List.copyOf(columns.getItems())) {
+                    if (item instanceof CheckMenuItem check) { check.setSelected(false); check.fire(); }
+                }
+                columns.hide();
+                assertTrue(table.getColumns().stream().noneMatch(TableColumn::isVisible));
+                assertFalse(TablePreferences.isColumnVisible(key, "GRB"));
+                assertNotNull(stage.getScene().getRoot().lookup(".included-columns-button"));
+                columns.show();
+                columns.getItems().get(columns.getItems().size() - 1).fire();
+                columns.hide();
+                assertTrue(table.getColumns().stream().allMatch(TableColumn::isVisible));
+                assertTrue(TablePreferences.isColumnVisible(key, "GRB"));
+                I18n.setLanguage(I18n.Language.IT);
+                assertEquals("Colonne", columns.getText());
+                return null;
+            });
+        } finally {
+            fx(() -> { stage.close(); return null; });
+            java.util.prefs.Preferences.userNodeForPackage(TablePreferences.class).node(key).removeNode();
+        }
+    }
+
+    private static Stage showStyled(Parent root, int width, int height) {
+        root.getStyleClass().addAll("app-root", "reference-redesign", "black-hole-redesign");
+        Stage stage = new Stage();
+        Scene scene = new Scene(root, width, height);
+        for (String sheet : List.of("app.css", "ui-refinements.css", "black-hole-theme.css",
+                "reference-redesign.css", "stability-final.css")) {
+            scene.getStylesheets().add(ExplorerUiLifecycleTest.class.getResource("/" + sheet).toExternalForm());
+        }
+        stage.setScene(scene);
+        stage.show();
+        root.applyCss();
+        root.layout();
+        return stage;
+    }
+
+    private static GrbData compareData(String name, int peak) {
+        TabularData ascii = new TabularData(List.of("TIME_FROM_TRIGGER_CENTER_S", "RATE_15_350_KEV", "ERROR_15_350_KEV"),
+                List.of(List.of("-30", "0", "0.1"), List.of("0", String.valueOf(peak), "0.2"),
+                        List.of("30", "0", "0.1")));
+        return new GrbData(name, "1", Instant.EPOCH, null, List.of(), ascii, TabularData.empty(), List.of(), List.of());
+    }
+
+    private static Object field(Object owner, String name) throws Exception {
+        Field field = owner.getClass().getDeclaredField(name);
+        field.setAccessible(true);
+        return field.get(owner);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static LineChart<Number, Number> compareChart(Parent root) {
+        root.applyCss();
+        root.layout();
+        return (LineChart<Number, Number>) root.lookup(".compare-chart");
+    }
+
+    private static void awaitCompareChart(Parent root) throws Exception {
+        for (int attempt = 0; attempt < 20; attempt++) {
+            if (fx(() -> compareChart(root) != null)) return;
+            pulse(); // Compare may rebuild after editable selectors regain their Scene.
+        }
+        fail("Compare chart did not return after fullscreen");
+    }
+
+    private static void pointEvent(LineChart<Number, Number> chart, int seriesIndex,
+                                   javafx.event.EventType<MouseEvent> type) {
+        XYChart.Data<Number, Number> point = chart.getData().get(seriesIndex).getData().get(1);
+        Point2D x = chart.getXAxis().localToScene(chart.getXAxis().getDisplayPosition(point.getXValue()), 0);
+        Point2D y = chart.getYAxis().localToScene(0, chart.getYAxis().getDisplayPosition(point.getYValue()));
+        Point2D screen = chart.localToScreen(chart.sceneToLocal(x.getX(), y.getY()));
+        chart.fireEvent(new MouseEvent(type, x.getX(), y.getY(), screen.getX(), screen.getY(), MouseButton.PRIMARY, 1,
+                false, false, false, false, false, false, false, false, false, true,
+                new PickResult(chart, x.getX(), y.getY())));
+    }
+
+    private static Tooltip shownTooltip() {
+        return Window.getWindows().stream().filter(Tooltip.class::isInstance).map(Tooltip.class::cast)
+                .filter(Window::isShowing).findFirst().orElseThrow();
+    }
+
+    private static void assertNoTooltip() {
+        assertTrue(Window.getWindows().stream().filter(Tooltip.class::isInstance).noneMatch(Window::isShowing));
     }
 
     @Test

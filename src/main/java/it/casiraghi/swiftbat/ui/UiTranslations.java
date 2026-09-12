@@ -39,6 +39,10 @@ public final class UiTranslations {
     private static final Map<String, String> IT = new LinkedHashMap<>();
 
     static {
+        put("Passa sulla curva per leggere i dati. Clic per selezionarla; riclic per liberare la selezione.",
+                "Hover over a curve for data. Click to select it; click again to release the selection.");
+        put("Rate originale", "Original rate");
+        put("Errore sul rate originale", "Original rate error");
         // Home / shell.
         put("Benvenuto su", "Welcome to");
         put("Esplora, analizza e interpreta i lampi di raggi gamma con i dati di Swift/BAT.",

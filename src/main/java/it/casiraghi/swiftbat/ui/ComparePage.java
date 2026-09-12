@@ -6,6 +6,8 @@ import it.casiraghi.swiftbat.model.SummaryItem;
 import it.casiraghi.swiftbat.model.TabularData;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
+import javafx.beans.property.SimpleStringProperty;
+import javafx.beans.property.StringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableMap;
 import javafx.geometry.Insets;
@@ -59,6 +61,7 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
     private final Set<String> requestedLoads = new LinkedHashSet<>();
     private List<String> availableNames = List.of();
     private int comparisonVersion;
+    private final StringProperty selectedCurve = new SimpleStringProperty();
 
     public ComparePage(ObservableMap<String, GrbData> sessionData, Consumer<CatalogEntry> loadRequest) {
         this.sessionData = sessionData;
@@ -345,25 +348,26 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
                 compareMetric("Durezza proxy", value(a, "HARDNESS_PROXY"), value(b, "HARDNESS_PROXY"), a.grbName(), b.grbName()),
                 compareMetric("Esposizione completa", value(a, "FULL_EXPOSURE_FRACTION"), value(b, "FULL_EXPOSURE_FRACTION"), a.grbName(), b.grbName()));
 
-        NumberAxis xAxis = new NumberAxis(-60, 60, 10);
-        NumberAxis yAxis = new NumberAxis();
-        xAxis.setLabel(I18n.t("Tempo dal trigger (s)"));
-        yAxis.setLabel(I18n.t(normalize.isSelected() ? "Rate normalizzato" : "Rate totale (count/s)"));
-        LineChart<Number, Number> chart = new LineChart<>(xAxis, yAxis);
-        chart.setAnimated(false);
-        chart.setCreateSymbols(false);
-        chart.setTitle("±60 s");
-        chart.getStyleClass().add("lightcurve-chart");
-        chart.getData().add(seriesFor(a, normalize.isSelected()));
-        chart.getData().add(seriesFor(b, normalize.isSelected()));
-        VBox.setVgrow(chart, Priority.ALWAYS);
+        if (!a.grbName().equals(selectedCurve.get()) && !b.grbName().equals(selectedCurve.get())) {
+            selectedCurve.set(null);
+        }
+        boolean normalized = normalize.isSelected();
+        LineChart<Number, Number> chart = comparisonChart(a, b, normalized);
 
         Button export = UiFactory.button("Esporta PNG", "ghost-button");
         export.setOnAction(event -> ExportSupport.exportPng(export, chart,
                 "comparison_" + a.grbName() + "_" + b.grbName() + ".png"));
-        HBox chartActions = new HBox(export);
+        Button fullscreen = UiFactory.button("Schermo intero", "secondary-button");
+        fullscreen.getStyleClass().add("compare-fullscreen-button");
+        fullscreen.setOnAction(event -> InPlaceFullscreen.show(fullscreen,
+                I18n.dynamic("Confronto temporale", "Time comparison") + " · " + a.grbName() + " / " + b.grbName(),
+                comparisonChart(a, b, normalized)));
+        HBox chartActions = new HBox(8, export, fullscreen);
         chartActions.setAlignment(Pos.CENTER_RIGHT);
-        VBox chartContent = new VBox(8, chartActions, chart);
+        Label hint = UiFactory.wrappedLabel("", "subtle-text");
+        I18n.setText(hint, "Passa sulla curva per leggere i dati. Clic per selezionarla; riclic per liberare la selezione.",
+                "Hover over a curve for data. Click to select it; click again to release the selection.");
+        VBox chartContent = new VBox(8, chartActions, chart, hint);
         chartContent.setMinWidth(0);
         chartContent.setMaxWidth(Double.MAX_VALUE);
         VBox.setVgrow(chart, Priority.ALWAYS);
@@ -371,6 +375,26 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         VBox chartCard = UiFactory.card("Confronto temporale", "", chartContent);
         page.getChildren().addAll(cards, chartCard);
         return page;
+    }
+
+    private LineChart<Number, Number> comparisonChart(GrbData a, GrbData b, boolean normalized) {
+        NumberAxis xAxis = new NumberAxis(-60, 60, 10);
+        NumberAxis yAxis = new NumberAxis();
+        xAxis.setLabel(I18n.t("Tempo dal trigger (s)"));
+        yAxis.setLabel(I18n.t(normalized ? "Rate normalizzato" : "Rate totale (count/s)"));
+        LineChart<Number, Number> chart = new LineChart<>(xAxis, yAxis);
+        chart.setAnimated(false);
+        chart.setCreateSymbols(false);
+        chart.setTitle("±60 s");
+        chart.setMinSize(0, 0);
+        chart.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+        chart.getStyleClass().addAll("lightcurve-chart", "compare-chart");
+        chart.getProperties().put("compare.normalized", normalized);
+        chart.getData().add(seriesFor(a, normalized));
+        chart.getData().add(seriesFor(b, normalized));
+        CompareChartInteraction.install(chart, selectedCurve);
+        VBox.setVgrow(chart, Priority.ALWAYS);
+        return chart;
     }
 
     private VBox compareMetric(String title, String a, String b, String nameA, String nameB) {
@@ -391,20 +415,25 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         TabularData table = data.asciiData().isEmpty() ? data.fitsData() : data.asciiData();
         int timeIndex = table.indexOf("TIME_FROM_TRIGGER_CENTER_S");
         int rateIndex = table.indexOf(data.asciiData().isEmpty() ? "RATE" : "RATE_15_350_KEV");
+        int errorIndex = table.indexOf(data.asciiData().isEmpty() ? "ERROR" : "ERROR_15_350_KEV");
+        int fracexpIndex = table.indexOf("FRACEXP");
         List<double[]> points = new ArrayList<>();
         double peak = 0;
         for (List<String> row : table.rows()) {
             double time = parse(row, timeIndex);
             double rate = parse(row, rateIndex);
             if (Double.isFinite(time) && Double.isFinite(rate) && Math.abs(time) <= 60) {
-                points.add(new double[]{time, rate});
+                points.add(new double[]{time, rate, parse(row, errorIndex), parse(row, fracexpIndex)});
                 peak = Math.max(peak, Math.abs(rate));
             }
         }
         double scale = normalized && peak > 0 ? peak : 1;
         XYChart.Series<Number, Number> series = new XYChart.Series<>();
         series.setName(data.grbName());
-        for (double[] point : points) series.getData().add(new XYChart.Data<>(point[0], point[1] / scale));
+        for (double[] point : points) {
+            series.getData().add(new XYChart.Data<>(point[0], point[1] / scale,
+                    new CompareChartInteraction.Sample(point[1], point[2], point[3])));
+        }
         return series;
     }
 
