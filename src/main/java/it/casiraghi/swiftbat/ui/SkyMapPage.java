@@ -48,7 +48,7 @@ public final class SkyMapPage extends BorderPane {
     private List<SkyBurst> visibleBursts = List.of();
     private SkyBurst selectedBurst;
     private boolean sphereView;
-    private final PauseTransition filterDebounce = new PauseTransition(Duration.millis(900));
+    private final PauseTransition filterDebounce = new PauseTransition(Duration.millis(140));
 
     private final MollweideSkyPane mollweide = new MollweideSkyPane();
     private final CelestialSpherePane sphere = new CelestialSpherePane();
@@ -61,7 +61,9 @@ public final class SkyMapPage extends BorderPane {
     private final Label noT90Metric = UiFactory.label("0", "sky-metric-value");
 
     private final TextField search = new TextField();
-    private final ComboBox<String> durationFilter = new ComboBox<>();
+    private final GrbSearchAssist searchAssist;
+    private final MultiSelectMenuButton durationFilter = new MultiSelectMenuButton(
+            FILTER_ALL, List.of(FILTER_SHORT, FILTER_LONG, FILTER_UNKNOWN));
     private final ComboBox<String> redshiftFilter = new ComboBox<>();
     private final TextField raMin = compactField("0");
     private final TextField raMax = compactField("360");
@@ -82,6 +84,10 @@ public final class SkyMapPage extends BorderPane {
 
     public SkyMapPage(Consumer<CatalogEntry> openGrb) {
         this.openGrb = openGrb == null ? entry -> { } : openGrb;
+        searchAssist = new GrbSearchAssist(
+                search,
+                () -> allBursts.stream().map(SkyBurst::grbName).toList(),
+                this::selectSkySearchMatch);
         getStyleClass().add("page-root");
         setCenter(buildPage());
         mollweide.setOnSelect(this::selectBurst);
@@ -122,6 +128,7 @@ public final class SkyMapPage extends BorderPane {
 
     public void setSkyBursts(List<SkyBurst> bursts) {
         allBursts = bursts == null ? List.of() : List.copyOf(bursts);
+        searchAssist.refresh();
         status.setText(allBursts.size() + " GRB con coordinate BAT caricati");
         setStatusStyle("status-online");
         applyFilters();
@@ -211,16 +218,15 @@ public final class SkyMapPage extends BorderPane {
         HBox row = new HBox(7);
         row.setAlignment(Pos.CENTER_LEFT);
 
-        search.setPromptText("Cerca GRB…");
         search.getStyleClass().add("modern-text-field");
         search.setMinWidth(145);
-        search.setPrefWidth(165);
-        search.setMaxWidth(175);
+        search.setPrefWidth(190);
+        search.setMaxWidth(220);
+        StackPane searchNode = searchAssist.node();
+        searchNode.setMinWidth(145);
+        searchNode.setPrefWidth(190);
+        searchNode.setMaxWidth(220);
 
-        durationFilter.setItems(FXCollections.observableArrayList(
-                FILTER_ALL, FILTER_SHORT, FILTER_LONG, FILTER_UNKNOWN));
-        durationFilter.setValue(FILTER_ALL);
-        durationFilter.getStyleClass().add("choice-box-modern");
         durationFilter.setMinWidth(135);
         durationFilter.setPrefWidth(145);
 
@@ -243,7 +249,7 @@ public final class SkyMapPage extends BorderPane {
         HBox raRange = compactSkyRange("RA", raMin, raMax);
         HBox decRange = compactSkyRange("DEC", decMin, decMax);
         HBox zRange = compactSkyRange("z", zMin, zMax);
-        row.getChildren().addAll(search, durationFilter, redshiftControl,
+        row.getChildren().addAll(searchNode, durationFilter, redshiftControl,
                 raRange, decRange, zRange, galacticPlane, reset);
         card.getChildren().add(row);
         return card;
@@ -534,7 +540,7 @@ public final class SkyMapPage extends BorderPane {
     private void configureFilters() {
         filterDebounce.setOnFinished(event -> applyFilters());
         search.textProperty().addListener((obs, oldValue, newValue) -> scheduleFilterApply());
-        durationFilter.valueProperty().addListener((obs, oldValue, newValue) -> scheduleFilterApply());
+        durationFilter.setOnSelectionChanged(this::scheduleFilterApply);
         redshiftFilter.valueProperty().addListener((obs, oldValue, newValue) -> scheduleFilterApply());
         for (TextField field : List.of(raMin, raMax, decMin, decMax, zMin, zMax)) {
             field.textProperty().addListener((obs, oldValue, newValue) -> scheduleFilterApply());
@@ -559,8 +565,8 @@ public final class SkyMapPage extends BorderPane {
     }
 
     private void resetFilters() {
-        search.clear();
-        durationFilter.setValue(FILTER_ALL);
+        searchAssist.reset();
+        durationFilter.selectAll();
         redshiftFilter.setValue("Con e senza redshift");
         raMin.setText("0");
         raMax.setText("360");
@@ -583,8 +589,10 @@ public final class SkyMapPage extends BorderPane {
             return;
         }
 
-        String query = search.getText() == null ? "" : search.getText().trim().toUpperCase(Locale.ROOT);
-        String duration = durationFilter.getValue() == null ? FILTER_ALL : durationFilter.getValue();
+        String rawQuery = search.getText() == null ? "" : search.getText().trim().toUpperCase(Locale.ROOT);
+        String query = rawQuery.equals("GRB") ? "" : rawQuery;
+        java.util.Set<String> durations = durationFilter.selectedValues();
+        boolean allDurations = durationFilter.isAllSelected();
         String redshift = redshiftFilter.getValue() == null ? "Con e senza redshift" : redshiftFilter.getValue();
         double minimumZ;
         double maximumZ;
@@ -604,14 +612,11 @@ public final class SkyMapPage extends BorderPane {
             if (!query.isEmpty() && !burst.grbName().contains(query) && !burst.triggerId().contains(query)) {
                 continue;
             }
-            if (duration.equals(FILTER_SHORT) && !burst.isShort()) {
-                continue;
-            }
-            if (duration.equals(FILTER_LONG) && !burst.isLong()) {
-                continue;
-            }
-            if (duration.equals(FILTER_UNKNOWN) && burst.hasT90()) {
-                continue;
+            if (!allDurations) {
+                boolean matchesDuration = (durations.contains(FILTER_SHORT) && burst.isShort())
+                        || (durations.contains(FILTER_LONG) && burst.isLong())
+                        || (durations.contains(FILTER_UNKNOWN) && !burst.hasT90());
+                if (!matchesDuration) continue;
             }
             boolean hasRedshift = burst.redshift().available();
             if (redshift.equals("Solo con redshift") && !hasRedshift) {
@@ -642,6 +647,15 @@ public final class SkyMapPage extends BorderPane {
             status.setText(visibleBursts.size() + " / " + allBursts.size() + " GRB visualizzati");
             setStatusStyle("status-online");
         }
+    }
+
+    private void selectSkySearchMatch(String grbName) {
+        filterDebounce.stop();
+        applyFilters();
+        visibleBursts.stream()
+                .filter(burst -> burst.grbName().equalsIgnoreCase(grbName))
+                .findFirst()
+                .ifPresent(this::selectBurst);
     }
 
     private Range readRange() {

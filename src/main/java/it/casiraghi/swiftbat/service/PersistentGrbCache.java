@@ -13,6 +13,8 @@ import java.time.format.DateTimeParseException;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 /**
@@ -29,6 +31,7 @@ public final class PersistentGrbCache {
     private static final String FITS_FILE = "fits-1chan-1s.lc";
 
     private final Path root;
+    private final Set<String> cachedNames = ConcurrentHashMap.newKeySet();
 
     public PersistentGrbCache() {
         this(defaultRoot());
@@ -36,6 +39,7 @@ public final class PersistentGrbCache {
 
     PersistentGrbCache(Path root) {
         this.root = root.toAbsolutePath().normalize();
+        indexExistingEntries();
     }
 
     public Optional<CachedProducts> read(CatalogEntry entry) throws IOException {
@@ -59,6 +63,7 @@ public final class PersistentGrbCache {
         if (ascii == null && fits == null) {
             return Optional.empty();
         }
+        cachedNames.add(cacheKey(entry.grbName()));
 
         return Optional.of(new CachedProducts(
                 ascii,
@@ -92,23 +97,15 @@ public final class PersistentGrbCache {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         manifest.store(output, "SwiftBAT Explorer local cache");
         writeAtomically(directory.resolve(MANIFEST), output.toByteArray());
+        cachedNames.add(cacheKey(entry.grbName()));
     }
 
     public boolean contains(String grbName) {
-        return Files.isRegularFile(eventDirectory(grbName).resolve(MANIFEST));
+        return cachedNames.contains(cacheKey(grbName));
     }
 
     public int count() {
-        if (!Files.isDirectory(root)) {
-            return 0;
-        }
-        try (Stream<Path> entries = Files.list(root)) {
-            return (int) entries.filter(Files::isDirectory)
-                    .filter(path -> Files.isRegularFile(path.resolve(MANIFEST)))
-                    .count();
-        } catch (IOException ignored) {
-            return 0;
-        }
+        return cachedNames.size();
     }
 
     Path root() {
@@ -116,9 +113,24 @@ public final class PersistentGrbCache {
     }
 
     private Path eventDirectory(String grbName) {
-        String safeName = grbName == null ? "UNKNOWN"
+        return root.resolve(cacheKey(grbName)).normalize();
+    }
+
+    private String cacheKey(String grbName) {
+        return grbName == null ? "UNKNOWN"
                 : grbName.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9_-]", "_");
-        return root.resolve(safeName).normalize();
+    }
+
+    private void indexExistingEntries() {
+        if (!Files.isDirectory(root)) return;
+        try (Stream<Path> entries = Files.list(root)) {
+            entries.filter(Files::isDirectory)
+                    .filter(path -> Files.isRegularFile(path.resolve(MANIFEST)))
+                    .map(path -> path.getFileName().toString().toUpperCase(Locale.ROOT))
+                    .forEach(cachedNames::add);
+        } catch (IOException ignored) {
+            // The cache is an optimization: an unreadable index must not block startup.
+        }
     }
 
     private byte[] readOptional(Path path) throws IOException {

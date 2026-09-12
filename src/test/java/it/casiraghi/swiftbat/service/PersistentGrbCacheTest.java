@@ -32,6 +32,10 @@ class PersistentGrbCacheTest {
         assertEquals(Instant.EPOCH, restored.savedAt());
         assertTrue(cache.contains(entry.grbName()));
         assertEquals(1, cache.count());
+
+        PersistentGrbCache reopened = new PersistentGrbCache(temporary);
+        assertTrue(reopened.contains(entry.grbName()));
+        assertEquals(1, reopened.count());
     }
 
     @Test

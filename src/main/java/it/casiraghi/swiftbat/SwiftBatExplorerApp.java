@@ -3,15 +3,12 @@ package it.casiraghi.swiftbat;
 import it.casiraghi.swiftbat.ui.AdaptiveChromeEnhancer;
 import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
-import it.casiraghi.swiftbat.ui.ExpertFilterAndSearchEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerRegressionFixes;
-import it.casiraghi.swiftbat.ui.ExplorerSearchAndCacheFix;
 import it.casiraghi.swiftbat.ui.ExplorerUiRegressionFix;
 import it.casiraghi.swiftbat.ui.FinalMacAndPopulationPolish;
 import it.casiraghi.swiftbat.ui.FinalRequestedUiFastFixes;
 import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
 import it.casiraghi.swiftbat.ui.GlobalSearchAssistEnhancer;
-import it.casiraghi.swiftbat.ui.GrbSearchStartupFix;
 import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
 import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
 import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
@@ -42,7 +39,6 @@ public final class SwiftBatExplorerApp extends Application {
         GlobalSearchAssistEnhancer.install(mainView);
         PopulationDurationMultiSelectEnhancer.install(mainView);
         PopulationFracexpSliderFix.install(mainView);
-        ExpertFilterAndSearchEnhancer.install(mainView);
         Scene scene = new Scene(mainView.getRoot(), 1580, 960);
 
         /*
@@ -105,12 +101,9 @@ public final class SwiftBatExplorerApp extends Application {
 
         FinalMacAndPopulationPolish.install(mainView.getRoot());
         PageScopedPolishRouter.install(mainView.getRoot());
-        GrbSearchStartupFix.install(mainView);
-        ExplorerSearchAndCacheFix.install(mainView);
 
-        /* One lightweight owner for the Explorer catalogue caption, stable fast
-           scrollbar drag and spectroscopy hover labels. Avoid duplicate sidebar
-           observers and thumb-resize loops that caused Explorer-wide stutter. */
+        /* Adds only the scoped spectroscopy hover labels. Catalogue search,
+           filtering and scrollbar behaviour are owned by the page itself. */
         ExplorerUiRegressionFix.install(mainView);
     }
 

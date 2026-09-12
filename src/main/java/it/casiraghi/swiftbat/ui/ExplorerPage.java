@@ -78,6 +78,7 @@ public final class ExplorerPage extends BorderPane {
     private final FilteredList<CatalogEntry> filteredCatalog = new FilteredList<>(catalog, ignored -> true);
     private final ListView<CatalogEntry> catalogList = new ListView<>(filteredCatalog);
     private final TextField catalogSearch = new TextField();
+    private final GrbSearchAssist catalogSearchAssist;
     private final MultiSelectMenuButton durationFilter = new MultiSelectMenuButton(
             "Tutte", List.of("Short ≤ 2 s", "Long > 2 s", "T90 n.d."));
     private final MultiSelectMenuButton redshiftFilter = new MultiSelectMenuButton(
@@ -94,13 +95,17 @@ public final class ExplorerPage extends BorderPane {
     private CatalogEntry selectedEntry;
     private GrbData currentData;
     private String preferredTab = "Curva 2D";
-    private final PauseTransition catalogFilterDebounce = new PauseTransition(Duration.millis(900));
+    private final PauseTransition catalogFilterDebounce = new PauseTransition(Duration.millis(140));
 
     public ExplorerPage(HostServices hostServices, BiConsumer<CatalogEntry, Boolean> loadRequest,
                         Predicate<CatalogEntry> cacheLookup) {
         this.hostServices = hostServices;
         this.loadRequest = loadRequest;
         this.cacheLookup = cacheLookup == null ? ignored -> false : cacheLookup;
+        catalogSearchAssist = new GrbSearchAssist(
+                catalogSearch,
+                () -> catalog.stream().map(CatalogEntry::grbName).toList(),
+                this::selectCatalogSearchMatch);
         getStyleClass().add("page-root");
         setPadding(new Insets(20, 24, 24, 24));
         setTop(buildHeader());
@@ -112,6 +117,7 @@ public final class ExplorerPage extends BorderPane {
 
     public void setCatalog(List<CatalogEntry> entries, boolean fallback) {
         catalog.setAll(entries);
+        catalogSearchAssist.refresh();
         applyCatalogFilters();
         I18n.setText(catalogCount,
                 entries.size() + (fallback ? " GRB di emergenza" : " GRB nel catalogo online"),
@@ -227,8 +233,9 @@ public final class ExplorerPage extends BorderPane {
         sidebar.setMinHeight(0);
 
         Label title = UiFactory.label("GRB", "panel-title");
-        catalogSearch.setPromptText("Cerca GRB o Trigger ID…");
         catalogSearch.getStyleClass().add("search-field");
+        StackPane catalogSearchNode = catalogSearchAssist.node();
+        catalogSearchNode.setMaxWidth(Double.MAX_VALUE);
         durationFilter.setMaxWidth(Double.MAX_VALUE);
         redshiftFilter.setMaxWidth(Double.MAX_VALUE);
 
@@ -323,7 +330,7 @@ public final class ExplorerPage extends BorderPane {
 
         Separator separator = new Separator(Orientation.HORIZONTAL);
         separator.getStyleClass().add("soft-separator");
-        sidebar.getChildren().addAll(title, catalogSearch, filterGrid, extraToggle, extraBox,
+        sidebar.getChildren().addAll(title, catalogSearchNode, filterGrid, extraToggle, extraBox,
                 catalogCount, catalogList, separator);
 
         workspace.getStyleClass().add("workspace-host");
@@ -358,8 +365,22 @@ public final class ExplorerPage extends BorderPane {
         catalogFilterDebounce.playFromStart();
     }
 
+    private void selectCatalogSearchMatch(String grbName) {
+        catalogFilterDebounce.stop();
+        applyCatalogFilters();
+        CatalogEntry match = catalog.stream()
+                .filter(entry -> entry.grbName().equalsIgnoreCase(grbName))
+                .findFirst()
+                .orElse(null);
+        if (match == null || !filteredCatalog.contains(match)) return;
+        catalogList.getSelectionModel().select(match);
+        catalogList.scrollTo(match);
+    }
+
     private void applyCatalogFilters() {
-        String query = catalogSearch.getText() == null ? "" : catalogSearch.getText().trim().toLowerCase(Locale.ROOT);
+        String rawQuery = catalogSearch.getText() == null
+                ? "" : catalogSearch.getText().trim().toLowerCase(Locale.ROOT);
+        String query = rawQuery.equals("grb") ? "" : rawQuery;
         java.util.Set<String> durations = durationFilter.selectedValues();
         java.util.Set<String> redshifts = redshiftFilter.selectedValues();
         boolean durationAll = durationFilter.isAllSelected();
@@ -376,9 +397,11 @@ public final class ExplorerPage extends BorderPane {
                     && !entry.triggerId().toLowerCase(Locale.ROOT).contains(query)) {
                 return false;
             }
-            boolean cached = cacheLookup.test(entry);
-            if (cache.equals("Solo in cache") && !cached) return false;
-            if (cache.equals("Da scaricare") && cached) return false;
+            if (!cache.equals("Tutti")) {
+                boolean cached = cacheLookup.test(entry);
+                if (cache.equals("Solo in cache") && !cached) return false;
+                if (cache.equals("Da scaricare") && cached) return false;
+            }
 
             SkyBurst burst = scientificMetadata.get(entry.grbName().toUpperCase(Locale.ROOT));
             boolean hasNumericFilters = t90Min != null || t90Max != null || zMin != null || zMax != null;

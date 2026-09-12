@@ -286,7 +286,7 @@ public final class MainView {
             updateCacheStatus();
         }));
 
-        HBox telemetry = new HBox(4, catalogStatus, sessionStatus, connectionStatus);
+        HBox telemetry = new HBox(4, catalogStatus, connectionStatus);
         telemetry.getStyleClass().add("top-telemetry");
         telemetry.setAlignment(Pos.CENTER_RIGHT);
 

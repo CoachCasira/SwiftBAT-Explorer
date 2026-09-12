@@ -51,8 +51,6 @@ public final class ExplorerUiRegressionFix {
         Object value = readField(mainView, "explorerPage");
         if (!(value instanceof ExplorerPage explorer)) return;
 
-        installCatalogCaption(explorer);
-        installCatalogScrollbar(explorer);
         installSpectroscopyTooltips(explorer);
     }
 
