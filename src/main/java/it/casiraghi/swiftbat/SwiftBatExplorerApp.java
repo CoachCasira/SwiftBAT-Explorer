@@ -4,7 +4,6 @@ import it.casiraghi.swiftbat.ui.AdaptiveChromeEnhancer;
 import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
 import it.casiraghi.swiftbat.ui.ExpertFilterAndSearchEnhancer;
-import it.casiraghi.swiftbat.ui.ExplorerCatalogSidebarFix;
 import it.casiraghi.swiftbat.ui.ExplorerRegressionFixes;
 import it.casiraghi.swiftbat.ui.ExplorerSearchAndCacheFix;
 import it.casiraghi.swiftbat.ui.ExplorerUiRegressionFix;
@@ -106,9 +105,12 @@ public final class SwiftBatExplorerApp extends Application {
 
         FinalMacAndPopulationPolish.install(mainView.getRoot());
         PageScopedPolishRouter.install(mainView.getRoot());
-        ExplorerCatalogSidebarFix.install(mainView.getRoot());
         GrbSearchStartupFix.install(mainView);
         ExplorerSearchAndCacheFix.install(mainView);
+
+        /* One lightweight owner for the Explorer catalogue caption, stable fast
+           scrollbar drag and spectroscopy hover labels. Avoid duplicate sidebar
+           observers and thumb-resize loops that caused Explorer-wide stutter. */
         ExplorerUiRegressionFix.install(mainView);
     }
 
