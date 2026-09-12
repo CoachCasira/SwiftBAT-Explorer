@@ -3,6 +3,7 @@ package it.casiraghi.swiftbat;
 import it.casiraghi.swiftbat.ui.AdaptiveChromeEnhancer;
 import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
+import it.casiraghi.swiftbat.ui.ExpertFilterAndSearchEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerCatalogSidebarFix;
 import it.casiraghi.swiftbat.ui.ExplorerRegressionFixes;
 import it.casiraghi.swiftbat.ui.FinalMacAndPopulationPolish;
@@ -37,6 +38,7 @@ public final class SwiftBatExplorerApp extends Application {
         MainView mainView = new MainView(getHostServices(), stage);
         GlobalSearchAssistEnhancer.install(mainView);
         PopulationDurationMultiSelectEnhancer.install(mainView);
+        ExpertFilterAndSearchEnhancer.install(mainView);
         Scene scene = new Scene(mainView.getRoot(), 1580, 960);
 
         /*
