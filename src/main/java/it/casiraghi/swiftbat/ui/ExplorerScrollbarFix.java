@@ -167,20 +167,36 @@ public final class ExplorerScrollbarFix {
             double ratio = range <= 0.0 ? 0.0 : (bar.getValue() - bar.getMin()) / range;
             ratio = Math.max(0.0, Math.min(1.0, ratio));
 
+            /*
+             * ScrollBarSkin positions the native thumb with translations. If we
+             * resizeRelocate without clearing them, the position is applied twice:
+             * the farther the user scrolls, the farther the thumb drifts outside
+             * the track. Reset the native translation first, then place the thumb
+             * once inside the real track bounds.
+             */
+            thumb.setTranslateX(0.0);
+            thumb.setTranslateY(0.0);
+
             if (bar.getOrientation() == Orientation.VERTICAL) {
                 double trackLength = Math.max(0.0, trackBounds.getHeight());
                 if (trackLength <= 0.0) return;
                 double length = Math.min(trackLength, Math.max(MIN_THUMB_LENGTH, thumb.getHeight()));
                 double thickness = Math.min(THUMB_THICKNESS, Math.max(5.0, trackBounds.getWidth() - 2.0));
+                double minY = trackBounds.getMinY();
+                double maxY = Math.max(minY, trackBounds.getMaxY() - length);
                 double px = trackBounds.getMinX() + (trackBounds.getWidth() - thickness) / 2.0;
-                double py = trackBounds.getMinY() + ratio * Math.max(0.0, trackLength - length);
+                double py = minY + ratio * Math.max(0.0, maxY - minY);
+                py = Math.max(minY, Math.min(maxY, py));
                 thumb.resizeRelocate(px, py, thickness, length);
             } else {
                 double trackLength = Math.max(0.0, trackBounds.getWidth());
                 if (trackLength <= 0.0) return;
                 double length = Math.min(trackLength, Math.max(MIN_THUMB_LENGTH, thumb.getWidth()));
                 double thickness = Math.min(THUMB_THICKNESS, Math.max(5.0, trackBounds.getHeight() - 2.0));
-                double px = trackBounds.getMinX() + ratio * Math.max(0.0, trackLength - length);
+                double minX = trackBounds.getMinX();
+                double maxX = Math.max(minX, trackBounds.getMaxX() - length);
+                double px = minX + ratio * Math.max(0.0, maxX - minX);
+                px = Math.max(minX, Math.min(maxX, px));
                 double py = trackBounds.getMinY() + (trackBounds.getHeight() - thickness) / 2.0;
                 thumb.resizeRelocate(px, py, length, thickness);
             }
