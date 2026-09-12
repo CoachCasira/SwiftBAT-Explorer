@@ -179,7 +179,8 @@ public final class ExplorerScrollbarFix {
                 pointer = event.getSceneX() - dragOffset[0];
             }
 
-            double ratio = available <= 0.0 ? 0.0 : clamp01((pointer - start) / available);
+            double rawRatio = available <= 0.0 ? 0.0 : (pointer - start) / available;
+            double ratio = Math.max(0.0, Math.min(1.0, rawRatio));
             double range = bar.getMax() - bar.getMin();
             bar.setValue(range <= 0.0 ? bar.getMin() : bar.getMin() + ratio * range);
             bar.requestLayout();
