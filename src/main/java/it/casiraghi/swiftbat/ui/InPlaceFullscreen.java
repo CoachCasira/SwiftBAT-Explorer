@@ -26,10 +26,29 @@ import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /** Mostra un contenuto a schermo intero riutilizzando la finestra principale. */
 public final class InPlaceFullscreen {
     private static final String ACTIVE_SESSION = InPlaceFullscreen.class.getName() + ".activeSession";
+
+    /** Content with a second UI toolkit must finish detaching before root replacement. */
+    public interface CloseParticipant {
+        CompletionStage<Void> prepareForFullscreenExit();
+    }
+
+    private static void collectCloseParticipants(Node node, List<CloseParticipant> participants) {
+        if (node instanceof CloseParticipant participant) {
+            participants.add(participant);
+            return;
+        }
+        if (node instanceof ScrollPane scroll) {
+            collectCloseParticipants(scroll.getContent(), participants);
+        } else if (node instanceof Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable()) collectCloseParticipants(child, participants);
+        }
+    }
 
     private InPlaceFullscreen() {
     }
@@ -65,8 +84,10 @@ public final class InPlaceFullscreen {
         private final ChangeListener<Boolean> fullscreenListener;
         private final EventHandler<KeyEvent> keyHandler;
         private final PauseTransition restoreDelay = new PauseTransition(Duration.millis(110));
+        private final List<CloseParticipant> closeParticipants = new ArrayList<>();
         private boolean active;
         private boolean closing;
+        private boolean contentReady;
         private boolean leaveFullscreenRequested;
 
         private Session(Scene scene, Stage stage, Node owner, String title, Node content) {
@@ -76,6 +97,7 @@ public final class InPlaceFullscreen {
             this.originalRoot = scene.getRoot();
             this.originallyFullscreen = stage.isFullScreen();
             this.originalExitHint = stage.getFullScreenExitHint();
+            collectCloseParticipants(content, closeParticipants);
 
             Button back = UiFactory.button("← Torna all'app", "secondary-button");
             String italianTitle = title == null || title.isBlank() ? "Schermo intero" : title;
@@ -100,9 +122,7 @@ public final class InPlaceFullscreen {
             keyHandler = this::handleKeyPressed;
             fullscreenListener = (observable, wasFullscreen, isFullscreen) -> {
                 if (!active || !wasFullscreen || isFullscreen) return;
-                leaveFullscreenRequested = true;
-                if (!closing) beginClosing();
-                scheduleRootRestore();
+                close(true);
             };
             restoreDelay.setOnFinished(event -> finishClose());
         }
@@ -438,8 +458,38 @@ public final class InPlaceFullscreen {
         private void close(boolean leaveFullscreen) {
             if (!active) return;
             leaveFullscreenRequested |= leaveFullscreen || !originallyFullscreen;
-            if (!closing) beginClosing();
+            if (closing) {
+                if (contentReady) continueClosing();
+                return;
+            }
+            beginClosing();
+            if (closeParticipants.isEmpty()) {
+                contentReady = true;
+                continueClosing();
+                return;
+            }
 
+            // Back, ESC and native fullscreen exit all share this one gate.
+            // Never wait for the Swing EDT on the FX thread.
+            CompletableFuture<?>[] preparations = closeParticipants.stream()
+                    .map(participant -> participant.prepareForFullscreenExit().toCompletableFuture())
+                    .toArray(CompletableFuture<?>[]::new);
+            CompletableFuture.allOf(preparations).whenComplete((ignored, failure) -> Platform.runLater(() -> {
+                if (!active) return;
+                if (failure != null) {
+                    // Keep the attached tree in place when native disposal failed.
+                    // Report the cause rather than detach a live Swing surface.
+                    Thread.currentThread().getUncaughtExceptionHandler()
+                            .uncaughtException(Thread.currentThread(), failure);
+                    return;
+                }
+                contentReady = true;
+                continueClosing();
+            }));
+        }
+
+        private void continueClosing() {
+            if (!active || !contentReady) return;
             if (leaveFullscreenRequested && stage.isFullScreen()) {
                 // Leave native fullscreen on a later pulse. The property listener
                 // will schedule the root restore only after Windows/Glass reports
@@ -462,13 +512,13 @@ public final class InPlaceFullscreen {
         }
 
         private void scheduleRootRestore() {
-            if (!active) return;
+            if (!active || !contentReady) return;
             restoreDelay.stop();
             restoreDelay.playFromStart();
         }
 
         private void finishClose() {
-            if (!active) return;
+            if (!active || !contentReady) return;
             if (leaveFullscreenRequested && stage.isFullScreen()) {
                 scheduleRootRestore();
                 return;

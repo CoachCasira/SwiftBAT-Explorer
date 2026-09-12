@@ -1,15 +1,11 @@
 package it.casiraghi.swiftbat.ui;
 
-import it.casiraghi.swiftbat.ui.components.ThreeDChartPane;
 import javafx.application.Platform;
 import javafx.beans.binding.Bindings;
 import javafx.collections.ListChangeListener;
-import javafx.embed.swing.SwingNode;
-import javafx.event.ActionEvent;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
-import javafx.scene.Scene;
 import javafx.scene.control.ButtonBase;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.ContextMenu;
@@ -20,27 +16,18 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.Tooltip;
 import javafx.scene.control.cell.TextFieldTableCell;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyEvent;
-import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.control.OverrunStyle;
 import javafx.util.StringConverter;
 
-import javax.swing.JComponent;
-import javax.swing.SwingUtilities;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
-import java.util.WeakHashMap;
 
 /**
  * Small regression layer for Explorer behaviours that must survive the first
@@ -54,15 +41,11 @@ public final class ExplorerRegressionFixes {
     private static final String COLUMN_DONE = ExplorerRegressionFixes.class.getName() + ".columnDone";
     private static final String COLUMN_NAME = ExplorerRegressionFixes.class.getName() + ".columnName";
     private static final String METADATA_HORIZONTAL = ExplorerRegressionFixes.class.getName() + ".metadataHorizontal";
-    private static final String SWING_CLOSE_ACTIVE = ExplorerRegressionFixes.class.getName() + ".swingCloseActive";
-    private static final Set<Scene> SCENES = Collections.newSetFromMap(new WeakHashMap<>());
 
     private ExplorerRegressionFixes() { }
 
     public static void install(Parent root) {
         if (root == null) return;
-        attachScene(root.getScene());
-        root.sceneProperty().addListener((obs, oldScene, newScene) -> attachScene(newScene));
         Platform.runLater(() -> installHost(root));
     }
 
@@ -293,95 +276,6 @@ public final class ExplorerRegressionFixes {
             return;
         }
         for (TableColumn<?, ?> child : column.getColumns()) collectLeaves(child, target);
-    }
-
-    /* ---------------- Swing-backed 3D fullscreen close on macOS ---------------- */
-
-    private static void attachScene(Scene scene) {
-        if (scene == null || !SCENES.add(scene)) return;
-        scene.addEventFilter(ActionEvent.ACTION, event -> {
-            if (!(event.getTarget() instanceof ButtonBase button) || !isFullscreenBackButton(button)) return;
-            Parent root = scene.getRoot();
-            if (!isSwingThreeDFullscreen(root)) return;
-            event.consume();
-            requestSafeSwingClose(scene, root);
-        });
-        scene.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-            if (event.getCode() != KeyCode.ESCAPE) return;
-            Parent root = scene.getRoot();
-            if (!isSwingThreeDFullscreen(root)) return;
-            event.consume();
-            requestSafeSwingClose(scene, root);
-        });
-    }
-
-    private static boolean isFullscreenBackButton(ButtonBase button) {
-        Parent parent = button.getParent();
-        return parent != null
-                && parent.getStyleClass().contains("fullscreen-toolbar")
-                && button.getText() != null
-                && button.getText().trim().startsWith("←");
-    }
-
-    private static boolean isSwingThreeDFullscreen(Parent root) {
-        return root != null
-                && root.getStyleClass().contains("in-place-fullscreen")
-                && findDescendant(root, ThreeDChartPane.class) != null
-                && findDescendant(root, SwingNode.class) != null;
-    }
-
-    private static void requestSafeSwingClose(Scene scene, Parent fullscreenRoot) {
-        if (scene == null || fullscreenRoot == null
-                || Boolean.TRUE.equals(fullscreenRoot.getProperties().get(SWING_CLOSE_ACTIVE))) return;
-        fullscreenRoot.getProperties().put(SWING_CLOSE_ACTIVE, Boolean.TRUE);
-
-        ThreeDChartPane pane = findDescendant(fullscreenRoot, ThreeDChartPane.class);
-        SwingNode swing = findDescendant(fullscreenRoot, SwingNode.class);
-        if (pane == null || swing == null) {
-            InPlaceFullscreen.close(fullscreenRoot);
-            return;
-        }
-
-        JComponent content = swing.getContent();
-        Runnable detachOnFx = () -> Platform.runLater(() -> {
-            if (scene.getRoot() != fullscreenRoot) return;
-            try {
-                swing.setContent(null);
-            } catch (RuntimeException ignored) {
-            }
-            detachPane(pane);
-            Platform.runLater(() -> {
-                if (scene.getRoot() == fullscreenRoot) InPlaceFullscreen.close(fullscreenRoot);
-            });
-        });
-
-        if (content == null) {
-            detachOnFx.run();
-            return;
-        }
-        SwingUtilities.invokeLater(() -> {
-            try {
-                content.setEnabled(false);
-                content.setVisible(false);
-            } finally {
-                detachOnFx.run();
-            }
-        });
-    }
-
-    private static void detachPane(ThreeDChartPane pane) {
-        Parent parent = pane.getParent();
-        if (parent instanceof BorderPane border) {
-            StackPane placeholder = new StackPane();
-            placeholder.setMinSize(0, 0);
-            if (border.getCenter() == pane) border.setCenter(placeholder);
-            else if (border.getTop() == pane) border.setTop(placeholder);
-            else if (border.getBottom() == pane) border.setBottom(placeholder);
-            else if (border.getLeft() == pane) border.setLeft(placeholder);
-            else if (border.getRight() == pane) border.setRight(placeholder);
-            return;
-        }
-        if (parent instanceof Pane container) container.getChildren().remove(pane);
     }
 
     private static Parent findParentWithStyleClass(Parent root, String styleClass) {

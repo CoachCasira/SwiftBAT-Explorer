@@ -43,7 +43,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 /**
  * Synchronizes interactive state between embedded and in-place fullscreen
@@ -332,8 +333,16 @@ public final class InteractiveViewSyncEnhancer {
             Scene scene = button.getScene();
             if (scene == null) return;
             Parent originalRoot = scene.getRoot();
-            Object state = capture(source.node(), source.kind());
-            Platform.runLater(() -> bindFullscreen(scene, originalRoot, source, state));
+            CompletableFuture<Object> captured = new CompletableFuture<>();
+            captureAsync(source.node(), source.kind(), captured::complete);
+            Platform.runLater(() -> {
+                Parent openedRoot = scene.getRoot();
+                if (openedRoot == originalRoot) return;
+                captured.thenAccept(state -> {
+                    // A delayed EDT snapshot belongs only to this fullscreen.
+                    if (scene.getRoot() == openedRoot) bindFullscreen(scene, originalRoot, source, state);
+                });
+            });
         });
     }
 
@@ -380,8 +389,8 @@ public final class InteractiveViewSyncEnhancer {
         holder[0] = (obs, oldRoot, newRoot) -> {
             if (newRoot != originalRoot) return;
             scene.rootProperty().removeListener(holder[0]);
-            Object finalState = capture(fullscreen, source.kind());
-            Platform.runLater(() -> apply(source.node(), source.kind(), finalState, false));
+            captureAsync(fullscreen, source.kind(),
+                    finalState -> apply(source.node(), source.kind(), finalState, false));
         };
         scene.rootProperty().addListener(holder[0]);
     }
@@ -395,12 +404,17 @@ public final class InteractiveViewSyncEnhancer {
         };
     }
 
-    private static Object capture(Node node, Kind kind) {
-        return switch (kind) {
+    private static void captureAsync(Node node, Kind kind, Consumer<Object> continuation) {
+        if (kind == Kind.THREE_D && node instanceof ThreeDChartPane pane) {
+            captureThreeD(pane, continuation);
+            return;
+        }
+        Object state = switch (kind) {
             case EXPLORER_LINE, POPULATION_LINE -> node instanceof LineChart<?, ?> line ? captureLine(line) : null;
             case HEATMAP -> node instanceof TimeEnergyHeatmapPane heatmap ? captureHeatmap(heatmap) : null;
-            case THREE_D -> node instanceof ThreeDChartPane pane ? captureThreeD(pane) : null;
+            case THREE_D -> null;
         };
+        Platform.runLater(() -> continuation.accept(state));
     }
 
     private static void apply(Node node, Kind kind, Object state, boolean opening) {
@@ -577,11 +591,17 @@ public final class InteractiveViewSyncEnhancer {
 
     /* ---------------- 3D renderer state ---------------- */
 
-    private static ThreeDState captureThreeD(ThreeDChartPane pane) {
+    private static void captureThreeD(ThreeDChartPane pane, Consumer<Object> continuation) {
         Object rawChoice = fieldValue(pane, "windowChoice");
         String window = rawChoice instanceof ChoiceBox<?> choice && choice.getValue() != null
                 ? choice.getValue().toString() : null;
-        return new ThreeDState(window, captureWaterfall(fieldValue(pane, "renderer")));
+        Object renderer = fieldValue(pane, "renderer");
+        // SwingNode can itself wait on FX while disposing a native peer.
+        // Waiting for EDT here (especially inside a Scene root listener) deadlocks.
+        SwingUtilities.invokeLater(() -> {
+            ThreeDState state = new ThreeDState(window, captureWaterfall(renderer));
+            Platform.runLater(() -> continuation.accept(state));
+        });
     }
 
     @SuppressWarnings("unchecked")
@@ -601,17 +621,13 @@ public final class InteractiveViewSyncEnhancer {
     private static WaterfallState captureWaterfall(Object renderer) {
         WaterfallState defaults = new WaterfallState(Set.of(), 0.32, 0.72, 1.0, 0.0, 0.0);
         if (renderer == null) return defaults;
-        AtomicReference<WaterfallState> result = new AtomicReference<>(defaults);
-        runOnSwingAndWait(() -> {
-            Set<Integer> bands = new LinkedHashSet<>();
-            Object raw = fieldValue(renderer, "focusedBands");
-            if (raw instanceof Set<?> set) for (Object item : set) if (item instanceof Integer index) bands.add(index);
-            result.set(new WaterfallState(Set.copyOf(bands),
-                    doubleField(renderer, "yaw", 0.32), doubleField(renderer, "pitch", 0.72),
-                    doubleField(renderer, "zoom", 1.0), doubleField(renderer, "panX", 0.0),
-                    doubleField(renderer, "panY", 0.0)));
-        });
-        return result.get();
+        Set<Integer> bands = new LinkedHashSet<>();
+        Object raw = fieldValue(renderer, "focusedBands");
+        if (raw instanceof Set<?> set) for (Object item : set) if (item instanceof Integer index) bands.add(index);
+        return new WaterfallState(Set.copyOf(bands),
+                doubleField(renderer, "yaw", 0.32), doubleField(renderer, "pitch", 0.72),
+                doubleField(renderer, "zoom", 1.0), doubleField(renderer, "panX", 0.0),
+                doubleField(renderer, "panY", 0.0));
     }
 
     @SuppressWarnings("unchecked")
@@ -631,16 +647,6 @@ public final class InteractiveViewSyncEnhancer {
             setDoubleField(renderer, "panY", state.panY());
             if (renderer instanceof Component component) component.repaint();
         });
-    }
-
-    private static void runOnSwingAndWait(Runnable action) {
-        if (SwingUtilities.isEventDispatchThread()) {
-            action.run();
-            return;
-        }
-        try {
-            SwingUtilities.invokeAndWait(action);
-        } catch (Exception ignored) { }
     }
 
     /* ---------------- Reflection/tree helpers ---------------- */

@@ -474,6 +474,14 @@ public final class UiRefinements {
     private static void fixEnglish(Node node) {
         if (I18n.language() != I18n.Language.EN) return;
         if (node instanceof Labeled labeled) {
+            if (labeled.textProperty().isBound()) return;
+            // Runtime status/count pairs supersede the factory's constructor
+            // text. A late pass must not restore "Loading catalog…" after load.
+            if (labeled.getProperties().get(I18n.class.getName() + ".localized.it") instanceof String
+                    && labeled.getProperties().get(I18n.class.getName() + ".localized.en") instanceof String) {
+                UiTranslations.localizeLabeled(labeled);
+                return;
+            }
             String source = sourceText(labeled);
             if (source != null && !source.isBlank()) {
                 String english = englishFor(source);

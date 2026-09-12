@@ -584,15 +584,26 @@
     -fx-shape: "";
 }
 .reference-redesign .catalog-list .scroll-bar:vertical {
-    -fx-pref-width: 12px;
-    -fx-min-width: 12px;
-    -fx-max-width: 12px;
+    -fx-pref-width: 20px;
+    -fx-min-width: 20px;
+    -fx-max-width: 20px;
+    -fx-padding: 0;
     -fx-background-color: transparent;
 }
 .reference-redesign .catalog-list .scroll-bar:vertical .thumb {
     -fx-background-color: linear-gradient(to bottom, rgba(200, 62, 239, 0.88), rgba(37, 177, 247, 0.92));
     -fx-background-radius: 999px;
-    -fx-min-height: 46px;
+    -fx-background-insets: 0 2;
+}
+/* JavaFX 17's native ScrollBarSkin ignores thumb min-height: its minimum
+   length is 1.5 * the buttons' preferred breadth. 48 gives a 72px handle;
+   layout still fits the buttons to the 20px bar. Native drag geometry stays
+   consistent, without replacing skins or resizing thumbs during layout. */
+.reference-redesign .catalog-list .scroll-bar:vertical .increment-button,
+.reference-redesign .catalog-list .scroll-bar:vertical .decrement-button {
+    -fx-pref-width: 48px;
+    -fx-pref-height: 12px;
+    -fx-padding: 0;
 }
 .reference-redesign .population-curve-lock {
     -fx-min-width: 44px;

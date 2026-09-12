@@ -94,7 +94,7 @@ public final class SwiftBatExplorerApp extends Application {
         TargetedLayoutPolish.install(mainView.getRoot());
 
         /* Final targeted regressions: cached-filter label, removable table
-           columns, metadata horizontal scrolling and safe Swing-backed 3D exit. */
+           columns and metadata horizontal scrolling. Fullscreen owns its exit. */
         ExplorerRegressionFixes.install(mainView.getRoot());
 
         mainView.initialize();
