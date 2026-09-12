@@ -10,11 +10,12 @@ import javafx.scene.control.ScrollBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableView;
 import javafx.scene.control.skin.ScrollBarSkin;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Region;
 
 import java.util.Set;
 
-/** Stable Explorer scrollbar geometry for macOS and Windows. */
+/** Stable Explorer scrollbar geometry and direct thumb dragging for macOS/Windows. */
 public final class ExplorerScrollbarFix {
     private static final String INSTALLED = ExplorerScrollbarFix.class.getName() + ".installed";
     private static final String VIRTUAL_INSTALLED = ExplorerScrollbarFix.class.getName() + ".virtualInstalled";
@@ -104,8 +105,6 @@ public final class ExplorerScrollbarFix {
     private static void fixNow(Parent root) {
         try {
             if (root.getScene() == null) return;
-            // No root.applyCss(): skins notify us when their internal scrollbars
-            // materialise. Forcing CSS here made Explorer re-style large subtrees.
             Set<Node> bars = root.lookupAll(".scroll-bar");
             for (Node node : bars) {
                 if (!(node instanceof ScrollBar bar)) continue;
@@ -144,6 +143,8 @@ public final class ExplorerScrollbarFix {
     private static final class StableScrollBarSkin extends ScrollBarSkin {
         private Region thumb;
         private Region track;
+        private Region dragThumb;
+        private double dragOffset;
 
         private StableScrollBarSkin(ScrollBar control) {
             super(control);
@@ -165,15 +166,10 @@ public final class ExplorerScrollbarFix {
             if (trackBounds == null) return;
             double range = bar.getMax() - bar.getMin();
             double ratio = range <= 0.0 ? 0.0 : (bar.getValue() - bar.getMin()) / range;
-            ratio = Math.max(0.0, Math.min(1.0, ratio));
+            ratio = clamp01(ratio);
 
-            /*
-             * ScrollBarSkin positions the native thumb with translations. If we
-             * resizeRelocate without clearing them, the position is applied twice:
-             * the farther the user scrolls, the farther the thumb drifts outside
-             * the track. Reset the native translation first, then place the thumb
-             * once inside the real track bounds.
-             */
+            /* ScrollBarSkin also translates the thumb. Clear that translation and
+               place the enlarged thumb once, inside the actual track bounds. */
             thumb.setTranslateX(0.0);
             thumb.setTranslateY(0.0);
 
@@ -186,8 +182,7 @@ public final class ExplorerScrollbarFix {
                 double maxY = Math.max(minY, trackBounds.getMaxY() - length);
                 double px = trackBounds.getMinX() + (trackBounds.getWidth() - thickness) / 2.0;
                 double py = minY + ratio * Math.max(0.0, maxY - minY);
-                py = Math.max(minY, Math.min(maxY, py));
-                thumb.resizeRelocate(px, py, thickness, length);
+                thumb.resizeRelocate(px, clamp(py, minY, maxY), thickness, length);
             } else {
                 double trackLength = Math.max(0.0, trackBounds.getWidth());
                 if (trackLength <= 0.0) return;
@@ -196,18 +191,81 @@ public final class ExplorerScrollbarFix {
                 double minX = trackBounds.getMinX();
                 double maxX = Math.max(minX, trackBounds.getMaxX() - length);
                 double px = minX + ratio * Math.max(0.0, maxX - minX);
-                px = Math.max(minX, Math.min(maxX, px));
                 double py = trackBounds.getMinY() + (trackBounds.getHeight() - thickness) / 2.0;
-                thumb.resizeRelocate(px, py, length, thickness);
+                thumb.resizeRelocate(clamp(px, minX, maxX), py, length, thickness);
             }
         }
 
         private void resolveParts(ScrollBar bar) {
-            if (thumb != null && thumb.getParent() != null && track != null && track.getParent() != null) return;
+            if (thumb != null && thumb.getParent() != null && track != null && track.getParent() != null) {
+                installDirectDragHandlers(bar);
+                return;
+            }
             Node thumbNode = bar.lookup(".thumb");
             Node trackNode = bar.lookup(".track");
             thumb = thumbNode instanceof Region region ? region : null;
             track = trackNode instanceof Region region ? region : null;
+            installDirectDragHandlers(bar);
+        }
+
+        /**
+         * The stock ScrollBarSkin calculates dragging using its original tiny
+         * thumb length. After enlarging that thumb, macOS therefore maps a long
+         * mouse movement to an almost imperceptible value change. Handle thumb
+         * dragging directly against the real visible geometry so one drag maps
+         * linearly to the full scrollbar range.
+         */
+        private void installDirectDragHandlers(ScrollBar bar) {
+            if (thumb == null || track == null || dragThumb == thumb) return;
+            dragThumb = thumb;
+
+            thumb.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+                if (!event.isPrimaryButtonDown()) return;
+                Bounds thumbScene = thumb.localToScene(thumb.getBoundsInLocal());
+                if (thumbScene == null) return;
+                dragOffset = bar.getOrientation() == Orientation.VERTICAL
+                        ? event.getSceneY() - thumbScene.getMinY()
+                        : event.getSceneX() - thumbScene.getMinX();
+                event.consume();
+            });
+
+            thumb.addEventFilter(MouseEvent.MOUSE_DRAGGED, event -> {
+                if (!event.isPrimaryButtonDown()) return;
+                Bounds trackScene = track.localToScene(track.getBoundsInLocal());
+                Bounds thumbScene = thumb.localToScene(thumb.getBoundsInLocal());
+                if (trackScene == null || thumbScene == null) return;
+
+                double start;
+                double available;
+                double pointer;
+                if (bar.getOrientation() == Orientation.VERTICAL) {
+                    start = trackScene.getMinY();
+                    available = Math.max(0.0, trackScene.getHeight() - thumbScene.getHeight());
+                    pointer = event.getSceneY() - dragOffset;
+                } else {
+                    start = trackScene.getMinX();
+                    available = Math.max(0.0, trackScene.getWidth() - thumbScene.getWidth());
+                    pointer = event.getSceneX() - dragOffset;
+                }
+
+                double ratio = available <= 0.0 ? 0.0 : clamp01((pointer - start) / available);
+                double range = bar.getMax() - bar.getMin();
+                bar.setValue(range <= 0.0 ? bar.getMin() : bar.getMin() + ratio * range);
+                bar.requestLayout();
+                event.consume();
+            });
+
+            thumb.addEventFilter(MouseEvent.MOUSE_RELEASED, event -> {
+                if (event.getButton() == javafx.scene.input.MouseButton.PRIMARY) event.consume();
+            });
+        }
+
+        private static double clamp01(double value) {
+            return clamp(value, 0.0, 1.0);
+        }
+
+        private static double clamp(double value, double min, double max) {
+            return Math.max(min, Math.min(max, value));
         }
     }
 }
