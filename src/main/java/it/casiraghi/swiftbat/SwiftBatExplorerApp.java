@@ -3,6 +3,7 @@ package it.casiraghi.swiftbat;
 import it.casiraghi.swiftbat.ui.AdaptiveChromeEnhancer;
 import it.casiraghi.swiftbat.ui.ChartInteractionEnhancer;
 import it.casiraghi.swiftbat.ui.CurveInteractionLinkEnhancer;
+import it.casiraghi.swiftbat.ui.ExplorerCatalogSidebarFix;
 import it.casiraghi.swiftbat.ui.FinalMacAndPopulationPolish;
 import it.casiraghi.swiftbat.ui.FinalRequestedUiFastFixes;
 import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
@@ -93,6 +94,7 @@ public final class SwiftBatExplorerApp extends Application {
 
         FinalMacAndPopulationPolish.install(mainView.getRoot());
         PageScopedPolishRouter.install(mainView.getRoot());
+        ExplorerCatalogSidebarFix.install(mainView.getRoot());
     }
 
     @Override
