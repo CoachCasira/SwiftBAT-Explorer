@@ -82,6 +82,10 @@ public final class ExplorerChoiceBoxEllipsisFix {
                 updateTooltip(choice);
                 schedule(choice);
             });
+            I18n.languageProperty().addListener((obs, oldLanguage, newLanguage) -> {
+                updateTooltip(choice);
+                schedule(choice);
+            });
         }
         updateTooltip(choice);
         schedule(choice);
@@ -127,13 +131,22 @@ public final class ExplorerChoiceBoxEllipsisFix {
 
     private static void updateTooltip(ChoiceBox<?> choice) {
         Object value = choice.getValue();
-        String text = value == null ? "" : value.toString();
-        if (text.isBlank()) return;
+        String source = value == null ? "" : value.toString();
+        if (source.isBlank()) {
+            choice.setTooltip(null);
+            return;
+        }
+
+        // Always derive the tooltip from the original model value and the current
+        // application language. Previously an already-created tooltip was replaced
+        // with value.toString(), which reintroduced the Italian source text while
+        // the ChoiceBox itself was correctly rendered in English.
+        String localized = I18n.t(source);
         Tooltip tooltip = choice.getTooltip();
         if (tooltip == null) {
-            choice.setTooltip(UiFactory.quickTooltip(text));
-        } else if (!text.equals(tooltip.getText())) {
-            tooltip.setText(text);
+            choice.setTooltip(UiFactory.quickTooltip(source));
+        } else if (!localized.equals(tooltip.getText())) {
+            tooltip.setText(localized);
         }
     }
 
