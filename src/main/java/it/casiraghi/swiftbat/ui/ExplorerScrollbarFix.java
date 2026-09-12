@@ -10,6 +10,7 @@ import javafx.scene.control.ScrollBar;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TableView;
 import javafx.scene.control.skin.ScrollBarSkin;
+import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Region;
 
@@ -20,6 +21,7 @@ public final class ExplorerScrollbarFix {
     private static final String INSTALLED = ExplorerScrollbarFix.class.getName() + ".installed";
     private static final String VIRTUAL_INSTALLED = ExplorerScrollbarFix.class.getName() + ".virtualInstalled";
     private static final String SCHEDULED = ExplorerScrollbarFix.class.getName() + ".scheduled";
+    private static final String DIRECT_DRAG_INSTALLED = ExplorerScrollbarFix.class.getName() + ".directDragInstalled";
     private static final String STABLE_CLASS = "explorer-stable-scrollbar";
 
     private static final double BAR_THICKNESS = 16.0;
@@ -109,6 +111,7 @@ public final class ExplorerScrollbarFix {
             for (Node node : bars) {
                 if (!(node instanceof ScrollBar bar)) continue;
                 installStableSkin(bar);
+                installBarLevelDirectDrag(bar);
                 styleBar(bar);
             }
         } catch (RuntimeException ignored) {
@@ -123,6 +126,85 @@ public final class ExplorerScrollbarFix {
         } catch (RuntimeException ignored) {
             // Leave native skin in place if JavaFX is currently rebuilding it.
         }
+    }
+
+    /**
+     * Install the drag mapping on the ScrollBar itself, not on the current thumb node.
+     * VirtualFlow can replace the thumb/skin while the Explorer list is rebuilt; the
+     * old thumb handlers then disappear and macOS falls back to the stock mapping,
+     * which is extremely slow with our enlarged visual thumb. This handler survives
+     * skin replacement and resolves the live thumb/track on every gesture.
+     */
+    private static void installBarLevelDirectDrag(ScrollBar bar) {
+        if (bar == null || Boolean.TRUE.equals(bar.getProperties().get(DIRECT_DRAG_INSTALLED))) return;
+        bar.getProperties().put(DIRECT_DRAG_INSTALLED, Boolean.TRUE);
+
+        final boolean[] dragging = {false};
+        final double[] dragOffset = {0.0};
+
+        bar.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+            if (event.getButton() != MouseButton.PRIMARY) return;
+            Region thumb = liveRegion(bar, ".thumb");
+            if (thumb == null) return;
+            Bounds thumbScene = thumb.localToScene(thumb.getBoundsInLocal());
+            if (thumbScene == null || !containsScene(thumbScene, event.getSceneX(), event.getSceneY())) return;
+
+            dragging[0] = true;
+            dragOffset[0] = bar.getOrientation() == Orientation.VERTICAL
+                    ? event.getSceneY() - thumbScene.getMinY()
+                    : event.getSceneX() - thumbScene.getMinX();
+            event.consume();
+        });
+
+        bar.addEventFilter(MouseEvent.MOUSE_DRAGGED, event -> {
+            if (!dragging[0] || !event.isPrimaryButtonDown()) return;
+            Region thumb = liveRegion(bar, ".thumb");
+            Region track = liveRegion(bar, ".track");
+            if (thumb == null || track == null) return;
+
+            Bounds thumbScene = thumb.localToScene(thumb.getBoundsInLocal());
+            Bounds trackScene = track.localToScene(track.getBoundsInLocal());
+            if (thumbScene == null || trackScene == null) return;
+
+            double start;
+            double available;
+            double pointer;
+            if (bar.getOrientation() == Orientation.VERTICAL) {
+                start = trackScene.getMinY();
+                available = Math.max(0.0, trackScene.getHeight() - thumbScene.getHeight());
+                pointer = event.getSceneY() - dragOffset[0];
+            } else {
+                start = trackScene.getMinX();
+                available = Math.max(0.0, trackScene.getWidth() - thumbScene.getWidth());
+                pointer = event.getSceneX() - dragOffset[0];
+            }
+
+            double ratio = available <= 0.0 ? 0.0 : clamp01((pointer - start) / available);
+            double range = bar.getMax() - bar.getMin();
+            bar.setValue(range <= 0.0 ? bar.getMin() : bar.getMin() + ratio * range);
+            bar.requestLayout();
+            event.consume();
+        });
+
+        bar.addEventFilter(MouseEvent.MOUSE_RELEASED, event -> {
+            if (!dragging[0]) return;
+            dragging[0] = false;
+            if (event.getButton() == MouseButton.PRIMARY) event.consume();
+        });
+
+        bar.addEventFilter(MouseEvent.DRAG_DETECTED, event -> {
+            if (dragging[0]) event.consume();
+        });
+    }
+
+    private static Region liveRegion(ScrollBar bar, String selector) {
+        Node node = bar.lookup(selector);
+        return node instanceof Region region ? region : null;
+    }
+
+    private static boolean containsScene(Bounds bounds, double x, double y) {
+        return x >= bounds.getMinX() && x <= bounds.getMaxX()
+                && y >= bounds.getMinY() && y <= bounds.getMaxY();
     }
 
     private static void styleBar(ScrollBar bar) {
@@ -209,11 +291,9 @@ public final class ExplorerScrollbarFix {
         }
 
         /**
-         * The stock ScrollBarSkin calculates dragging using its original tiny
-         * thumb length. After enlarging that thumb, macOS therefore maps a long
-         * mouse movement to an almost imperceptible value change. Handle thumb
-         * dragging directly against the real visible geometry so one drag maps
-         * linearly to the full scrollbar range.
+         * Kept as a skin-local fallback for JavaFX builds that dispatch directly
+         * to the thumb. The bar-level handler above is the authoritative mapping
+         * and consumes the normal gesture before this fallback is reached.
          */
         private void installDirectDragHandlers(ScrollBar bar) {
             if (thumb == null || track == null || dragThumb == thumb) return;
@@ -256,7 +336,7 @@ public final class ExplorerScrollbarFix {
             });
 
             thumb.addEventFilter(MouseEvent.MOUSE_RELEASED, event -> {
-                if (event.getButton() == javafx.scene.input.MouseButton.PRIMARY) event.consume();
+                if (event.getButton() == MouseButton.PRIMARY) event.consume();
             });
         }
 
