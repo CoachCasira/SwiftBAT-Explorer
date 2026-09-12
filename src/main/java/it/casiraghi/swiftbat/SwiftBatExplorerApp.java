@@ -10,6 +10,7 @@ import it.casiraghi.swiftbat.ui.FinalMacAndPopulationPolish;
 import it.casiraghi.swiftbat.ui.FinalRequestedUiFastFixes;
 import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
 import it.casiraghi.swiftbat.ui.GlobalSearchAssistEnhancer;
+import it.casiraghi.swiftbat.ui.GrbSearchStartupFix;
 import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
 import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
 import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
@@ -104,6 +105,7 @@ public final class SwiftBatExplorerApp extends Application {
         FinalMacAndPopulationPolish.install(mainView.getRoot());
         PageScopedPolishRouter.install(mainView.getRoot());
         ExplorerCatalogSidebarFix.install(mainView.getRoot());
+        GrbSearchStartupFix.install(mainView);
     }
 
     @Override
