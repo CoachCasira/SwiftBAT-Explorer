@@ -8,13 +8,21 @@ import it.casiraghi.swiftbat.ui.InPlaceFullscreen;
 import it.casiraghi.swiftbat.ui.UiFactory;
 import it.casiraghi.swiftbat.ui.UiTranslations;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
 import javafx.collections.FXCollections;
 import javafx.embed.swing.SwingNode;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonBase;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
@@ -23,6 +31,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 
 import javax.swing.SwingUtilities;
 import java.awt.Color;
@@ -58,6 +67,7 @@ public final class ThreeDChartPane extends BorderPane {
 
     private TabularData sourceData = TabularData.empty();
     private String contextName = "GRB";
+    private boolean rendererClosing;
 
     public ThreeDChartPane() {
         this(true);
@@ -84,8 +94,12 @@ public final class ThreeDChartPane extends BorderPane {
         SwingUtilities.invokeLater(() -> swingNode.setContent(renderer));
 
         zoomLabel.setMouseTransparent(true);
-        renderer.setZoomListener(value -> Platform.runLater(
-                () -> zoomLabel.setText("Zoom " + Math.round(value * 100.0) + "%")));
+        renderer.setZoomListener(value -> {
+            if (rendererClosing) return;
+            Platform.runLater(() -> {
+                if (!rendererClosing) zoomLabel.setText("Zoom " + Math.round(value * 100.0) + "%");
+            });
+        });
 
         viewer = new StackPane(swingNode);
         viewer.addEventHandler(ScrollEvent.SCROLL, event -> event.consume());
@@ -119,14 +133,18 @@ public final class ThreeDChartPane extends BorderPane {
 
     /** Rebuilds this already-created 3D pane when the Explorer 2D band selector changes. */
     public void refreshBandSelection() {
+        if (rendererClosing) return;
         refreshLegend();
         rebuildDataset();
     }
 
     private void rebuildDataset() {
+        if (rendererClosing) return;
         Java2DWaterfallPanel.Dataset dataset = toDataset(sourceData,
                 WINDOWS.getOrDefault(windowChoice.getValue(), 60.0));
-        SwingUtilities.invokeLater(() -> renderer.setDataset(dataset));
+        SwingUtilities.invokeLater(() -> {
+            if (!rendererClosing) renderer.setDataset(dataset);
+        });
     }
 
     private Java2DWaterfallPanel.Dataset toDataset(TabularData data, double selectedWindow) {
@@ -244,7 +262,9 @@ public final class ThreeDChartPane extends BorderPane {
 
         Label windowLabel = UiFactory.label("Finestra", "toolbar-label");
         Button reset = UiFactory.button("Centra vista", "secondary-button");
-        reset.setOnAction(event -> SwingUtilities.invokeLater(renderer::resetView));
+        reset.setOnAction(event -> {
+            if (!rendererClosing) SwingUtilities.invokeLater(renderer::resetView);
+        });
 
         Button export = UiFactory.button("Esporta PNG", "ghost-button");
         export.setOnAction(event -> exportViewerPng());
@@ -260,26 +280,60 @@ public final class ThreeDChartPane extends BorderPane {
 
     private void openFullscreen() {
         if (getScene() == null) return;
+        Scene scene = getScene();
         ThreeDChartPane enlarged = new ThreeDChartPane(false);
         enlarged.setContextName(contextName);
         enlarged.windowChoice.setValue(windowChoice.getValue());
         enlarged.setData(sourceData);
         enlarged.setMinSize(0, 0);
         enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+
+        FullscreenExitGuard guard = new FullscreenExitGuard(scene, enlarged);
+        guard.install();
         InPlaceFullscreen.show(this, UiTranslations.t("Confronto 3D dei rate") + " · " + contextName, enlarged);
     }
 
+    private void prepareForFullscreenExit(Runnable continuation) {
+        if (rendererClosing) {
+            if (continuation != null) Platform.runLater(continuation);
+            return;
+        }
+        rendererClosing = true;
+        viewer.setMouseTransparent(true);
+        windowChoice.setDisable(true);
+
+        /*
+         * SwingNode mixes the JavaFX pulse thread with the AWT event thread.
+         * On macOS, leaving native fullscreen while the AWT component is still
+         * attached can deadlock the two toolkits. Quiesce AWT first, detach the
+         * Swing content, then let InPlaceFullscreen restore the application root.
+         */
+        SwingUtilities.invokeLater(() -> {
+            renderer.setZoomListener(null);
+            renderer.setFocusListener(null);
+            renderer.setSpotlightListener(null);
+            renderer.setVisible(false);
+            renderer.setDataset(Java2DWaterfallPanel.Dataset.empty());
+            swingNode.setContent(null);
+            Platform.runLater(() -> {
+                if (continuation != null) Platform.runLater(continuation);
+            });
+        });
+    }
+
     private void exportViewerPng() {
-        if (getScene() == null || viewer.getWidth() <= 1 || viewer.getHeight() <= 1) return;
+        if (rendererClosing || getScene() == null || viewer.getWidth() <= 1 || viewer.getHeight() <= 1) return;
         String suffix = I18n.dynamic("_vista_3D.png", "_3D_view.png");
         ExportSupport.exportPng(this, viewer,
                 contextName.replaceAll("[^A-Za-z0-9._-]", "_") + suffix);
     }
 
     private void syncRendererSize(StackPane viewer) {
+        if (rendererClosing) return;
         int width = (int) Math.max(620, viewer.getWidth());
         int height = (int) Math.max(430, viewer.getHeight());
         SwingUtilities.invokeLater(() -> {
+            if (rendererClosing) return;
             Dimension dimension = new Dimension(width, height);
             renderer.setPreferredSize(dimension);
             renderer.setSize(dimension);
@@ -289,7 +343,10 @@ public final class ThreeDChartPane extends BorderPane {
     }
 
     private void repaintRenderer() {
-        Platform.runLater(() -> SwingUtilities.invokeLater(renderer::repaint));
+        if (rendererClosing) return;
+        Platform.runLater(() -> {
+            if (!rendererClosing) SwingUtilities.invokeLater(renderer::repaint);
+        });
     }
 
     private double parse(String value) {
@@ -311,6 +368,106 @@ public final class ThreeDChartPane extends BorderPane {
         windows.put("±120 s dal trigger", 120.0);
         windows.put("Intera osservazione", Double.POSITIVE_INFINITY);
         return windows;
+    }
+
+    /**
+     * Intercepts only this Swing-backed fullscreen. Other Explorer fullscreen
+     * views keep the standard InPlaceFullscreen path unchanged.
+     */
+    private static final class FullscreenExitGuard {
+        private final Scene scene;
+        private final ThreeDChartPane pane;
+        private final EventHandler<ActionEvent> actionFilter = this::handleAction;
+        private final EventHandler<KeyEvent> keyFilter = this::handleKey;
+        private final ChangeListener<Parent> rootListener = this::handleRootChanged;
+        private final ChangeListener<Boolean> fullscreenListener = this::handleFullscreenChanged;
+        private boolean installed;
+        private boolean closing;
+
+        private FullscreenExitGuard(Scene scene, ThreeDChartPane pane) {
+            this.scene = scene;
+            this.pane = pane;
+        }
+
+        private void install() {
+            if (installed || scene == null) return;
+            installed = true;
+            scene.addEventFilter(ActionEvent.ACTION, actionFilter);
+            scene.addEventFilter(KeyEvent.KEY_PRESSED, keyFilter);
+            scene.rootProperty().addListener(rootListener);
+            if (scene.getWindow() instanceof Stage stage) {
+                stage.fullScreenProperty().addListener(fullscreenListener);
+            }
+        }
+
+        private void handleAction(ActionEvent event) {
+            if (!isActiveFullscreen() || closing) return;
+            if (event.getTarget() instanceof ButtonBase button && isFullscreenBackButton(button)) {
+                event.consume();
+                requestSafeClose();
+            }
+        }
+
+        private void handleKey(KeyEvent event) {
+            if (!isActiveFullscreen() || closing || event.getCode() != KeyCode.ESCAPE) return;
+            event.consume();
+            requestSafeClose();
+        }
+
+        private void handleFullscreenChanged(javafx.beans.value.ObservableValue<? extends Boolean> observable,
+                                             Boolean oldValue, Boolean newValue) {
+            if (!isActiveFullscreen() || closing) return;
+            if (Boolean.TRUE.equals(oldValue) && !Boolean.TRUE.equals(newValue)) {
+                closing = true;
+                pane.prepareForFullscreenExit(() -> { });
+            }
+        }
+
+        private void handleRootChanged(javafx.beans.value.ObservableValue<? extends Parent> observable,
+                                       Parent oldRoot, Parent newRoot) {
+            if (newRoot == null || !newRoot.getStyleClass().contains("in-place-fullscreen")) {
+                uninstall();
+            }
+        }
+
+        private boolean isActiveFullscreen() {
+            Parent root = scene.getRoot();
+            return root != null
+                    && root.getStyleClass().contains("in-place-fullscreen")
+                    && pane.getScene() == scene;
+        }
+
+        private static boolean isFullscreenBackButton(ButtonBase button) {
+            Parent parent = button.getParent();
+            return parent != null
+                    && parent.getStyleClass().contains("fullscreen-toolbar")
+                    && button.getText() != null
+                    && button.getText().trim().startsWith("←");
+        }
+
+        private void requestSafeClose() {
+            if (closing) return;
+            closing = true;
+            pane.prepareForFullscreenExit(() -> {
+                Parent root = scene.getRoot();
+                if (root != null && root.getStyleClass().contains("in-place-fullscreen")) {
+                    InPlaceFullscreen.close(root);
+                } else {
+                    uninstall();
+                }
+            });
+        }
+
+        private void uninstall() {
+            if (!installed) return;
+            installed = false;
+            scene.removeEventFilter(ActionEvent.ACTION, actionFilter);
+            scene.removeEventFilter(KeyEvent.KEY_PRESSED, keyFilter);
+            scene.rootProperty().removeListener(rootListener);
+            if (scene.getWindow() instanceof Stage stage) {
+                stage.fullScreenProperty().removeListener(fullscreenListener);
+            }
+        }
     }
 
     private record Band(String label, String field, Color color) { }
