@@ -7,6 +7,7 @@ import it.casiraghi.swiftbat.ui.ExpertFilterAndSearchEnhancer;
 import it.casiraghi.swiftbat.ui.ExplorerCatalogSidebarFix;
 import it.casiraghi.swiftbat.ui.ExplorerRegressionFixes;
 import it.casiraghi.swiftbat.ui.ExplorerSearchAndCacheFix;
+import it.casiraghi.swiftbat.ui.ExplorerUiRegressionFix;
 import it.casiraghi.swiftbat.ui.FinalMacAndPopulationPolish;
 import it.casiraghi.swiftbat.ui.FinalRequestedUiFastFixes;
 import it.casiraghi.swiftbat.ui.FinalUiStabilityEnhancer;
@@ -108,6 +109,7 @@ public final class SwiftBatExplorerApp extends Application {
         ExplorerCatalogSidebarFix.install(mainView.getRoot());
         GrbSearchStartupFix.install(mainView);
         ExplorerSearchAndCacheFix.install(mainView);
+        ExplorerUiRegressionFix.install(mainView);
     }
 
     @Override
