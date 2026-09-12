@@ -22,7 +22,6 @@ import javafx.scene.paint.Color;
 
 import java.lang.reflect.Field;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -96,11 +95,13 @@ public final class GrbSearchStartupFix {
         stack.setMaxWidth(Double.MAX_VALUE);
         if (oldParent instanceof VBox box) {
             box.getChildren().add(index, stack);
-            VBox.setVgrow(stack, VBox.getVgrow(search));
+            Priority grow = VBox.getVgrow(search);
+            if (grow != null) VBox.setVgrow(stack, grow);
             if (margin != null) VBox.setMargin(stack, margin);
         } else if (oldParent instanceof HBox box) {
             box.getChildren().add(index, stack);
-            HBox.setHgrow(stack, HBox.getHgrow(search));
+            Priority grow = HBox.getHgrow(search);
+            if (grow != null) HBox.setHgrow(stack, grow);
             if (margin != null) HBox.setMargin(stack, margin);
         } else {
             return;
@@ -254,9 +255,10 @@ public final class GrbSearchStartupFix {
             if (durationIndex < 0) durationIndex = 0;
             filterRow.getChildren().add(durationIndex, assistedStack);
         }
-        assistedStack.setMinWidth(150);
-        assistedStack.setPrefWidth(165);
-        assistedStack.setMaxWidth(180);
+
+        // The existing assisted stack binds its width properties to this field,
+        // so size the TextField only. Setting the bound StackPane properties would
+        // throw "A bound value cannot be set" on JavaFX/macOS.
         HBox.setHgrow(assistedStack, Priority.NEVER);
         search.setMinWidth(150);
         search.setPrefWidth(165);
