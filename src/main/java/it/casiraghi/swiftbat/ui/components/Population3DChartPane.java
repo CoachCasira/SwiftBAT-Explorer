@@ -170,6 +170,8 @@ public final class Population3DChartPane extends BorderPane {
     }
 
     private VBox buildHeader() {
+        HBox controls = buildControls();
+
         Label title = UiFactory.label("Profilo di popolazione 3D", "overlay-title");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -183,25 +185,31 @@ public final class Population3DChartPane extends BorderPane {
                 legendItem("— Singoli GRB", SINGLE_COLOR),
                 legendItem("— Mediana", MEDIAN_COLOR),
                 legendItem("- - Fascia centrale 25°–75°", QUARTILE_COLOR));
-        VBox header = new VBox(8, titleRow, explanation, legend);
+        VBox header = new VBox(8, controls, titleRow, explanation, legend);
         header.getStyleClass().add("three-d-header");
         header.setPadding(new Insets(15, 17, 13, 17));
         return header;
+    }
+
+    private HBox buildControls() {
+        Button export = UiFactory.button("", "secondary-button");
+        I18n.setText(export, "Esporta PNG", "Export PNG");
+        export.setOnAction(event -> ExportSupport.exportSwingPng(
+                this, renderer, "population_temporal_profile_3d.png"));
+
+        Button reset = UiFactory.button("Centra vista", "secondary-button");
+        reset.setOnAction(event -> SwingUtilities.invokeLater(renderer::resetView));
+
+        HBox controls = new HBox(10, focusLock, export, reset);
+        controls.setAlignment(Pos.CENTER_LEFT);
+        return controls;
     }
 
     private HBox buildFooter() {
         Label note = UiFactory.label(
                 "Trascina per ruotare · rotella per zoom · doppio clic per centrare. La profondità è puramente grafica.",
                 "subtle-text");
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        Button export = UiFactory.button("", "secondary-button");
-        I18n.setText(export, "Esporta PNG", "Export PNG");
-        export.setOnAction(event -> ExportSupport.exportSwingPng(
-                this, renderer, "population_temporal_profile_3d.png"));
-        Button reset = UiFactory.button("Centra vista", "secondary-button");
-        reset.setOnAction(event -> SwingUtilities.invokeLater(renderer::resetView));
-        HBox footer = new HBox(12, note, spacer, focusLock, export, reset);
+        HBox footer = new HBox(note);
         footer.setAlignment(Pos.CENTER_LEFT);
         footer.getStyleClass().add("three-d-footer");
         return footer;
