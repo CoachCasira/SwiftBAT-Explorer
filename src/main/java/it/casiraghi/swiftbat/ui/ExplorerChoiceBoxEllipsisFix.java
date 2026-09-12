@@ -7,6 +7,7 @@ import javafx.scene.Parent;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.OverrunStyle;
+import javafx.scene.control.RadioButton;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
 import javafx.scene.control.Tab;
@@ -16,11 +17,12 @@ import javafx.scene.control.skin.ChoiceBoxSkin;
 
 import java.util.List;
 
-/** Keeps Explorer 2D ChoiceBox text inside the arrow lane without extra CSS pulses. */
+/** Keeps Explorer compact controls readable without adding layout churn. */
 public final class ExplorerChoiceBoxEllipsisFix {
     private static final String INSTALLED = ExplorerChoiceBoxEllipsisFix.class.getName() + ".installed";
     private static final String LABEL_CACHE = ExplorerChoiceBoxEllipsisFix.class.getName() + ".label";
     private static final String SCHEDULED = ExplorerChoiceBoxEllipsisFix.class.getName() + ".scheduled";
+    private static final String RADIO_TOOLTIP = ExplorerChoiceBoxEllipsisFix.class.getName() + ".radioTooltip";
     private static final double RIGHT_TEXT_RESERVE = 38.0;
     private static final Insets LABEL_PADDING = new Insets(0, RIGHT_TEXT_RESERVE, 0, 0);
 
@@ -33,6 +35,10 @@ public final class ExplorerChoiceBoxEllipsisFix {
 
     private static void visitLogical(Node node) {
         if (node == null) return;
+        if (node instanceof RadioButton radio && insideSpectroscopy(node)) {
+            installRadioTooltip(radio);
+            return;
+        }
         if (node instanceof ChoiceBox<?> choice && insideOverviewChart(choice)) {
             installChoice(choice);
             return;
@@ -61,6 +67,25 @@ public final class ExplorerChoiceBoxEllipsisFix {
             current = current.getParent();
         }
         return false;
+    }
+
+    private static boolean insideSpectroscopy(Node node) {
+        Node current = node;
+        while (current != null) {
+            if (current.getStyleClass().contains("spectroscopy-pane")) return true;
+            current = current.getParent();
+        }
+        return false;
+    }
+
+    private static void installRadioTooltip(RadioButton radio) {
+        if (radio == null || Boolean.TRUE.equals(radio.getProperties().get(RADIO_TOOLTIP))) return;
+        radio.getProperties().put(RADIO_TOOLTIP, Boolean.TRUE);
+        // UiFactory computes clipping after the first layout pulse and refreshes
+        // the tooltip whenever width, text, font or language changes. Therefore
+        // ellipsized fit filters expose their complete localized label even on
+        // the first Spectroscopy opening.
+        UiFactory.autoTooltip(radio);
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
