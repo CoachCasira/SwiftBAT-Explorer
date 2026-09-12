@@ -6,6 +6,7 @@ import javafx.scene.Parent;
 import javafx.scene.control.ScrollBar;
 import javafx.scene.layout.Region;
 
+import java.lang.reflect.Field;
 import java.util.Set;
 
 /** Keeps the two FRACEXP percentage sliders visible inside their own filter cards. */
@@ -13,6 +14,18 @@ public final class PopulationFracexpSliderFix {
     private static final String INSTALLED = PopulationFracexpSliderFix.class.getName() + ".installed";
 
     private PopulationFracexpSliderFix() { }
+
+    public static void install(MainView mainView) {
+        if (mainView == null) return;
+        try {
+            Field field = MainView.class.getDeclaredField("populationPage");
+            field.setAccessible(true);
+            Object value = field.get(mainView);
+            if (value instanceof PopulationPage page) install(page);
+        } catch (ReflectiveOperationException | RuntimeException ignored) {
+            // Keep startup safe if the MainView implementation changes later.
+        }
+    }
 
     public static void install(PopulationPage page) {
         if (page == null || Boolean.TRUE.equals(page.getProperties().get(INSTALLED))) return;
