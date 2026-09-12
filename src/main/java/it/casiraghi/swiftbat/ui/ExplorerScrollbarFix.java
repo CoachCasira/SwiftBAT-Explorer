@@ -26,7 +26,7 @@ public final class ExplorerScrollbarFix {
 
     private static final double BAR_THICKNESS = 16.0;
     private static final double THUMB_THICKNESS = 11.0;
-    private static final double MIN_THUMB_LENGTH = 64.0;
+    private static final double MIN_THUMB_LENGTH = 112.0;
 
     private ExplorerScrollbarFix() { }
 
@@ -182,8 +182,8 @@ public final class ExplorerScrollbarFix {
             double rawRatio = available <= 0.0 ? 0.0 : (pointer - start) / available;
             double ratio = Math.max(0.0, Math.min(1.0, rawRatio));
             double range = bar.getMax() - bar.getMin();
-            bar.setValue(range <= 0.0 ? bar.getMin() : bar.getMin() + ratio * range);
-            bar.requestLayout();
+            double value = range <= 0.0 ? bar.getMin() : bar.getMin() + ratio * range;
+            if (Math.abs(bar.getValue() - value) > 1e-9) bar.setValue(value);
             event.consume();
         });
 
@@ -331,8 +331,8 @@ public final class ExplorerScrollbarFix {
 
                 double ratio = available <= 0.0 ? 0.0 : clamp01((pointer - start) / available);
                 double range = bar.getMax() - bar.getMin();
-                bar.setValue(range <= 0.0 ? bar.getMin() : bar.getMin() + ratio * range);
-                bar.requestLayout();
+                double value = range <= 0.0 ? bar.getMin() : bar.getMin() + ratio * range;
+                if (Math.abs(bar.getValue() - value) > 1e-9) bar.setValue(value);
                 event.consume();
             });
 
