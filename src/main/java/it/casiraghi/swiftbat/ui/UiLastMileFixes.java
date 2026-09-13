@@ -226,7 +226,8 @@ public final class UiLastMileFixes {
             Button button = topButtons.get(i);
             button.setMinWidth(w);
             button.setPrefWidth(w);
-            button.setMaxWidth(w);
+            button.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(button, Priority.ALWAYS);
             button.setTextOverrun(OverrunStyle.CLIP);
         }
 
@@ -242,6 +243,11 @@ public final class UiLastMileFixes {
             }
         }
         ensureTopSpacer(bar, telemetry);
+        // Distribute any spare room across search and navigation, including
+        // macOS fullscreen at scaled logical widths below the roomy breakpoint.
+        for (Node child : bar.getChildren()) {
+            if (child.getStyleClass().contains("responsive-top-spacer")) child.setManaged(false);
+        }
     }
 
     private static void ensureTopSpacer(HBox bar, HBox telemetry) {
