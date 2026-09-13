@@ -201,7 +201,9 @@ public final class FinalRequestedUiFastFixes {
             Node oldDirectChild = directChildUnder(container, export);
             detach(export);
             for (FlowPane hiddenBar : hiddenBars) {
-                if (hiddenBar.getParent() != container) detach(hiddenBar);
+                // Reinsert even direct children so restored-column chips always
+                // follow Export Excel instead of retaining their old position.
+                detach(hiddenBar);
             }
             if (oldDirectChild != null && oldDirectChild != table && oldDirectChild != table.getParent()) {
                 container.getChildren().remove(oldDirectChild);

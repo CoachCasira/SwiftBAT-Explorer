@@ -610,6 +610,14 @@
 .compare-chart .default-color1.chart-series-line { -fx-stroke: #f000d4; }
 .compare-chart .default-color0.chart-legend-item-symbol { -fx-background-color: #00d9f5; }
 .compare-chart .default-color1.chart-legend-item-symbol { -fx-background-color: #f000d4; }
+/* Selection already has its gradient and cyan underline. Suppress only the
+   native inner focus rectangle while retaining keyboard tab navigation. */
+.tab-pane .tab .focus-indicator,
+.tab-pane:focused > .tab-header-area > .headers-region > .tab:selected .focus-indicator {
+    -fx-border-color: transparent;
+    -fx-background-color: transparent;
+}
+
 .spectroscopy-controls:stuck,
 .reference-redesign .spectroscopy-controls:stuck,
 .black-hole-redesign .spectroscopy-controls:stuck {
