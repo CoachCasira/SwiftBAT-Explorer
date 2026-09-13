@@ -15,11 +15,12 @@ if ($LASTEXITCODE -ne 0) {
 $InputDir = Join-Path $ProjectDir "target\jpackage-input"
 $OutputDir = Join-Path $ProjectDir "dist"
 $AppDir = Join-Path $OutputDir "SwiftBAT Explorer"
-$AppJar = "swiftbat-explorer-1.2.0.jar"
+$AppVersion = "1.3.0"
+$AppJar = "swiftbat-explorer-$AppVersion.jar"
 $PortableZip = Join-Path $OutputDir "SwiftBAT-Explorer-Windows-x64-portable.zip"
 $InstallerTempDir = Join-Path $OutputDir "installer"
-$InstallerFile = Join-Path $OutputDir "SwiftBAT-Explorer-Setup-1.2.0.exe"
-$ChecksumFile = Join-Path $OutputDir "SwiftBAT-Explorer-Setup-1.2.0.sha256.txt"
+$InstallerFile = Join-Path $OutputDir "SwiftBAT-Explorer-Setup-$AppVersion.exe"
+$ChecksumFile = Join-Path $OutputDir "SwiftBAT-Explorer-Setup-$AppVersion.sha256.txt"
 $IconFile = Join-Path $PSScriptRoot "app-icon.ico"
 
 if (-not (Test-Path $IconFile)) {
@@ -61,7 +62,7 @@ New-Item -ItemType Directory -Path $InstallerTempDir -Force | Out-Null
     --name "SwiftBAT Explorer" `
     --main-jar $AppJar `
     --main-class it.casiraghi.swiftbat.Launcher `
-    --app-version 1.2.0 `
+    --app-version $AppVersion `
     --vendor "Matteo Casiraghi" `
     --description "Esplorazione e confronto dei dati Swift/BAT GRB" `
     --copyright "2026 Matteo Casiraghi" `
@@ -78,7 +79,7 @@ Compress-Archive -Path $AppDir -DestinationPath $PortableZip -CompressionLevel O
     --dest $InstallerTempDir `
     --name "SwiftBAT Explorer" `
     --app-image $AppDir `
-    --app-version 1.2.0 `
+    --app-version $AppVersion `
     --vendor "Matteo Casiraghi" `
     --description "Esplorazione e confronto dei dati Swift/BAT GRB" `
     --copyright "2026 Matteo Casiraghi" `
@@ -100,7 +101,7 @@ if ($GeneratedInstallers.Count -ne 1) {
 Move-Item $GeneratedInstallers[0].FullName $InstallerFile -Force
 
 $InstallerHash = (Get-FileHash -Path $InstallerFile -Algorithm SHA256).Hash.ToLowerInvariant()
-Set-Content -Path $ChecksumFile -Value "$InstallerHash  SwiftBAT-Explorer-Setup-1.2.0.exe" -Encoding ascii
+Set-Content -Path $ChecksumFile -Value "$InstallerHash  SwiftBAT-Explorer-Setup-$AppVersion.exe" -Encoding ascii
 
 Write-Host "Installer autosufficiente creato: $InstallerFile"
 Write-Host "Pacchetto portabile creato: $PortableZip"

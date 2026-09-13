@@ -6,7 +6,7 @@
 
     <groupId>it.casiraghi</groupId>
     <artifactId>swiftbat-explorer</artifactId>
-    <version>1.2.0</version>
+    <version>1.3.0</version>
     <name>SwiftBAT Explorer</name>
     <description>Applicazione JavaFX online per esplorazione, comprensione e confronto delle curve di luce e distribuzione celeste Swift/BAT GRB</description>
 
@@ -17,6 +17,9 @@
         <jsoup.version>1.22.2</jsoup.version>
         <nom-tam-fits.version>1.22.1</nom-tam-fits.version>
         <junit.version>5.13.4</junit.version>
+        <poi.version>5.5.1</poi.version>
+        <!-- Su JDK 24+ il profilo in fondo sostituisce questa opzione neutra. -->
+        <javafx.unsafe.memory.option>-Dswiftbat.jdk.compatibility=true</javafx.unsafe.memory.option>
     </properties>
 
     <dependencies>
@@ -39,6 +42,11 @@
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
             <version>${jsoup.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>${poi.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -97,6 +105,11 @@
                 <configuration>
                     <mainClass>it.casiraghi.swiftbat.SwiftBatExplorerApp</mainClass>
                     <launcher>swiftbat-explorer</launcher>
+                    <options>
+                        <option>--enable-native-access=javafx.graphics,javafx.swing</option>
+                        <option>-Dfile.encoding=UTF-8</option>
+                        <option>${javafx.unsafe.memory.option}</option>
+                    </options>
                 </configuration>
             </plugin>
             <plugin>
@@ -109,4 +122,18 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>jdk-24-plus</id>
+            <activation>
+                <jdk>[24,)</jdk>
+            </activation>
+            <properties>
+                <!-- JavaFX 17 usa ancora internamente Unsafe; su JDK 24+ questa
+                     opzione evita il warning senza modificare i dati o il rendering. -->
+                <javafx.unsafe.memory.option>--sun-misc-unsafe-memory-access=allow</javafx.unsafe.memory.option>
+            </properties>
+        </profile>
+    </profiles>
 </project>

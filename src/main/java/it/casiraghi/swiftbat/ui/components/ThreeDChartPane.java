@@ -1,16 +1,22 @@
 package it.casiraghi.swiftbat.ui.components;
 
 import it.casiraghi.swiftbat.model.TabularData;
+import it.casiraghi.swiftbat.ui.ExplorerBandSelectionEnhancer;
+import it.casiraghi.swiftbat.ui.ExportSupport;
+import it.casiraghi.swiftbat.ui.I18n;
+import it.casiraghi.swiftbat.ui.InPlaceFullscreen;
 import it.casiraghi.swiftbat.ui.UiFactory;
+import it.casiraghi.swiftbat.ui.UiTranslations;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
 import javafx.collections.FXCollections;
 import javafx.embed.swing.SwingNode;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
+import javafx.scene.input.ScrollEvent;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
@@ -18,8 +24,6 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.stage.Stage;
-import javafx.stage.Window;
 
 import javax.swing.SwingUtilities;
 import java.awt.Color;
@@ -28,16 +32,17 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Contenitore JavaFX per il renderer scientifico Java2D tempo-energia.
- *
- * <p>Il grafico viene disegnato con Java2D dentro uno SwingNode. La vista normale
- * e quella a schermo intero usano lo stesso dataset e le stesse interazioni.</p>
  */
-public final class ThreeDChartPane extends BorderPane {
+public final class ThreeDChartPane extends BorderPane implements InPlaceFullscreen.CloseParticipant {
+    /** Exact series palette of the Explorer 2D four-band chart. */
     private static final List<Band> BANDS = List.of(
-            new Band("15–25 keV", "RATE_15_25_KEV", new Color(82, 216, 255)),
+            new Band("15–25 keV", "RATE_15_25_KEV", new Color(91, 220, 255)),
             new Band("25–50 keV", "RATE_25_50_KEV", new Color(110, 231, 183)),
             new Band("50–100 keV", "RATE_50_100_KEV", new Color(167, 139, 250)),
             new Band("100–350 keV", "RATE_100_350_KEV", new Color(251, 113, 133)));
@@ -45,37 +50,61 @@ public final class ThreeDChartPane extends BorderPane {
     private static final Map<String, Double> WINDOWS = createWindows();
     private static final String DEFAULT_WINDOW = "±60 s dal trigger";
 
-    private final ChoiceBox<String> windowChoice = new ChoiceBox<>(
-            FXCollections.observableArrayList(WINDOWS.keySet()));
+    private final ChoiceBox<String> windowChoice = new ChoiceBox<>(FXCollections.observableArrayList(WINDOWS.keySet()));
     private final SwingNode swingNode = new SwingNode();
     private final Java2DWaterfallPanel renderer = new Java2DWaterfallPanel();
     private final Label contextLabel = UiFactory.label("GRB", "three-d-context");
+    private final Label zoomLabel = UiFactory.label("Zoom 100%", "three-d-zoom-inline");
+    private final FlowPane legend = new FlowPane(12, 5);
     private final boolean allowFullscreen;
+    private final StackPane viewer;
 
     private TabularData sourceData = TabularData.empty();
     private String contextName = "GRB";
+    private volatile boolean rendererClosing;
+    private CompletableFuture<Void> rendererClosed;
+    private final ChangeListener<I18n.Language> languageListener = (obs, oldValue, newValue) -> repaintRenderer();
 
     public ThreeDChartPane() {
         this(true);
     }
 
+    public static ThreeDChartPane fullscreenView() {
+        return new ThreeDChartPane(false);
+    }
+
     private ThreeDChartPane(boolean allowFullscreen) {
         this.allowFullscreen = allowFullscreen;
         getStyleClass().add("three-d-panel");
-        setMinHeight(560);
-        setPrefHeight(650);
+        if (!allowFullscreen) getStyleClass().add("three-d-panel-fullscreen");
+        setMinHeight(allowFullscreen ? 430 : 0);
+        setPrefHeight(allowFullscreen ? 500 : 760);
+        setMaxHeight(Double.MAX_VALUE);
 
         windowChoice.getStyleClass().add("choice-box-modern");
+        UiTranslations.installChoiceBox(windowChoice);
         windowChoice.setValue(DEFAULT_WINDOW);
         windowChoice.getSelectionModel().selectedItemProperty().addListener(
                 (observable, oldValue, newValue) -> rebuildDataset());
 
-        SwingUtilities.invokeLater(() -> swingNode.setContent(renderer));
+        SwingUtilities.invokeLater(() -> {
+            if (!rendererClosing) swingNode.setContent(renderer);
+        });
 
-        StackPane viewer = new StackPane(swingNode);
+        zoomLabel.setMouseTransparent(true);
+        renderer.setZoomListener(value -> {
+            if (rendererClosing) return;
+            Platform.runLater(() -> {
+                if (!rendererClosing) zoomLabel.setText("Zoom " + Math.round(value * 100.0) + "%");
+            });
+        });
+
+        viewer = new StackPane(swingNode);
+        viewer.addEventHandler(ScrollEvent.SCROLL, event -> event.consume());
         viewer.getStyleClass().add("three-d-viewer");
-        viewer.setMinHeight(500);
-        viewer.setPrefHeight(560);
+        viewer.setMinHeight(allowFullscreen ? 330 : 0);
+        viewer.setPrefHeight(allowFullscreen ? 390 : 650);
+        viewer.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
         viewer.widthProperty().addListener((obs, oldValue, newValue) -> syncRendererSize(viewer));
         viewer.heightProperty().addListener((obs, oldValue, newValue) -> syncRendererSize(viewer));
 
@@ -86,6 +115,7 @@ public final class ThreeDChartPane extends BorderPane {
 
         widthProperty().addListener((observable, oldValue, newValue) -> repaintRenderer());
         heightProperty().addListener((observable, oldValue, newValue) -> repaintRenderer());
+        I18n.languageProperty().addListener(languageListener);
         Platform.runLater(() -> syncRendererSize(viewer));
     }
 
@@ -99,46 +129,50 @@ public final class ThreeDChartPane extends BorderPane {
         contextLabel.setText(this.contextName);
     }
 
+    /** Rebuilds this already-created 3D pane when the Explorer 2D band selector changes. */
+    public void refreshBandSelection() {
+        if (rendererClosing) return;
+        refreshLegend();
+        rebuildDataset();
+    }
+
     private void rebuildDataset() {
+        if (rendererClosing) return;
         Java2DWaterfallPanel.Dataset dataset = toDataset(sourceData,
                 WINDOWS.getOrDefault(windowChoice.getValue(), 60.0));
-        SwingUtilities.invokeLater(() -> renderer.setDataset(dataset));
+        SwingUtilities.invokeLater(() -> {
+            if (!rendererClosing) renderer.setDataset(dataset);
+        });
     }
 
     private Java2DWaterfallPanel.Dataset toDataset(TabularData data, double selectedWindow) {
-        if (data == null || data.isEmpty()) {
-            return Java2DWaterfallPanel.Dataset.empty();
-        }
-
+        if (data == null || data.isEmpty()) return Java2DWaterfallPanel.Dataset.empty();
         int timeIndex = data.indexOf("TIME_FROM_TRIGGER_CENTER_S");
-        if (timeIndex < 0) {
-            return Java2DWaterfallPanel.Dataset.empty();
-        }
+        if (timeIndex < 0) return Java2DWaterfallPanel.Dataset.empty();
 
-        int[] bandIndices = new int[BANDS.size()];
-        for (int band = 0; band < BANDS.size(); band++) {
-            bandIndices[band] = data.indexOf(BANDS.get(band).field());
-            if (bandIndices[band] < 0) {
-                return Java2DWaterfallPanel.Dataset.empty();
-            }
+        Set<String> selectedLabels = ExplorerBandSelectionEnhancer.effectiveBandsFor3D();
+        List<Band> activeBands = new ArrayList<>();
+        for (Band band : BANDS) {
+            if (selectedLabels.contains(band.label())) activeBands.add(band);
+        }
+        if (activeBands.isEmpty()) activeBands.addAll(BANDS);
+
+        int[] bandIndices = new int[activeBands.size()];
+        for (int band = 0; band < activeBands.size(); band++) {
+            bandIndices[band] = data.indexOf(activeBands.get(band).field());
+            if (bandIndices[band] < 0) return Java2DWaterfallPanel.Dataset.empty();
         }
 
         List<Sample> eligible = new ArrayList<>();
         for (List<String> row : data.rows()) {
-            if (timeIndex >= row.size()) {
-                continue;
-            }
+            if (timeIndex >= row.size()) continue;
             double time = parse(row.get(timeIndex));
-            if (!Double.isFinite(time)) {
-                continue;
-            }
-            if (!Double.isInfinite(selectedWindow) && Math.abs(time) > selectedWindow) {
-                continue;
-            }
+            if (!Double.isFinite(time)) continue;
+            if (!Double.isInfinite(selectedWindow) && Math.abs(time) > selectedWindow) continue;
 
-            double[] rates = new double[BANDS.size()];
+            double[] rates = new double[activeBands.size()];
             boolean valid = true;
-            for (int band = 0; band < BANDS.size(); band++) {
+            for (int band = 0; band < activeBands.size(); band++) {
                 int column = bandIndices[band];
                 if (column >= row.size()) {
                     valid = false;
@@ -150,89 +184,94 @@ public final class ThreeDChartPane extends BorderPane {
                     break;
                 }
             }
-            if (valid) {
-                eligible.add(new Sample(time, rates));
-            }
+            if (valid) eligible.add(new Sample(time, rates));
         }
 
-        if (eligible.isEmpty()) {
-            return Java2DWaterfallPanel.Dataset.empty();
-        }
+        if (eligible.isEmpty()) return Java2DWaterfallPanel.Dataset.empty();
 
         List<Sample> samples = sampleRows(eligible, 520);
         double[] times = new double[samples.size()];
-        double[][] rates = new double[BANDS.size()][samples.size()];
+        double[][] rates = new double[activeBands.size()][samples.size()];
         for (int index = 0; index < samples.size(); index++) {
             Sample sample = samples.get(index);
             times[index] = sample.time();
-            for (int band = 0; band < BANDS.size(); band++) {
-                rates[band][index] = sample.rates()[band];
-            }
+            for (int band = 0; band < activeBands.size(); band++) rates[band][index] = sample.rates()[band];
         }
 
-        String[] labels = BANDS.stream().map(Band::label).toArray(String[]::new);
-        Color[] colors = BANDS.stream().map(Band::color).toArray(Color[]::new);
+        String[] labels = activeBands.stream().map(Band::label).toArray(String[]::new);
+        Color[] colors = activeBands.stream().map(Band::color).toArray(Color[]::new);
         return new Java2DWaterfallPanel.Dataset(times, rates, labels, colors);
     }
 
     private List<Sample> sampleRows(List<Sample> rows, int maximumSamples) {
-        if (rows.size() <= maximumSamples) {
-            return rows;
-        }
+        if (rows.size() <= maximumSamples) return rows;
         List<Sample> sampled = new ArrayList<>(maximumSamples);
         double step = (rows.size() - 1.0) / (maximumSamples - 1.0);
-        for (int index = 0; index < maximumSamples; index++) {
-            sampled.add(rows.get((int) Math.round(index * step)));
-        }
+        for (int index = 0; index < maximumSamples; index++) sampled.add(rows.get((int) Math.round(index * step)));
         return sampled;
     }
 
     private VBox buildHeader() {
-        VBox header = new VBox(8);
+        VBox header = new VBox(allowFullscreen ? 8 : 12);
         header.getStyleClass().add("three-d-header");
-        header.setPadding(new Insets(15, 17, 13, 17));
+        if (!allowFullscreen) header.getStyleClass().add("three-d-header-fullscreen");
+        header.setPadding(allowFullscreen ? new Insets(10, 14, 9, 14) : new Insets(18, 22, 16, 22));
 
         HBox titleRow = new HBox(10);
         titleRow.setAlignment(Pos.CENTER_LEFT);
-        Label title = UiFactory.label("Paesaggio tempo–energia", "overlay-title");
+        Label title = UiFactory.label("Curve di luce 3D per banda energetica", "overlay-title");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
         titleRow.getChildren().addAll(title, spacer, contextLabel);
 
         Label text = UiFactory.wrappedLabel(
-                "Le quattro bande sono separate in profondità solo per renderle confrontabili. Trascina per cambiare prospettiva, usa la rotella per lo zoom e passa sui dati per leggere tempo e rate.",
+                "Asse X = tempo dal trigger; asse Y = rate; profondità = bande energetiche attive nel grafico 2D. "
+                        + "Ogni linea è una curva di luce a bin di 1 secondo: la vista non rappresenta "
+                        + "una distanza nello spazio né uno spettro continuo. Trascina per ruotare e usa la rotella per lo zoom.",
                 "overlay-caption");
         text.setMaxWidth(Double.MAX_VALUE);
 
-        FlowPane legend = new FlowPane(12, 5);
+        refreshLegend();
+        header.getChildren().addAll(titleRow, text, legend);
+        return header;
+    }
+
+    private void refreshLegend() {
+        Set<String> selectedLabels = ExplorerBandSelectionEnhancer.effectiveBandsFor3D();
+        legend.getChildren().clear();
         for (Band band : BANDS) {
+            if (!selectedLabels.contains(band.label())) continue;
             Label item = new Label("● " + band.label());
             item.setStyle("-fx-text-fill: " + toHex(band.color()) + ";");
             item.getStyleClass().add("legend-item");
             legend.getChildren().add(item);
         }
-        header.getChildren().addAll(titleRow, text, legend);
-        return header;
     }
 
     private HBox buildFooter() {
         HBox footer = new HBox(10);
         footer.getStyleClass().add("three-d-footer");
+        footer.setMinHeight(50);
         footer.setAlignment(Pos.CENTER_LEFT);
 
-        Label note = UiFactory.label(
-                "Profondità = banda energetica, non posizione spaziale.",
-                "subtle-text");
+        Label note = UiFactory.label("Profondità = banda energetica ASCII; non distanza spaziale.", "subtle-text");
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         Label windowLabel = UiFactory.label("Finestra", "toolbar-label");
         Button reset = UiFactory.button("Centra vista", "secondary-button");
-        reset.setOnAction(event -> SwingUtilities.invokeLater(renderer::resetView));
+        reset.setOnAction(event -> {
+            if (!rendererClosing) SwingUtilities.invokeLater(() -> {
+                if (!rendererClosing) renderer.resetView();
+            });
+        });
 
-        footer.getChildren().addAll(note, spacer, windowLabel, windowChoice, reset);
+        Button export = UiFactory.button("Esporta PNG", "ghost-button");
+        export.setOnAction(event -> exportViewerPng());
+
+        footer.getChildren().addAll(zoomLabel, note, spacer, windowLabel, windowChoice, reset, export);
         if (allowFullscreen) {
-            Button fullscreen = UiFactory.button("Schermo intero ↗", "primary-button");
+            Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
             fullscreen.setOnAction(event -> openFullscreen());
             footer.getChildren().add(fullscreen);
         }
@@ -240,47 +279,56 @@ public final class ThreeDChartPane extends BorderPane {
     }
 
     private void openFullscreen() {
-        if (getScene() == null) {
-            return;
-        }
+        if (getScene() == null) return;
         ThreeDChartPane enlarged = new ThreeDChartPane(false);
         enlarged.setContextName(contextName);
         enlarged.windowChoice.setValue(windowChoice.getValue());
         enlarged.setData(sourceData);
+        enlarged.setMinSize(0, 0);
+        enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
 
-        Button back = UiFactory.button("← Torna all'app", "secondary-button");
-        Label title = UiFactory.label("Vista 3D · " + contextName, "page-title");
-        HBox toolbar = new HBox(14, back, title);
-        toolbar.setAlignment(Pos.CENTER_LEFT);
-        toolbar.getStyleClass().add("fullscreen-toolbar");
-        toolbar.setPadding(new Insets(12, 18, 12, 18));
+        InPlaceFullscreen.show(this, UiTranslations.t("Confronto 3D dei rate") + " · " + contextName, enlarged);
+    }
 
-        BorderPane root = new BorderPane(enlarged);
-        root.getStyleClass().add("app-root");
-        root.setTop(toolbar);
-        BorderPane.setMargin(enlarged, new Insets(12, 18, 18, 18));
+    /**
+     * One idempotent FX -> EDT -> FX shutdown, used for every fullscreen entry
+     * point, including the spectroscopy wrapper. No native surface is detached
+     * while resize/repaint work can still target it.
+     */
+    @Override
+    public CompletionStage<Void> prepareForFullscreenExit() {
+        if (rendererClosed != null) return rendererClosed;
+        rendererClosing = true;
+        viewer.setMouseTransparent(true);
+        windowChoice.setDisable(true);
+        I18n.languageProperty().removeListener(languageListener);
+        rendererClosed = CompletableFuture.runAsync(() -> {
+            renderer.setZoomListener(null);
+            renderer.setFocusListener(null);
+            renderer.setSpotlightListener(null);
+            renderer.setEnabled(false);
+            renderer.setVisible(false);
+            // Keep view/focus state available for asynchronous return-to-app sync.
+            swingNode.setContent(null);
+        }, SwingUtilities::invokeLater).thenRunAsync(() -> {
+            // An FX queue boundary lets the SwingNode peer-disposal callbacks drain.
+        }, Platform::runLater);
+        return rendererClosed;
+    }
 
-        Scene scene = new Scene(root, 1500, 900);
-        scene.getStylesheets().addAll(getScene().getStylesheets());
-        Stage stage = new Stage();
-        Window owner = getScene().getWindow();
-        if (owner != null) {
-            stage.initOwner(owner);
-        }
-        stage.setTitle("SwiftBAT Explorer — Vista 3D " + contextName);
-        stage.setScene(scene);
-        stage.setMinWidth(1000);
-        stage.setMinHeight(700);
-        back.setOnAction(event -> stage.close());
-        stage.show();
-        stage.setFullScreenExitHint("");
-        stage.setFullScreen(true);
+    private void exportViewerPng() {
+        if (rendererClosing || getScene() == null || viewer.getWidth() <= 1 || viewer.getHeight() <= 1) return;
+        String suffix = I18n.dynamic("_vista_3D.png", "_3D_view.png");
+        ExportSupport.exportPng(this, viewer,
+                contextName.replaceAll("[^A-Za-z0-9._-]", "_") + suffix);
     }
 
     private void syncRendererSize(StackPane viewer) {
+        if (rendererClosing) return;
         int width = (int) Math.max(620, viewer.getWidth());
         int height = (int) Math.max(430, viewer.getHeight());
         SwingUtilities.invokeLater(() -> {
+            if (rendererClosing) return;
             Dimension dimension = new Dimension(width, height);
             renderer.setPreferredSize(dimension);
             renderer.setSize(dimension);
@@ -290,7 +338,12 @@ public final class ThreeDChartPane extends BorderPane {
     }
 
     private void repaintRenderer() {
-        Platform.runLater(() -> SwingUtilities.invokeLater(renderer::repaint));
+        if (rendererClosing) return;
+        Platform.runLater(() -> {
+            if (!rendererClosing) SwingUtilities.invokeLater(() -> {
+                if (!rendererClosing) renderer.repaint();
+            });
+        });
     }
 
     private double parse(String value) {

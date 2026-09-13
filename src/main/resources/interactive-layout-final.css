@@ -1,0 +1,159 @@
+/* SwiftBAT Explorer 1.3.0 — final interaction/responsive overrides.
+   This file is intentionally loaded last. */
+
+/* ---------------- Interactive scientific cards ---------------- */
+.reference-redesign .interactive-visual-card {
+    -fx-cursor: hand;
+}
+
+.reference-redesign .interactive-visual-card:hover {
+    -fx-border-color: rgba(52, 205, 246, 0.72) rgba(120, 87, 244, 0.68) rgba(224, 67, 219, 0.54) rgba(52, 205, 246, 0.72);
+    -fx-effect: dropshadow(gaussian, rgba(35, 171, 238, 0.24), 20, 0.22, 0, 4);
+}
+
+.reference-redesign .interactive-plot {
+    -fx-cursor: hand;
+}
+
+/* Population temporal-profile actions belong to the left edge, next to the
+   legend/plot context, rather than floating against the right border. */
+.reference-redesign .population-chart-card > .hbox,
+.reference-redesign .population-chart-card .spectroscopy-chart-actions {
+    -fx-alignment: center-left;
+}
+
+/* ---------------- Roomy desktop chrome (starts before fullscreen) ---------------- */
+.reference-redesign.layout-roomy .top-bar {
+    -fx-min-height: 80px;
+    -fx-pref-height: 80px;
+    -fx-spacing: 10px;
+}
+
+.reference-redesign.layout-roomy .top-brand-title {
+    -fx-font-size: 18px;
+}
+
+.reference-redesign.layout-roomy .top-brand-subtitle {
+    -fx-font-size: 9.5px;
+}
+
+.reference-redesign.layout-roomy .global-search-field {
+    -fx-min-height: 42px;
+    -fx-pref-height: 42px;
+    -fx-font-size: 12.5px;
+    -fx-padding: 0 14px;
+}
+
+.reference-redesign.layout-roomy .top-nav-button {
+    -fx-font-size: 12.5px;
+    -fx-padding: 10px 10px;
+}
+
+.reference-redesign.layout-roomy .top-telemetry {
+    -fx-spacing: 4px;
+}
+
+.reference-redesign.layout-roomy .top-telemetry .top-info,
+.reference-redesign.layout-roomy .top-telemetry .status-pill {
+    -fx-font-size: 8.5px;
+    -fx-padding: 5px 8px;
+}
+
+.reference-redesign.layout-roomy .language-switch {
+    -fx-padding: 3px 4px;
+    -fx-spacing: 4px;
+}
+
+.reference-redesign.layout-roomy .language-toggle {
+    -fx-min-width: 31px;
+    -fx-pref-width: 31px;
+    -fx-min-height: 26px;
+    -fx-pref-height: 26px;
+    -fx-font-size: 10px;
+}
+
+.reference-redesign.layout-roomy .top-square-action {
+    -fx-min-width: 40px;
+    -fx-pref-width: 40px;
+    -fx-max-width: 40px;
+    -fx-min-height: 40px;
+    -fx-pref-height: 40px;
+}
+
+.reference-redesign.layout-roomy .nav-button {
+    -fx-min-height: 53px;
+    -fx-font-size: 14px;
+    -fx-padding: 14px 16px;
+}
+
+.reference-redesign.layout-roomy .nav-footer-title {
+    -fx-font-size: 12px;
+}
+
+.reference-redesign.layout-roomy .nav-footer-version,
+.reference-redesign.layout-roomy .nav-footer-line,
+.reference-redesign.layout-roomy .nav-source {
+    -fx-font-size: 9.5px;
+}
+
+.reference-redesign.layout-roomy .nav-source-button {
+    -fx-min-height: 37px;
+    -fx-font-size: 10.5px;
+}
+
+/* ---------------- Very wide / large desktop ---------------- */
+.reference-redesign.layout-very-wide .top-bar {
+    -fx-min-height: 86px;
+    -fx-pref-height: 86px;
+    -fx-spacing: 12px;
+}
+
+.reference-redesign.layout-very-wide .top-brand-title {
+    -fx-font-size: 20px;
+}
+
+.reference-redesign.layout-very-wide .top-brand-subtitle {
+    -fx-font-size: 10px;
+}
+
+.reference-redesign.layout-very-wide .global-search-field {
+    -fx-min-height: 45px;
+    -fx-pref-height: 45px;
+    -fx-font-size: 13.5px;
+}
+
+.reference-redesign.layout-very-wide .top-nav-button {
+    -fx-font-size: 13.5px;
+    -fx-padding: 11px 12px;
+}
+
+.reference-redesign.layout-very-wide .top-telemetry .top-info,
+.reference-redesign.layout-very-wide .top-telemetry .status-pill {
+    -fx-font-size: 9px;
+    -fx-padding: 6px 9px;
+}
+
+.reference-redesign.layout-very-wide .nav-button {
+    -fx-min-height: 57px;
+    -fx-font-size: 15px;
+    -fx-padding: 15px 17px;
+}
+
+.reference-redesign.layout-very-wide .nav-footer-title {
+    -fx-font-size: 13px;
+}
+
+.reference-redesign.layout-very-wide .nav-footer-version,
+.reference-redesign.layout-very-wide .nav-footer-line,
+.reference-redesign.layout-very-wide .nav-source {
+    -fx-font-size: 10px;
+}
+
+/* ---------------- Spectroscopy clipping guard ---------------- */
+.reference-redesign .spectroscopy-chart-card .spectral-flux-chart {
+    -fx-padding: 4px 4px 18px 4px;
+}
+
+.reference-redesign .spectroscopy-chart-card .spectral-flux-chart .chart-plot-background {
+    -fx-background-insets: 0;
+}

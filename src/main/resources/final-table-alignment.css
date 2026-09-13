@@ -1,0 +1,39 @@
+.final-aligned-table .column-header,
+.final-aligned-table .filler {
+    -fx-padding: 0;
+    -fx-alignment: CENTER-LEFT;
+}
+
+/* macOS TableView adds a few pixels of internal body-cell inset that are not
+   present in the header skin. Keep one explicit geometry: header text starts
+   4 px farther right than the raw header origin, body text uses 9 px. The two
+   baselines then coincide visually on both macOS and Windows. */
+.final-aligned-table .column-header .label,
+.final-aligned-table .final-table-header-label {
+    -fx-alignment: CENTER-LEFT;
+    -fx-text-alignment: left;
+    -fx-padding: 0 9 0 13;
+}
+
+.final-aligned-table .table-cell {
+    -fx-alignment: CENTER-LEFT;
+    -fx-text-alignment: left;
+    -fx-padding: 7 9 7 9;
+}
+
+.final-aligned-table .table-row-cell {
+    -fx-cell-size: 34px;
+}
+
+.final-aligned-table .closable-column-header {
+    -fx-padding: 0;
+    -fx-spacing: 0;
+}
+
+.final-aligned-table .column-close-button {
+    -fx-min-width: 0;
+    -fx-pref-width: 0;
+    -fx-max-width: 0;
+    -fx-opacity: 0;
+    -fx-padding: 0;
+}

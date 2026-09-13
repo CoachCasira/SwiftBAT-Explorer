@@ -11,7 +11,8 @@ public record SkyBurst(
         String triggerId,
         double raDeg,
         double decDeg,
-        Double t90Sec) {
+        Double t90Sec,
+        RedshiftInfo redshift) {
 
     public SkyBurst {
         grbName = normalizeName(grbName);
@@ -25,6 +26,15 @@ public record SkyBurst(
         if (t90Sec != null && (!Double.isFinite(t90Sec) || t90Sec < 0.0)) {
             t90Sec = null;
         }
+        redshift = redshift == null ? RedshiftInfo.missing() : redshift;
+    }
+
+    public SkyBurst(String grbName, String triggerId, double raDeg, double decDeg, Double t90Sec) {
+        this(grbName, triggerId, raDeg, decDeg, t90Sec, RedshiftInfo.missing());
+    }
+
+    public SkyBurst withRedshift(RedshiftInfo value) {
+        return new SkyBurst(grbName, triggerId, raDeg, decDeg, t90Sec, value);
     }
 
     public boolean hasT90() {
