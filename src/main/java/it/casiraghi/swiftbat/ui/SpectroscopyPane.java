@@ -107,7 +107,7 @@ public final class SpectroscopyPane extends BorderPane {
         VBox intervalBox = controlBox("Intervallo del fit", intervalRadios, "", 300);
         VBox modelBox = controlBox("Modello del fit", modelRadios, "", 410);
         VBox sourceBox = sourceControlBox(source);
-        HBox controls = new HBox(10, intervalBox, modelBox, sourceBox);
+        HBox controls = new ResponsiveRow(10, intervalBox, modelBox, sourceBox);
         controls.getStyleClass().add("spectroscopy-controls");
         controls.setAlignment(Pos.TOP_LEFT);
         HBox.setHgrow(intervalBox, Priority.ALWAYS);

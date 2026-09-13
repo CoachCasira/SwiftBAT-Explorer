@@ -71,6 +71,13 @@ public final class ExplorerBandSelectionEnhancer {
         observeScene(root);
     }
 
+    /** Build the final selector before the overview can be painted. */
+    static void prepareOverviewControls(HBox controls) {
+        for (Node child : List.copyOf(controls.getChildren())) {
+            if (child instanceof ChoiceBox<?> choice) installBandSelector(choice);
+        }
+    }
+
     /** Effective energy bands that the Explorer 3D view must display. */
     public static Set<String> effectiveBandsFor3D() {
         if (totalMode || selectedBands.isEmpty()) return new LinkedHashSet<>(BANDS);

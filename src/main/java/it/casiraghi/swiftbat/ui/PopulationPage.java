@@ -228,13 +228,13 @@ public final class PopulationPage extends BorderPane {
         Node windowControl = compactRadioChoice(window,
                 List.of("±20 s", "±60 s", "±120 s"), List.of("±20 s", "±60 s", "±120 s"));
 
-        HBox advancedContent = new HBox(10);
+        HBox advancedContent = new ResponsiveRow(10);
         advancedContent.setAlignment(Pos.TOP_LEFT);
         advancedContent.getChildren().addAll(
                 filterGroup("Intervallo redshift z", "Applicato ai GRB con z", range(zMin, zMax), 205),
                 filterGroup("Ascensione retta RA", "Intervallo 0°–360°", range(raMin, raMax), 205),
                 filterGroup("Declinazione DEC", "Intervallo −90°–+90°", range(decMin, decMax), 205));
-        advancedContent.setMaxWidth(635);
+        advancedContent.setMaxWidth(Double.MAX_VALUE);
         advancedContent.setVisible(false);
         advancedContent.setManaged(false);
 
@@ -266,7 +266,12 @@ public final class PopulationPage extends BorderPane {
         VBox redshiftGroup = filterGroup("Redshift", "", redshiftControl, 185);
         VBox windowGroup = filterGroup("Finestra temporale", "", windowControl, 180);
         VBox limitGroup = filterGroup("Campione massimo", "", limit, 125);
-        HBox topFilters = new HBox(14, durationGroup, redshiftGroup, windowGroup, exposureBox, limitGroup);
+        HBox topFilters = new ResponsiveRow(14, durationGroup, redshiftGroup, windowGroup, exposureBox, limitGroup);
+        ResponsiveRow.basis(durationGroup, 164);
+        ResponsiveRow.basis(redshiftGroup, 238);
+        ResponsiveRow.basis(windowGroup, 252);
+        ResponsiveRow.basis(exposureBox, 374);
+        ResponsiveRow.basis(limitGroup, 126);
         topFilters.setAlignment(Pos.TOP_LEFT);
         HBox.setHgrow(exposureBox, Priority.NEVER);
 

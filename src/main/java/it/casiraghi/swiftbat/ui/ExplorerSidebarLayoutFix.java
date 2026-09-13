@@ -101,6 +101,7 @@ public final class ExplorerSidebarLayoutFix {
     }
 
     private static void install(VBox chartCard) {
+        if (ExplorerOverviewPane.owns(chartCard)) return;
         if (!(chartCard.getParent() instanceof BorderPane pane)) return;
 
         Node sidebar = sidebarFor(pane);

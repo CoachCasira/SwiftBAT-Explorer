@@ -79,6 +79,7 @@ public final class DefinitiveLayoutAndManualSelectionFix {
     private static void polishExplorerDashboard(Node root) {
         VBox chartCard = findByStyle(root, VBox.class, "overview-chart-card");
         if (chartCard == null) return;
+        if (ExplorerOverviewPane.owns(chartCard)) return;
         if (Boolean.TRUE.equals(chartCard.getProperties().get(DASHBOARD_DONE))) return;
         chartCard.getProperties().put(DASHBOARD_DONE, Boolean.TRUE);
 

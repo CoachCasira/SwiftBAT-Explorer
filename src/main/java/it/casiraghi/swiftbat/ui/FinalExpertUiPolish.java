@@ -60,6 +60,7 @@ public final class FinalExpertUiPolish {
     /* ---------------- Explorer ---------------- */
 
     private static void compactExplorerOverview(VBox chartCard) {
+        if (ExplorerOverviewPane.owns(chartCard)) return;
         BorderPane overview = nearestBorderPane(chartCard);
         VBox right = overview != null && overview.getRight() instanceof VBox box ? box : null;
         if (right != null) {
@@ -186,7 +187,7 @@ public final class FinalExpertUiPolish {
             // Keep the dimensions chosen by the current responsive layout, but
             // center the whole filter content both horizontally and vertically.
             group.setAlignment(Pos.CENTER);
-            group.setFillWidth(false);
+            group.setFillWidth(row instanceof ResponsiveRow);
             for (Node child : group.getChildren()) {
                 if (child instanceof HBox childRow) childRow.setAlignment(Pos.CENTER);
             }
@@ -220,7 +221,7 @@ public final class FinalExpertUiPolish {
             // Do not resize the boxes: only move their existing content to the
             // visual center requested for z, RA and DEC.
             group.setAlignment(Pos.CENTER);
-            group.setFillWidth(false);
+            group.setFillWidth(advanced instanceof ResponsiveRow);
             for (Node nested : group.getChildren()) {
                 if (nested instanceof HBox row) row.setAlignment(Pos.CENTER);
             }

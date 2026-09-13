@@ -371,6 +371,171 @@ class ExplorerUiLifecycleTest {
     }
 
     @Test
+    void overviewKeepsItsFirstLayoutAndMovesActionsWhenInformationIsHidden() throws Exception {
+        ExplorerOverviewPane overview = fx(() -> {
+            I18n.setLanguage(I18n.Language.EN);
+            ExplorerPage page = new ExplorerPage(null, (entry, refresh) -> { }, entry -> false);
+            var build = ExplorerPage.class.getDeclaredMethod("buildOverview", GrbData.class);
+            build.setAccessible(true);
+            GrbData basic = compareData("GRB250605A", 3);
+            GrbData data = new GrbData(basic.grbName(), basic.triggerId(), basic.loadedAt(), basic.availability(),
+                    List.of(new it.casiraghi.swiftbat.model.SummaryItem("BIN_SIZE", "Binning temporale", "1", "s", ""),
+                            new it.casiraghi.swiftbat.model.SummaryItem("ENERGY_RANGE", "Banda energetica complessiva", "15–350", "keV", ""),
+                            new it.casiraghi.swiftbat.model.SummaryItem("TIME_RANGE", "Intervallo temporale", "-239.316 → 961.684", "s", ""),
+                            new it.casiraghi.swiftbat.model.SummaryItem("ASCII_ROWS", "Righe ASCII", "1202", "bin", ""),
+                            new it.casiraghi.swiftbat.model.SummaryItem("FITS_ROWS", "Righe FITS", "1202", "bin", "")),
+                    basic.asciiData(), basic.fitsData(), basic.metadata(), basic.dictionary());
+            ExplorerOverviewPane result = (ExplorerOverviewPane) build.invoke(page, data);
+            page.setCenter(result);
+            return result;
+        });
+        Stage stage = fx(() -> showStyled(overview.getParent(), 1366, 760));
+        double original = fx(() -> ((Region) overview.getCenter()).getWidth());
+        try {
+            fx(() -> {
+                UiRefinements.install(overview);
+                InteractiveViewSyncEnhancer.install(overview);
+                InteractionPolishEnhancer.install(overview);
+                UiCrossPlatformFastEnhancer.install(overview);
+                ExplorerSidebarLayoutFix.install(overview);
+                ExplorerVisualFastFixes.install(overview);
+                TargetedLayoutPolish.install(overview);
+                FinalExpertUiPolish.polishExplorer(overview);
+                ExplorerOverflowFix.apply(overview);
+                return null;
+            });
+            pulse(); pulse();
+            fx(() -> {
+                assertEquals(original, ((Region) overview.getCenter()).getWidth(), 1, "Late passes must not change the columns");
+                VBox sidebar = (VBox) overview.getRight();
+                assertTrue(sidebar.getChildren().get(0).getStyleClass().contains("overview-action-card"));
+                Button toggle = (Button) overview.lookup(".overview-information-toggle");
+                assertEquals("Hide Information", toggle.getText());
+                snapshot(overview, "overview-information");
+                toggle.fire();
+                return null;
+            });
+            pulse(); pulse();
+            fx(() -> {
+                assertTrue(((Region) overview.getCenter()).getWidth() > original + 200);
+                Button toggle = (Button) overview.lookup(".overview-information-toggle");
+                assertEquals("Show Information", toggle.getText());
+                assertSame(overview.getCenter(), toggle.getParent().getParent());
+                ResponsiveRow row = (ResponsiveRow) toggle.getParent();
+                assertEquals(3, row.getChildren().stream().limit(3).filter(Button.class::isInstance).count());
+                snapshot(overview, "overview-chart-expanded");
+                ((Button) row.getChildren().get(2)).fire();
+                return null;
+            });
+            pulse();
+            fx(() -> { back(stage.getScene().getRoot()).fire(); return null; });
+            pulse(); pulse();
+            fx(() -> {
+                Button toggle = (Button) overview.lookup(".overview-information-toggle");
+                assertEquals("Show Information", toggle.getText());
+                toggle.fire(); toggle.fire(); toggle.fire(); // Interrupt and reverse in-flight transitions.
+                return null;
+            });
+            pulse(); pulse();
+            fx(() -> {
+                assertEquals(original, ((Region) overview.getCenter()).getWidth(), 1);
+                assertEquals(1, overview.lookupAll(".overview-information-toggle").size());
+                return null;
+            });
+        } finally { fx(() -> { stage.close(); return null; }); }
+    }
+
+    @Test
+    void dashboardKeepsOverviewReachableWhenWindowIsResized() throws Exception {
+        ExplorerPage page = fx(() -> {
+            ExplorerPage result = new ExplorerPage(null, (entry, refresh) -> { }, entry -> false);
+            GrbData basic = compareData("GRB250605A", 3);
+            result.showData(new GrbData(basic.grbName(), basic.triggerId(), basic.loadedAt(),
+                    new it.casiraghi.swiftbat.model.ProductAvailability(false, true, "", "test.fits", "", "", ""),
+                    basic.summary(), TabularData.empty(), basic.asciiData(), basic.metadata(), basic.dictionary()));
+            return result;
+        });
+        Stage stage = fx(() -> showStyled(page, 1920, 1080));
+        try {
+            pulse(); pulse();
+            for (int width : new int[] {1920, 1100}) {
+                fx(() -> { stage.setWidth(width); return null; });
+                pulse(); pulse();
+                fx(() -> {
+                    ExplorerOverviewPane overview = (ExplorerOverviewPane) page.lookup(".responsive-overview");
+                    assertNotNull(overview);
+                    Region chart = (Region) overview.getCenter();
+                    Region sidebar = (Region) overview.getRight();
+                    assertTrue(chart.getWidth() <= overview.getWidth());
+                    assertTrue(sidebar.getBoundsInParent().getMaxY() <= overview.getHeight() + 1,
+                            "The stacked information must fit the scrollable overview");
+                    javafx.scene.control.TabPane tabs = (javafx.scene.control.TabPane) page.lookup(".main-tabs");
+                    double contentBottom = overview.localToScene(overview.getLayoutBounds()).getMaxY();
+                    double tabBottom = tabs.localToScene(tabs.getLayoutBounds()).getMaxY();
+                    assertTrue(contentBottom <= tabBottom + 1,
+                            "The tab must not clip the overview: content bottom=" + contentBottom
+                                    + ", tab bottom=" + tabBottom + ", width=" + width);
+                    snapshot(page, "explorer-dashboard-" + width);
+                    return null;
+                });
+            }
+        } finally { fx(() -> { stage.close(); return null; }); }
+    }
+
+    @Test
+    void populationFilterRowsUseAvailableWidthAndWrapOnSmallWindows() throws Exception {
+        PopulationPage page = fx(() -> new PopulationPage((entry, progress) -> null, Runnable::run, null,
+                FXCollections.observableHashMap()));
+        Stage stage = fx(() -> {
+            Stage result = showStyled(page, 1920, 1000);
+            FinalMacAndPopulationPolish.install(page);
+            DefinitiveLayoutAndManualSelectionFix.install(page);
+            PopulationFracexpSliderFix.install(page);
+            TargetedLayoutPolish.install(page);
+            FinalExpertUiPolish.polishPopulation((VBox) page.lookup(".population-filter-card"));
+            return result;
+        });
+        try {
+            pulse(); pulse();
+            fx(() -> {
+                VBox card = (VBox) page.lookup(".population-filter-card");
+                ResponsiveRow row = (ResponsiveRow) card.getChildren().get(0);
+                Node last = row.getChildren().get(row.getChildren().size() - 1);
+                assertEquals(row.getWidth(), last.getLayoutX() + ((Region) last).getWidth(), 1);
+                assertTrue(((Region) last).getWidth() > 150);
+                ((javafx.scene.control.ToggleButton) card.getChildren().get(1)).fire();
+                return null;
+            });
+            pulse();
+            fx(() -> {
+                VBox card = (VBox) page.lookup(".population-filter-card");
+                ResponsiveRow advanced = (ResponsiveRow) card.getChildren().get(2);
+                Node last = advanced.getChildren().get(advanced.getChildren().size() - 1);
+                assertEquals(advanced.getWidth(), last.getLayoutX() + ((Region) last).getWidth(), 1);
+                snapshot(card, "population-responsive-wide");
+                stage.setWidth(1000);
+                return null;
+            });
+            pulse(); pulse();
+            fx(() -> {
+                VBox card = (VBox) page.lookup(".population-filter-card");
+                ResponsiveRow row = (ResponsiveRow) card.getChildren().get(0);
+                assertTrue(row.getChildren().stream().anyMatch(node -> node.getLayoutY() > 10));
+                for (Node child : row.getChildren())
+                    assertTrue(child.getLayoutX() + ((Region) child).getWidth() <= row.getWidth() + 1);
+                snapshot(card, "population-responsive-narrow");
+                return null;
+            });
+        } finally { fx(() -> { stage.close(); return null; }); }
+    }
+
+    private static void snapshot(Parent node, String name) throws Exception {
+        if (!Boolean.getBoolean("swiftbat.uiSnapshots")) return;
+        javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(node.snapshot(null, null), null),
+                "png", new java.io.File("target/" + name + ".png"));
+    }
+
+    @Test
     void filterSliderEndpointReleaseDoesNotCollapseButBlankClickDoes() throws Exception {
         Stage stage = fx(() -> {
             ScrollBar minimum = new ScrollBar();

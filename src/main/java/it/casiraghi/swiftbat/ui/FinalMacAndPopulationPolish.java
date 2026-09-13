@@ -81,6 +81,7 @@ public final class FinalMacAndPopulationPolish {
     private static void polishExplorerDashboard(Node root) {
         VBox chartCard = findByStyle(root, VBox.class, "overview-chart-card");
         if (chartCard == null || Boolean.TRUE.equals(chartCard.getProperties().get(OVERVIEW_DONE))) return;
+        if (ExplorerOverviewPane.owns(chartCard)) return;
         chartCard.getProperties().put(OVERVIEW_DONE, Boolean.TRUE);
         chartCard.setMinWidth(0);
         chartCard.setMaxWidth(Double.MAX_VALUE);

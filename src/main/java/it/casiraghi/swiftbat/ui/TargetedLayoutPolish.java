@@ -96,6 +96,7 @@ public final class TargetedLayoutPolish {
     /* ---------------- Explorer 2D controls ---------------- */
 
     private static void polishExplorerMovingAverage(CheckBox check) {
+        if (ExplorerOverviewPane.owns(check)) return;
         String text = check.getText() == null ? "" : check.getText().toLowerCase(Locale.ROOT);
         if (!text.contains("5-bin") && !text.contains("media mobile")) return;
         check.setMinWidth(160);

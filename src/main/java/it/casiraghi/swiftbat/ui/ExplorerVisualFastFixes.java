@@ -99,6 +99,7 @@ public final class ExplorerVisualFastFixes {
     }
 
     private static void polishTimeWindowChoice(ChoiceBox<?> choice) {
+        if (ExplorerOverviewPane.owns(choice)) return;
         if (Boolean.TRUE.equals(choice.getProperties().get(WINDOW_DONE))) return;
         if (!looksLikeTriggerWindowItems(choice.getItems())) return;
         choice.getProperties().put(WINDOW_DONE, Boolean.TRUE);

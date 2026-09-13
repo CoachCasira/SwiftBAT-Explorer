@@ -277,6 +277,7 @@ public final class UiCrossPlatformPolishEnhancer {
     /* ---------------- Explorer overview: stack side cards on laptops ---------------- */
 
     private static void installExplorerOverviewResponsive(VBox chartCard) {
+        if (ExplorerOverviewPane.owns(chartCard)) return;
         if (!(chartCard.getParent() instanceof BorderPane pane)) return;
         if (!Boolean.TRUE.equals(pane.getProperties().get(OVERVIEW_DONE))) {
             Node right = pane.getRight();

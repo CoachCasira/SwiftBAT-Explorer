@@ -255,6 +255,7 @@ public final class UiCrossPlatformFastEnhancer {
 
     /** Keep the original Explorer composition: chart left, compact cards right. */
     private static void installExplorerOverviewLayout(VBox chartCard) {
+        if (ExplorerOverviewPane.owns(chartCard)) return;
         if (!(chartCard.getParent() instanceof BorderPane pane)) return;
         Node sidebar = pane.getRight();
         if (sidebar == null) {

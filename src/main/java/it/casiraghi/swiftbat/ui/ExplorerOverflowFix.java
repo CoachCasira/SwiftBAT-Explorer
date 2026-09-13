@@ -30,6 +30,7 @@ public final class ExplorerOverflowFix {
         if (root == null) return;
         VBox chartCard = find(root, VBox.class, "overview-chart-card");
         if (chartCard == null) return;
+        if (ExplorerOverviewPane.owns(chartCard)) return;
 
         chartCard.setMinWidth(0);
         BorderPane overview = nearestBorderPane(chartCard);

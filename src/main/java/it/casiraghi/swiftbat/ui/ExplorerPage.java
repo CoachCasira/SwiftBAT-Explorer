@@ -538,11 +538,28 @@ public final class ExplorerPage extends BorderPane {
                             ? scientific.redshift().rawValue() : "n.d.", "z cosmologico · valore BAT"));
         }
 
-        TabPane tabs = new TabPane();
+        TabPane tabs = new TabPane() {
+            @Override public javafx.geometry.Orientation getContentBias() {
+                return javafx.geometry.Orientation.HORIZONTAL;
+            }
+            @Override protected double computeMinHeight(double width) {
+                return overviewSelected() ? computePrefHeight(width) : 520;
+            }
+            @Override protected double computePrefHeight(double width) {
+                if (!overviewSelected()) return 610;
+                Node content = getSelectionModel().getSelectedItem().getContent();
+                Node header = lookup(".tab-header-area");
+                double headerHeight = header == null ? 65 : header.prefHeight(width);
+                return content.prefHeight(Math.max(1, width - snappedLeftInset() - snappedRightInset()))
+                        + headerHeight + snappedTopInset() + snappedBottomInset() + 4;
+            }
+            private boolean overviewSelected() {
+                Tab selected = getSelectionModel().getSelectedItem();
+                return selected != null && selected.getContent() instanceof ExplorerOverviewPane;
+            }
+        };
         tabs.getStyleClass().add("main-tabs");
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        tabs.setMinHeight(520);
-        tabs.setPrefHeight(610);
         tabs.setMaxHeight(Double.MAX_VALUE);
         tabs.getTabs().addAll(
                 tab("Curva 2D", buildOverview(data)),
@@ -559,6 +576,7 @@ public final class ExplorerPage extends BorderPane {
         tabs.getSelectionModel().selectedItemProperty().addListener((observable, previous, selected) -> {
             if (selected != null) {
                 preferredTab = selected.getText();
+                tabs.requestLayout();
             }
         });
         VBox.setVgrow(tabs, Priority.ALWAYS);
@@ -601,12 +619,11 @@ public final class ExplorerPage extends BorderPane {
     }
 
     private Node buildOverview(GrbData data) {
-        BorderPane pane = new BorderPane();
-        pane.setPadding(new Insets(12));
         VBox chartCard = new VBox(9);
-        chartCard.getStyleClass().addAll("card", "overview-chart-card");
+        chartCard.getStyleClass().addAll("card", "overview-chart-card", "responsive-overview-chart");
+        chartCard.setMinWidth(0);
         chartCard.setPadding(new Insets(12));
-        HBox controls = new HBox(9);
+        ResponsiveRow controls = new ResponsiveRow(9);
         controls.setAlignment(Pos.CENTER_LEFT);
 
         ChoiceBox<String> channelChoice = new ChoiceBox<>(FXCollections.observableArrayList(CHANNELS.keySet()));
@@ -625,9 +642,16 @@ public final class ExplorerPage extends BorderPane {
         smooth.getStyleClass().add("modern-check");
         UiFactory.autoTooltip(smooth);
         Label help = UiFactory.label("t = 0 indica il trigger", "subtle-text");
-        controls.getChildren().addAll(channelChoice, windowChoice, smooth, UiFactory.spacer(), help);
+        controls.getChildren().addAll(channelChoice, windowChoice, smooth, help);
+        ResponsiveRow.basis(channelChoice, 205);
+        ResponsiveRow.basis(windowChoice, 195);
+        ResponsiveRow.basis(smooth, 165);
+        ResponsiveRow.basis(help, 140);
 
         LineChart<Number, Number> chart = createLightCurveChart();
+        chart.setMinSize(0, 320);
+        chart.setPrefHeight(480);
+        chart.setMaxHeight(Double.MAX_VALUE);
         VBox.setVgrow(chart, Priority.ALWAYS);
 
         Runnable refresh = () -> populateChart(chart, data, channelChoice.getValue(), windowChoice.getValue(), smooth.isSelected());
@@ -640,12 +664,12 @@ public final class ExplorerPage extends BorderPane {
         export.setOnAction(event -> exportNode(chart, data.grbName()
                 + I18n.dynamic("_curva_1s.png", "_1s_light_curve.png")));
         Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
+        Button information = UiFactory.button("Nascondi informazioni", "ghost-button");
+        information.getStyleClass().add("overview-information-toggle");
         fullscreen.setOnAction(event -> openOverviewFullscreen(
                 data, channelChoice.getValue(), windowChoice.getValue(), smooth.isSelected()));
         chartCard.getChildren().addAll(controls, chart);
-        pane.setCenter(chartCard);
-
-        HBox graphActions = new HBox(8, export, fullscreen);
+        ResponsiveRow graphActions = new ResponsiveRow(8, export, information, fullscreen);
         graphActions.setAlignment(Pos.CENTER_RIGHT);
         VBox actionCard = new VBox(7,
                 UiFactory.label("Azioni grafico", "card-subtitle"), graphActions);
@@ -655,12 +679,12 @@ public final class ExplorerPage extends BorderPane {
         VBox right = new VBox(10);
         right.setPrefWidth(310);
         right.getChildren().addAll(
+                actionCard,
                 summaryCard(data, "In breve", List.of("BIN_SIZE", "ENERGY_RANGE", "TIME_RANGE", "ASCII_ROWS", "FITS_ROWS")),
-                plainConceptCard("Trigger", "Il punto zero dell'allerta", "Tempi negativi: prima del trigger. Tempi positivi: dopo il trigger. Il trigger non coincide necessariamente con l'inizio fisico esatto del burst."),
-                actionCard);
-        pane.setRight(right);
-        BorderPane.setMargin(right, new Insets(0, 0, 0, 12));
-        return pane;
+                plainConceptCard("Trigger", "Il punto zero dell'allerta", "Tempi negativi: prima del trigger. Tempi positivi: dopo il trigger. Il trigger non coincide necessariamente con l'inizio fisico esatto del burst."));
+        ExplorerBandSelectionEnhancer.prepareOverviewControls(controls);
+        return new ExplorerOverviewPane(chartCard, controls, right, actionCard, graphActions,
+                export, information, fullscreen);
     }
 
     private LineChart<Number, Number> createLightCurveChart() {
