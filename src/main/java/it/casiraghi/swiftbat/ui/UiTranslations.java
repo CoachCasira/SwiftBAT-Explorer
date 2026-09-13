@@ -39,8 +39,8 @@ public final class UiTranslations {
     private static final Map<String, String> IT = new LinkedHashMap<>();
 
     static {
-        put("Passa sulla curva per leggere i dati. Clic per selezionarla; riclic per liberare la selezione.",
-                "Hover over a curve for data. Click to select it; click again to release the selection.");
+        put("Passa sulla curva per leggere i dati; clic per selezionarla. Doppio clic nel grafico per azzerare la selezione. Clic sul riquadro esterno per lo schermo intero.",
+                "Hover over a curve for data; click to select it. Double-click inside the plot to clear the selection. Click the surrounding card for fullscreen.");
         put("Rate originale", "Original rate");
         put("Errore sul rate originale", "Original rate error");
         // Home / shell.

@@ -258,9 +258,22 @@ public final class InteractiveViewSyncEnhancer {
     private static void installFastFilterCollapse(Region card) {
         if (Boolean.TRUE.equals(card.getProperties().get(FILTER_DONE))) return;
         card.getProperties().put(FILTER_DONE, Boolean.TRUE);
+        boolean[] controlGesture = {false};
+        boolean[] dragged = {false};
+        card.addEventFilter(MouseEvent.MOUSE_PRESSED, event -> {
+            controlGesture[0] = isFilterControl(event.getTarget(), card);
+            dragged[0] = false;
+        });
+        card.addEventFilter(MouseEvent.MOUSE_DRAGGED, event -> dragged[0] = true);
         card.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
             if (event.getButton() != MouseButton.PRIMARY || event.getClickCount() != 1 || event.isConsumed()) return;
-            if (isActionControl(event.getTarget(), card)) return;
+            // A thumb reaching the endpoint can retarget the final click to
+            // the card. Classify the whole gesture, not just its final target.
+            if (controlGesture[0] || dragged[0] || !event.isStillSincePress()) {
+                event.consume();
+                return;
+            }
+            if (isFilterControl(event.getTarget(), card)) return;
             Button restore = siblingRestore(card);
             if (restore == null) return;
             card.setOpacity(1);
@@ -294,6 +307,15 @@ public final class InteractiveViewSyncEnhancer {
             if (parent != null) parent.requestLayout();
             event.consume();
         });
+    }
+
+    private static boolean isFilterControl(Object target, Node boundary) {
+        Node node = target instanceof Node value ? value : null;
+        while (node != null && node != boundary) {
+            if (node instanceof javafx.scene.control.Control) return true;
+            node = node.getParent();
+        }
+        return false;
     }
 
     private static Button siblingRestore(Node card) {

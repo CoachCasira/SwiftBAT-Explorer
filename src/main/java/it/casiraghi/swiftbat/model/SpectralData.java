@@ -24,6 +24,10 @@ public record SpectralData(
         return results.get(interval);
     }
 
+    public boolean hasOfficialResults() {
+        return results.values().stream().anyMatch(Result::available);
+    }
+
     public enum Interval {
         T100("T100", "Intero intervallo spettroscopico T100"),
         PEAK_ONE_SECOND("Picco 1 s", "Secondo attorno al picco del burst");
@@ -108,8 +112,12 @@ public record SpectralData(
         }
 
         public boolean available() {
-            return powerLaw != null || cutoffPowerLaw != null
-                    || !powerLawFluxes.isEmpty() || !cutoffPowerLawFluxes.isEmpty();
+            return available(Model.POWER_LAW) || available(Model.CUTOFF_POWER_LAW);
+        }
+
+        public boolean available(Model model) {
+            Fit fit = fit(model);
+            return (fit != null && fit.canPlot()) || fluxes(model).stream().anyMatch(EnergyFluxBand::available);
         }
     }
 
@@ -132,6 +140,13 @@ public record SpectralData(
             Double exposureSeconds,
             Double spectrumStartSeconds,
             Double spectrumStopSeconds) {
+
+        public boolean canPlot() {
+            return model != null && alpha != null && Double.isFinite(alpha)
+                    && normalization != null && Double.isFinite(normalization) && normalization > 0
+                    && (model != Model.CUTOFF_POWER_LAW
+                    || (ePeakKeV != null && Double.isFinite(ePeakKeV) && ePeakKeV > 0));
+        }
 
         public boolean hasConstrainedEPeak() {
             return model == Model.CUTOFF_POWER_LAW

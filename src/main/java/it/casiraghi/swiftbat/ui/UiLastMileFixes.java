@@ -615,7 +615,7 @@ public final class UiLastMileFixes {
 
     private static void normalizePopulationExport(TableView<?> table) {
         if (!isPopulationResultTable(table) || !(table.getParent() instanceof VBox container)) return;
-        if (container.lookup(".included-columns-button") != null) return;
+        if (container.lookup(".included-export-toolbar") != null) return;
         List<Button> exports = new ArrayList<>();
         List<Node> rows = new ArrayList<>();
         FlowPane hidden = null;

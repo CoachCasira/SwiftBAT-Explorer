@@ -12,6 +12,37 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SpectralCatalogServiceTest {
     @Test
+    void nasaGrb250103BHasNoPlottableOfficialResultsInEitherInterval() {
+        // NASA/GSFC summary_cflux, retrieved 2026-09-13. The source rows are
+        // identical in summary_T100 and summary_1s_peak for this GRB.
+        String best = """
+                GRB250103B |  1278865  | N/A
+                """;
+        String powerLaw = """
+                ## GRBname | Trig_ID | alpha | alpha_low | alpha_hi | norm | norm_low | norm_hi | chi2 | dof | reduced_chi2 | null_prob | enorm | Exposure_time | Spectrum_start | Spectrum_stop | comment
+                GRB250103B   |   1278865    | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+                """;
+        String cutoff = """
+                ## GRBname | Trig_ID | alpha | alpha_low | alpha_hi | Epeak | Epeak_low | Epeak_hi | norm | norm_low | norm_hi | chi2 | dof | reduced_chi2 | null_prob | enorm | Exposure_time | Spectrum_start | Spectrum_stop | comment
+                GRB250103B   |   1278865    | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | 50.0000 | N/A | N/A | N/A |
+                """;
+        String flux = """
+                ## GRBname | Trig_ID | 15_25kev | 15_25kev_low | 15_25kev_hi | 25_50kev | 25_50kev_low | 25_50kev_hi | 50_100kev | 50_100kev_low | 50_100kev_hi | 100_150kev | 100_150kev_low | 100_150kev_hi | 100_350kev | 100_350kev_low | 100_350kev_hi | 15_150kev | 15_150kev_low | 15_150kev_hi | 15_350kev | 15_350kev_low | 15_350kev_hi | Exposure_time | Spectrum_start | Spectrum_stop | comment
+                GRB250103B   |   1278865    | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A | N/A |
+                """;
+        for (Interval interval : Interval.values()) {
+            var parsed = SpectralCatalogService.parseInterval(interval, best, powerLaw, cutoff, flux, flux);
+            var result = parsed.results().get("GRB250103B");
+            assertNotNull(result);
+            assertNotNull(result.powerLaw()); // A parsed row is not evidence of usable data.
+            assertNotNull(result.cutoffPowerLaw());
+            assertFalse(result.available());
+            assertFalse(new it.casiraghi.swiftbat.model.SpectralData("GRB250103B", "1278865",
+                    java.util.Map.of(interval, result)).hasOfficialResults());
+        }
+    }
+
+    @Test
     void mergesOfficialModelsParametersAndEnergyFluxes() {
         String best = """
                 ## GRBname | Trig_ID | Best-fit model

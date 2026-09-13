@@ -20,9 +20,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollBar;
 import javafx.scene.control.TextField;
 import javafx.scene.control.CheckBox;
-import javafx.scene.control.CheckMenuItem;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.MenuButton;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.Tooltip;
@@ -233,7 +231,13 @@ class ExplorerUiLifecycleTest {
                 assertTrue(shownTooltip().getText().startsWith("GRB250603A"));
                 pointEvent(chart, 0, MouseEvent.MOUSE_MOVED);
                 assertNoTooltip();
-                ((Button) page.lookup(".compare-fullscreen-button")).fire();
+                pointEvent(chart, 0, MouseEvent.MOUSE_CLICKED, 2);
+                pointEvent(chart, 0, MouseEvent.MOUSE_MOVED);
+                assertTrue(shownTooltip().getText().startsWith("GRB250605A"));
+                pointEvent(chart, 1, MouseEvent.MOUSE_CLICKED); // Re-select B before opening.
+                Node card = page.lookup(".compare-chart-card");
+                assertEquals(javafx.scene.Cursor.HAND, card.getCursor());
+                card.fireEvent(mouse(card, MouseEvent.MOUSE_CLICKED, 10, 10, false));
                 return null;
             });
             pulse();
@@ -244,6 +248,9 @@ class ExplorerUiLifecycleTest {
                 assertTrue(stage.getScene().getRoot().lookupAll(".compare-control-bar").isEmpty());
                 pointEvent(enlarged, 0, MouseEvent.MOUSE_MOVED);
                 assertNoTooltip(); // B selection copied into fullscreen.
+                pointEvent(enlarged, 0, MouseEvent.MOUSE_CLICKED, 2);
+                pointEvent(enlarged, 0, MouseEvent.MOUSE_MOVED);
+                assertTrue(shownTooltip().getText().startsWith("GRB250605A"));
                 pointEvent(enlarged, 0, MouseEvent.MOUSE_CLICKED);
                 assertTrue(shownTooltip().getText().startsWith("GRB250605A"));
                 back(stage.getScene().getRoot()).fire();
@@ -308,14 +315,13 @@ class ExplorerUiLifecycleTest {
             FinalUiStabilityEnhancer.install(host);
             UiLastMileFixes.install(host);
             FinalRequestedUiFastFixes.install(host);
+            FinalTableAlignmentFix.install(host);
             return result;
         });
         try {
             pulse();
             fx(() -> {
-                MenuButton columns = (MenuButton) stage.getScene().getRoot().lookup(".included-columns-button");
-                assertNotNull(columns);
-                assertEquals("Columns", columns.getText());
+                assertNull(stage.getScene().getRoot().lookup(".included-columns-button"));
                 ScrollBar bar = (ScrollBar) stage.getScene().getRoot().lookup(".table-external-scrollbar");
                 assertEquals(9, bar.getWidth(), 0.5);
                 bar.setValue(bar.getMax());
@@ -323,21 +329,24 @@ class ExplorerUiLifecycleTest {
                         .map(ScrollBar.class::cast).filter(b -> b.getOrientation() == Orientation.VERTICAL)
                         .findFirst().orElseThrow();
                 assertEquals(internal.getMax(), internal.getValue(), 0.001);
-                columns.show();
-                for (var item : List.copyOf(columns.getItems())) {
-                    if (item instanceof CheckMenuItem check) { check.setSelected(false); check.fire(); }
+                for (var column : table.getColumns()) {
+                    assertNotNull(column.getGraphic());
+                    ((Button) column.getGraphic().lookup(".column-hide-action")).fire();
                 }
-                columns.hide();
                 assertTrue(table.getColumns().stream().noneMatch(TableColumn::isVisible));
                 assertFalse(TablePreferences.isColumnVisible(key, "GRB"));
-                assertNotNull(stage.getScene().getRoot().lookup(".included-columns-button"));
-                columns.show();
-                columns.getItems().get(columns.getItems().size() - 1).fire();
-                columns.hide();
+                ((Button) stage.getScene().getRoot().lookup(".hidden-column-restore-all")).fire();
                 assertTrue(table.getColumns().stream().allMatch(TableColumn::isVisible));
                 assertTrue(TablePreferences.isColumnVisible(key, "GRB"));
                 I18n.setLanguage(I18n.Language.IT);
-                assertEquals("Colonne", columns.getText());
+                return null;
+            });
+            pulse();
+            fx(() -> {
+                for (var column : table.getColumns()) {
+                    assertNotNull(column.getGraphic());
+                    assertNotNull(column.getGraphic().lookup(".column-hide-action"));
+                }
                 return null;
             });
         } finally {
@@ -359,6 +368,166 @@ class ExplorerUiLifecycleTest {
         root.applyCss();
         root.layout();
         return stage;
+    }
+
+    @Test
+    void filterSliderEndpointReleaseDoesNotCollapseButBlankClickDoes() throws Exception {
+        Stage stage = fx(() -> {
+            ScrollBar minimum = new ScrollBar();
+            ScrollBar maximum = new ScrollBar();
+            for (ScrollBar bar : List.of(minimum, maximum)) {
+                bar.setOrientation(Orientation.HORIZONTAL);
+                bar.setMax(100);
+                bar.getStyleClass().add("fracexp-slider");
+            }
+            VBox card = new VBox(12, minimum, maximum, new Region());
+            card.getStyleClass().add("population-filter-card");
+            Button restore = new Button("Show filters");
+            restore.getStyleClass().add("population-filter-restore");
+            restore.setManaged(false);
+            restore.setVisible(false);
+            VBox root = new VBox(restore, card);
+            Stage result = showStyled(root, 800, 500);
+            InteractiveViewSyncEnhancer.install(root);
+            ChartInteractionEnhancer.install(root);
+            return result;
+        });
+        try {
+            pulse();
+            fx(() -> {
+                VBox card = (VBox) stage.getScene().getRoot().lookup(".population-filter-card");
+                for (Node node : card.lookupAll(".fracexp-slider")) {
+                    ScrollBar bar = (ScrollBar) node;
+                    Node thumb = bar.lookup(".thumb");
+                    thumb.fireEvent(mouse(thumb, MouseEvent.MOUSE_PRESSED, 2, 2, true));
+                    thumb.fireEvent(mouse(thumb, MouseEvent.MOUSE_DRAGGED, 600, 2, true));
+                    bar.setValue(100);
+                    card.fireEvent(mouse(card, MouseEvent.MOUSE_RELEASED, 780, 2, false));
+                    card.fireEvent(mouse(card, MouseEvent.MOUSE_CLICKED, 780, 2, false));
+                    assertTrue(card.isVisible());
+                    assertTrue(card.isManaged());
+                }
+                card.fireEvent(mouse(card, MouseEvent.MOUSE_PRESSED, 10, 250, true));
+                card.fireEvent(mouse(card, MouseEvent.MOUSE_RELEASED, 10, 250, false));
+                card.fireEvent(mouse(card, MouseEvent.MOUSE_CLICKED, 10, 250, false));
+                assertFalse(card.isManaged());
+                ((Button) stage.getScene().getRoot().lookup(".population-filter-restore")).fire();
+                assertTrue(card.isManaged());
+                return null;
+            });
+        } finally { fx(() -> { stage.close(); return null; }); }
+    }
+
+    @Test
+    void unavailableOfficialResultsSelectMapAndPeakOnlyResultsRemainUsable() throws Exception {
+        fx(() -> {
+            var missing = new it.casiraghi.swiftbat.model.SpectralData.Result(
+                    it.casiraghi.swiftbat.model.SpectralData.Interval.T100, "PL", spectralFit(null), null, List.of(), List.of());
+            var data = new it.casiraghi.swiftbat.model.SpectralData("GRBTEST", "1", java.util.Map.of(missing.interval(), missing));
+            SpectroscopyPane pane = new SpectroscopyPane(compareData("GRBTEST", 3), data, null);
+            Stage stage = showStyled(pane, 1240, 800);
+            try {
+                javafx.scene.control.TabPane tabs = (javafx.scene.control.TabPane) pane.lookup(".spectroscopy-tabs");
+                assertTrue(tabs.getTabs().get(0).isDisable());
+                assertSame(tabs.getTabs().get(1), tabs.getSelectionModel().getSelectedItem());
+                assertNull(tabs.getTabs().get(1).getContent().lookup(".spectroscopy-controls"));
+            } finally { stage.close(); }
+            var peak = new it.casiraghi.swiftbat.model.SpectralData.Result(
+                    it.casiraghi.swiftbat.model.SpectralData.Interval.PEAK_ONE_SECOND, "PL", spectralFit(-1.5), null, List.of(), List.of());
+            data = new it.casiraghi.swiftbat.model.SpectralData("GRBTEST", "1", java.util.Map.of(missing.interval(), missing, peak.interval(), peak));
+            pane = new SpectroscopyPane(compareData("GRBTEST", 3), data, null);
+            stage = showStyled(pane, 1240, 800);
+            try {
+                javafx.scene.control.TabPane tabs = (javafx.scene.control.TabPane) pane.lookup(".spectroscopy-tabs");
+                assertFalse(tabs.getTabs().get(0).isDisable(), "PL does not need Epeak to draw its spectrum");
+                assertSame(tabs.getTabs().get(0), tabs.getSelectionModel().getSelectedItem());
+                assertEquals(peak.interval(), ((javafx.scene.control.ChoiceBox<?>) field(pane, "intervalChoice")).getValue());
+                assertNotNull(tabs.getTabs().get(0).getContent().lookup(".spectroscopy-controls"));
+                tabs.getSelectionModel().select(1);
+                assertNull(tabs.getTabs().get(1).getContent().lookup(".spectroscopy-controls"));
+            } finally { stage.close(); }
+            return null;
+        });
+    }
+
+    private static it.casiraghi.swiftbat.model.SpectralData.Fit spectralFit(Double alpha) {
+        return new it.casiraghi.swiftbat.model.SpectralData.Fit(
+                it.casiraghi.swiftbat.model.SpectralData.Model.POWER_LAW,
+                alpha, null, null, null, null, null, alpha == null ? null : 0.01,
+                null, null, null, null, null, null, 50.0, 30.0, 0.0, 30.0);
+    }
+
+    @Test
+    void officialControlsFollowScrollAndReturnToTheirOriginalPosition() throws Exception {
+        SpectroscopyPane pane = fx(() -> {
+            var interval = it.casiraghi.swiftbat.model.SpectralData.Interval.T100;
+            var result = new it.casiraghi.swiftbat.model.SpectralData.Result(interval, "PL", spectralFit(-1.5), null,
+                    List.of(new it.casiraghi.swiftbat.model.SpectralData.EnergyFluxBand("15–25 keV", 15, 25, 1e-8, 9e-9, 2e-8)), List.of());
+            return new SpectroscopyPane(compareData("GRBTEST", 3),
+                    new it.casiraghi.swiftbat.model.SpectralData("GRBTEST", "1", java.util.Map.of(interval, result)), null);
+        });
+        Stage stage = fx(() -> showStyled(pane, 1200, 650));
+        try {
+            pulse();
+            fx(() -> { ((javafx.scene.control.ScrollPane) pane.getCenter()).setVvalue(0.6); return null; });
+            pulse();
+            fx(() -> {
+                Node controls = pane.lookup(".spectroscopy-controls");
+                Node viewport = ((javafx.scene.control.ScrollPane) pane.getCenter()).lookup(".viewport");
+                assertTrue(controls.getTranslateY() > 0);
+                assertEquals(1, ((javafx.scene.paint.Color) ((Region) controls).getBackground()
+                        .getFills().get(0).getFill()).getOpacity(), 0.001, "Sticky controls must obscure the chart below");
+                assertEquals(viewport.localToScene(viewport.getBoundsInLocal()).getMinY(),
+                        controls.localToScene(0, 0).getY(), 2);
+                if (Boolean.getBoolean("swiftbat.uiSnapshots")) {
+                    javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(
+                            pane.snapshot(null, null), null), "png", new java.io.File("target/spectral-sticky.png"));
+                }
+                ((javafx.scene.control.ScrollPane) pane.getCenter()).setVvalue(0);
+                return null;
+            });
+            pulse();
+            fx(() -> { assertEquals(0, pane.lookup(".spectroscopy-controls").getTranslateY(), 0.5); return null; });
+        } finally { fx(() -> { stage.close(); return null; }); }
+    }
+
+    @Test
+    void stickyControlsAlsoTrackAnOuterExplorerScrollPane() throws Exception {
+        javafx.scene.control.ScrollPane outer = fx(() -> {
+            Region controls = new Region();
+            controls.setPrefHeight(80);
+            controls.setMinHeight(80);
+            controls.getStyleClass().add("spectroscopy-controls");
+            Region charts = new Region();
+            charts.setMinHeight(1600);
+            VBox content = new VBox(controls, charts);
+            StickySpectralControls.install(controls, content);
+            javafx.scene.control.ScrollPane inner = new javafx.scene.control.ScrollPane(content);
+            inner.setFitToWidth(true);
+            inner.setMinHeight(900);
+            inner.setMaxHeight(900);
+            Region heading = new Region();
+            heading.setMinHeight(300);
+            javafx.scene.control.ScrollPane result = new javafx.scene.control.ScrollPane(new VBox(heading, inner));
+            result.setFitToWidth(true);
+            return result;
+        });
+        Stage stage = fx(() -> showStyled(outer, 1200, 650));
+        try {
+            pulse();
+            fx(() -> {
+                outer.setVvalue(0.8);
+                ((javafx.scene.control.ScrollPane) ((VBox) outer.getContent()).getChildren().get(1)).setVvalue(0.5);
+                return null;
+            });
+            pulse();
+            fx(() -> {
+                Node controls = outer.lookup(".spectroscopy-controls");
+                assertTrue(controls.getTranslateY() > 0);
+                assertEquals(outer.lookup(".viewport").localToScene(0, 0).getY(), controls.localToScene(0, 0).getY(), 2);
+                return null;
+            });
+        } finally { fx(() -> { stage.close(); return null; }); }
     }
 
     private static GrbData compareData(String name, int peak) {
@@ -391,11 +560,16 @@ class ExplorerUiLifecycleTest {
 
     private static void pointEvent(LineChart<Number, Number> chart, int seriesIndex,
                                    javafx.event.EventType<MouseEvent> type) {
+        pointEvent(chart, seriesIndex, type, 1);
+    }
+
+    private static void pointEvent(LineChart<Number, Number> chart, int seriesIndex,
+                                   javafx.event.EventType<MouseEvent> type, int clickCount) {
         XYChart.Data<Number, Number> point = chart.getData().get(seriesIndex).getData().get(1);
         Point2D x = chart.getXAxis().localToScene(chart.getXAxis().getDisplayPosition(point.getXValue()), 0);
         Point2D y = chart.getYAxis().localToScene(0, chart.getYAxis().getDisplayPosition(point.getYValue()));
         Point2D screen = chart.localToScreen(chart.sceneToLocal(x.getX(), y.getY()));
-        chart.fireEvent(new MouseEvent(type, x.getX(), y.getY(), screen.getX(), screen.getY(), MouseButton.PRIMARY, 1,
+        chart.fireEvent(new MouseEvent(type, x.getX(), y.getY(), screen.getX(), screen.getY(), MouseButton.PRIMARY, clickCount,
                 false, false, false, false, false, false, false, false, false, true,
                 new PickResult(chart, x.getX(), y.getY())));
     }

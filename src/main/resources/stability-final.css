@@ -610,6 +610,12 @@
 .compare-chart .default-color1.chart-series-line { -fx-stroke: #f000d4; }
 .compare-chart .default-color0.chart-legend-item-symbol { -fx-background-color: #00d9f5; }
 .compare-chart .default-color1.chart-legend-item-symbol { -fx-background-color: #f000d4; }
+.spectroscopy-controls:stuck,
+.reference-redesign .spectroscopy-controls:stuck,
+.black-hole-redesign .spectroscopy-controls:stuck {
+    -fx-background-color: #031426;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.65), 12, 0.15, 0, 4);
+}
 .reference-redesign .population-curve-lock {
     -fx-min-width: 44px;
     -fx-pref-width: 44px;

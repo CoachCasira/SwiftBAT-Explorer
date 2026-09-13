@@ -61,6 +61,7 @@ public final class SpectroscopyPane extends BorderPane {
     private final ChoiceBox<Interval> intervalChoice = new ChoiceBox<>();
     private final ChoiceBox<String> modelChoice = new ChoiceBox<>();
     private final StackPane resultHost = new StackPane();
+    private Node modelRadios;
 
     public SpectroscopyPane(GrbData grbData, SpectralData spectralData, HostServices hostServices) {
         this.grbData = grbData;
@@ -102,7 +103,7 @@ public final class SpectroscopyPane extends BorderPane {
         source.setMaxWidth(Double.MAX_VALUE);
         source.setOnAction(event -> hostServices.showDocument(sourceUrl()));
         Node intervalRadios = radioChoice(List.of(Interval.values()), intervalChoice);
-        Node modelRadios = radioChoice(List.of(AUTOMATIC_MODEL, POWER_LAW_MODEL, CUTOFF_MODEL), modelChoice);
+        modelRadios = radioChoice(List.of(AUTOMATIC_MODEL, POWER_LAW_MODEL, CUTOFF_MODEL), modelChoice);
         VBox intervalBox = controlBox("Intervallo del fit", intervalRadios, "", 300);
         VBox modelBox = controlBox("Modello del fit", modelRadios, "", 410);
         VBox sourceBox = sourceControlBox(source);
@@ -119,10 +120,20 @@ public final class SpectroscopyPane extends BorderPane {
         TabPane tabs = new TabPane();
         tabs.getStyleClass().addAll("main-tabs", "spectroscopy-tabs");
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        VBox officialContent = new VBox(12, controls, resultHost);
+        officialContent.getStyleClass().add("spectroscopy-official-content");
+        StickySpectralControls.install(controls, officialContent);
+        Tab official = new Tab("Risultati ufficiali", officialContent);
+        Tab timeEnergy = new Tab("Mappa tempo–energia", buildTimeEnergyTab());
+        official.setDisable(spectralData == null || !spectralData.hasOfficialResults());
+        if (official.isDisable()) {
+            official.setTooltip(new Tooltip(I18n.t("Nessun risultato ufficiale disponibile")));
+        }
         tabs.getTabs().addAll(
-                new Tab("Risultati ufficiali", resultHost),
-                new Tab("Mappa tempo–energia", buildTimeEnergyTab()),
+                official,
+                timeEnergy,
                 new Tab("Guida scientifica", buildGuide()));
+        if (official.isDisable()) tabs.getSelectionModel().select(timeEnergy);
         // Lascia che la scheda assuma l'altezza reale del contenuto quando i grafici vengono impilati.
         resultHost.setMinHeight(Region.USE_PREF_SIZE);
         resultHost.setMaxHeight(Double.MAX_VALUE);
@@ -131,7 +142,7 @@ public final class SpectroscopyPane extends BorderPane {
         tabs.setMaxHeight(Double.MAX_VALUE);
         VBox.setVgrow(tabs, Priority.NEVER);
 
-        root.getChildren().addAll(heading, controls, tabs);
+        root.getChildren().addAll(heading, tabs);
         ScrollPane scroll = new ScrollPane(root);
         scroll.getStyleClass().add("page-scroll");
         scroll.setFitToWidth(true);
@@ -174,6 +185,10 @@ public final class SpectroscopyPane extends BorderPane {
             radio.getStyleClass().add("compact-radio");
             radio.setToggleGroup(group);
             radio.setUserData(value);
+            if (value instanceof Interval interval) {
+                SpectralData.Result result = spectralData == null ? null : spectralData.result(interval);
+                radio.setDisable(result == null || !result.available());
+            }
             if (value != null && value.equals(backing.getValue())) radio.setSelected(true);
             radio.setOnAction(event -> backing.setValue(value));
             I18n.languageProperty().addListener((obs, oldLanguage, newLanguage) ->
@@ -192,9 +207,9 @@ public final class SpectroscopyPane extends BorderPane {
     }
 
     private Interval preferredInterval() {
-        if (spectralData != null && spectralData.result(Interval.T100) == null
-                && spectralData.result(Interval.PEAK_ONE_SECOND) != null) {
-            return Interval.PEAK_ONE_SECOND;
+        for (Interval interval : Interval.values()) {
+            SpectralData.Result result = spectralData == null ? null : spectralData.result(interval);
+            if (result != null && result.available()) return interval;
         }
         return Interval.T100;
     }
@@ -204,6 +219,18 @@ public final class SpectroscopyPane extends BorderPane {
         SpectralData.Result result = spectralData == null ? null : spectralData.result(interval);
         if (result == null || !result.available()) {
             resultHost.getChildren().setAll(missingResult(interval));
+            return;
+        }
+        for (Node node : modelRadios.lookupAll(".radio-button")) {
+            if (node instanceof RadioButton radio) {
+                Model candidate = CUTOFF_MODEL.equals(radio.getUserData()) ? Model.CUTOFF_POWER_LAW : Model.POWER_LAW;
+                radio.setDisable(!AUTOMATIC_MODEL.equals(radio.getUserData()) && !result.available(candidate));
+            }
+        }
+        String requested = modelChoice.getValue();
+        if ((CUTOFF_MODEL.equals(requested) && !result.available(Model.CUTOFF_POWER_LAW))
+                || (POWER_LAW_MODEL.equals(requested) && !result.available(Model.POWER_LAW))) {
+            modelChoice.setValue(AUTOMATIC_MODEL);
             return;
         }
         Model model = selectedModel(result);
@@ -216,8 +243,8 @@ public final class SpectroscopyPane extends BorderPane {
         String requested = modelChoice.getValue();
         if (CUTOFF_MODEL.equals(requested)) return Model.CUTOFF_POWER_LAW;
         if (POWER_LAW_MODEL.equals(requested)) return Model.POWER_LAW;
-        if (result.bestModel() != null) return result.bestModel();
-        return result.powerLaw() != null ? Model.POWER_LAW : Model.CUTOFF_POWER_LAW;
+        if (result.bestModel() != null && result.available(result.bestModel())) return result.bestModel();
+        return result.available(Model.POWER_LAW) ? Model.POWER_LAW : Model.CUTOFF_POWER_LAW;
     }
 
     private Node missingResult(Interval interval) {
@@ -258,9 +285,10 @@ public final class SpectroscopyPane extends BorderPane {
                         fit == null ? "intervallo non disponibile" : intervalText(fit)));
 
 
-        GridPane charts = responsiveGrid(1320, 2,
-                buildModelChart(fit, true),
-                buildFluxChart(fluxes, model, true));
+        List<Node> availableCharts = new ArrayList<>();
+        if (fit != null && fit.canPlot()) availableCharts.add(buildModelChart(fit, true));
+        if (fluxes.stream().anyMatch(EnergyFluxBand::available)) availableCharts.add(buildFluxChart(fluxes, model, true));
+        GridPane charts = responsiveGrid(1320, 2, availableCharts.toArray(Node[]::new));
 
         content.getChildren().addAll(metrics, charts);
         return content;
@@ -301,7 +329,7 @@ public final class SpectroscopyPane extends BorderPane {
                                       int wideColumns, Node[] nodes) {
         int columns;
         if (width >= wideBreakpoint) {
-            columns = wideColumns;
+            columns = Math.min(wideColumns, Math.max(1, nodes.length));
         } else if (nodes.length > 2 && width >= 760) {
             columns = 2;
         } else {

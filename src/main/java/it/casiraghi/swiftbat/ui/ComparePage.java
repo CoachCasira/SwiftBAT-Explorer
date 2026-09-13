@@ -365,14 +365,28 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         HBox chartActions = new HBox(8, export, fullscreen);
         chartActions.setAlignment(Pos.CENTER_RIGHT);
         Label hint = UiFactory.wrappedLabel("", "subtle-text");
-        I18n.setText(hint, "Passa sulla curva per leggere i dati. Clic per selezionarla; riclic per liberare la selezione.",
-                "Hover over a curve for data. Click to select it; click again to release the selection.");
+        I18n.setText(hint, "Passa sulla curva per leggere i dati; clic per selezionarla. Doppio clic nel grafico per azzerare la selezione. Clic sul riquadro esterno per lo schermo intero.",
+                "Hover over a curve for data; click to select it. Double-click inside the plot to clear the selection. Click the surrounding card for fullscreen.");
         VBox chartContent = new VBox(8, chartActions, chart, hint);
         chartContent.setMinWidth(0);
         chartContent.setMaxWidth(Double.MAX_VALUE);
         VBox.setVgrow(chart, Priority.ALWAYS);
 
         VBox chartCard = UiFactory.card("Confronto temporale", "", chartContent);
+        chartCard.getStyleClass().add("compare-chart-card");
+        chartCard.setCursor(javafx.scene.Cursor.HAND);
+        chart.setCursor(javafx.scene.Cursor.DEFAULT);
+        chartCard.addEventHandler(javafx.scene.input.MouseEvent.MOUSE_CLICKED, event -> {
+            if (event.isConsumed() || event.getButton() != javafx.scene.input.MouseButton.PRIMARY
+                    || event.getClickCount() != 1 || !event.isStillSincePress()) return;
+            Node target = event.getTarget() instanceof Node node ? node : null;
+            while (target != null && target != chartCard) {
+                if (target == chart || target instanceof javafx.scene.control.ButtonBase) return;
+                target = target.getParent();
+            }
+            fullscreen.fire();
+            event.consume();
+        });
         page.getChildren().addAll(cards, chartCard);
         return page;
     }

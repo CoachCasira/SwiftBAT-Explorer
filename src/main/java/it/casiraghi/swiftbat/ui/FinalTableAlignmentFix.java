@@ -120,8 +120,13 @@ public final class FinalTableAlignmentFix {
         Object saved = column.getProperties().get(TITLE_KEY);
         String finalTitle = saved instanceof String value ? value : (title == null ? "" : title);
 
-        if (column.getGraphic() != null) column.setGraphic(null);
-        if (!finalTitle.equals(column.getText())) column.setText(finalTitle);
+        // The shared Explore/Included header owns its title and hide action.
+        boolean removable = column.getGraphic() != null
+                && column.getGraphic().getStyleClass().contains("removable-column-header");
+        if (!removable) {
+            if (column.getGraphic() != null) column.setGraphic(null);
+            if (!finalTitle.equals(column.getText())) column.setText(finalTitle);
+        }
         if (!COLUMN_STYLE.equals(column.getStyle())) column.setStyle(COLUMN_STYLE);
         for (TableColumn<?, ?> child : column.getColumns()) normalizeColumn(child);
     }

@@ -207,7 +207,7 @@ public final class FinalRequestedUiFastFixes {
                 container.getChildren().remove(oldDirectChild);
             }
 
-            HBox toolbar = new HBox(8, export, TablePreferences.columnsButton(table));
+            HBox toolbar = new HBox(8, export);
             toolbar.setAlignment(Pos.CENTER_LEFT);
             toolbar.setMinWidth(0);
             toolbar.setMaxWidth(Double.MAX_VALUE);
@@ -223,6 +223,7 @@ public final class FinalRequestedUiFastFixes {
                     container.getChildren().add(Math.min(hiddenInsert++, container.getChildren().size()), hiddenBar);
                 }
             }
+            ExplorerRegressionFixes.installManagedTable(table);
         });
     }
 

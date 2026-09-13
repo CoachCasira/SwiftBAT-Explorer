@@ -48,6 +48,12 @@ final class CompareChartInteraction {
         chart.addEventHandler(MouseEvent.MOUSE_EXITED, event -> clearHover());
         chart.addEventFilter(MouseEvent.MOUSE_CLICKED, event -> {
             if (event.getButton() != MouseButton.PRIMARY || !event.isStillSincePress()) return;
+            if (event.getClickCount() == 2 && insidePlot(event)) {
+                selected.set(null);
+                clearHover();
+                event.consume();
+                return;
+            }
             if (event.getClickCount() != 1) { event.consume(); return; }
             Hit hit = nearest(event);
             if (hit == null) return;
@@ -125,8 +131,7 @@ final class CompareChartInteraction {
 
     /** Hit-test segments as well as points; tooltips always report a measured sample. */
     private Hit nearest(MouseEvent event) {
-        Node plot = chart.lookup(".chart-plot-background");
-        if (plot == null || !plot.contains(plot.sceneToLocal(event.getSceneX(), event.getSceneY()))) return null;
+        if (!insidePlot(event)) return null;
         Point2D mouse = chart.sceneToLocal(event.getSceneX(), event.getSceneY());
         double best = 12.0 * 12.0;
         Hit hit = null;
@@ -156,6 +161,11 @@ final class CompareChartInteraction {
             }
         }
         return hit;
+    }
+
+    private boolean insidePlot(MouseEvent event) {
+        Node plot = chart.lookup(".chart-plot-background");
+        return plot != null && plot.contains(plot.sceneToLocal(event.getSceneX(), event.getSceneY()));
     }
 
     private static double squared(Point2D a, Point2D b) {

@@ -139,7 +139,7 @@ public final class ExplorerRegressionFixes {
         combo.requestLayout();
     }
 
-    private static void installManagedTable(TableView<?> table) {
+    static void installManagedTable(TableView<?> table) {
         if (table == null || Boolean.TRUE.equals(table.getProperties().get(TABLE_DONE))) return;
         if (!hasColumnManagement(table.getContextMenu())) return;
         table.getProperties().put(TABLE_DONE, Boolean.TRUE);

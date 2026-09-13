@@ -301,10 +301,7 @@ public final class ChartInteractionEnhancer {
         export.setOnAction(event -> ExportSupport.exportTableExcel(
                 export, table, "population_included_grbs.xlsx", "GRB inclusi"));
 
-        // The old column-preference strip became a wide blue outlined box with the
-        // export action pushed to the far right. The Included GRBs tab now keeps only
-        // the actual export action, aligned with the table content on the left.
-        box.getChildren().remove(0);
+        // Keep the preference strip: its chips restore columns hidden with X.
         HBox toolbar = new HBox(8, export);
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setMinWidth(0);
