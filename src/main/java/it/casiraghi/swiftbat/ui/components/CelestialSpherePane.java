@@ -7,10 +7,12 @@ import javafx.geometry.Point3D;
 import javafx.scene.AmbientLight;
 import javafx.scene.Cursor;
 import javafx.scene.Group;
+import javafx.scene.Node;
 import javafx.scene.PerspectiveCamera;
 import javafx.scene.PointLight;
 import javafx.scene.SceneAntialiasing;
 import javafx.scene.SubScene;
+import javafx.scene.control.Label;
 import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.Pane;
@@ -44,6 +46,7 @@ public final class CelestialSpherePane extends Pane {
     private final Rotate rotateY = new Rotate(-24, Rotate.Y_AXIS);
     private final PerspectiveCamera camera = new PerspectiveCamera(true);
     private final SubScene subScene;
+    private final Label zoomLabel = new Label("Zoom 100%");
 
     private final PhongMaterial longMaterial = material("#50d8ff", 0.95);
     private final PhongMaterial shortMaterial = material("#ffae4a", 0.98);
@@ -57,6 +60,7 @@ public final class CelestialSpherePane extends Pane {
     private SkyBurst selectedBurst;
     private Consumer<SkyBurst> onSelect = burst -> { };
     private boolean showGalacticPlane = true;
+    private boolean markerInteractionPending;
     private double lastMouseX;
     private double lastMouseY;
 
@@ -88,18 +92,15 @@ public final class CelestialSpherePane extends Pane {
         subScene.setManaged(false);
         subScene.setFill(Color.web("#07101f"));
 
-        /*
-         * Con PerspectiveCamera(true) il centro di proiezione è già il centro del viewport.
-         * Il mondo deve quindi restare attorno all'origine (0,0,0). La precedente traslazione
-         * di width/2 e height/2 spostava la sfera realmente in basso a destra.
-         */
         camera.setNearClip(0.1);
         camera.setFarClip(5000.0);
         camera.setFieldOfView(36.0);
         camera.setTranslateZ(DEFAULT_CAMERA_Z);
         subScene.setCamera(camera);
 
-        getChildren().add(subScene);
+        zoomLabel.getStyleClass().add("sky-zoom-label");
+        zoomLabel.setMouseTransparent(true);
+        getChildren().addAll(subScene, zoomLabel);
         subScene.widthProperty().bind(widthProperty());
         subScene.heightProperty().bind(heightProperty());
 
@@ -120,6 +121,19 @@ public final class CelestialSpherePane extends Pane {
     public void setShowGalacticPlane(boolean show) {
         this.showGalacticPlane = show;
         galacticGroup.setVisible(show);
+    }
+
+    /**
+     * Used by the outer Sky Map card to suppress its fullscreen action for the
+     * mouse click that belongs to a real 3D GRB marker. The marker is selected
+     * on mouse release, before the subsequent MOUSE_CLICKED capture reaches the
+     * card, so the SubScene never has to be detached while JavaFX is recomputing
+     * coordinates for that same input event.
+     */
+    public boolean consumeMarkerInteractionGuard() {
+        boolean pending = markerInteractionPending;
+        markerInteractionPending = false;
+        return pending;
     }
 
     public void select(SkyBurst burst) {
@@ -148,6 +162,20 @@ public final class CelestialSpherePane extends Pane {
         rotateX.setAngle(-14.0);
         rotateY.setAngle(-24.0);
         camera.setTranslateZ(DEFAULT_CAMERA_Z);
+        updateZoomLabel();
+    }
+
+    @Override
+    protected void layoutChildren() {
+        super.layoutChildren();
+        zoomLabel.autosize();
+        double y = Math.max(12.0, getHeight() - zoomLabel.prefHeight(-1) - 14.0);
+        zoomLabel.relocate(14.0, y);
+    }
+
+    private void updateZoomLabel() {
+        double factor = Math.abs(DEFAULT_CAMERA_Z / camera.getTranslateZ());
+        zoomLabel.setText("Zoom " + Math.round(factor * 100.0) + "%");
     }
 
     private void rebuildMarkers() {
@@ -165,11 +193,21 @@ public final class CelestialSpherePane extends Pane {
             Tooltip.install(marker, new Tooltip(tooltipText(burst)));
             marker.setOnMouseEntered(event -> setCursor(Cursor.CROSSHAIR));
             marker.setOnMouseExited(event -> setCursor(Cursor.HAND));
-            marker.setOnMouseClicked(event -> {
+            marker.setOnMousePressed(event -> {
                 if (event.getButton() == MouseButton.PRIMARY) {
-                    onSelect.accept(burst);
-                    event.consume();
+                    markerInteractionPending = true;
                 }
+            });
+            marker.setOnMouseReleased(event -> {
+                if (event.getButton() != MouseButton.PRIMARY) {
+                    return;
+                }
+                if (!event.isStillSincePress()) {
+                    markerInteractionPending = false;
+                    return;
+                }
+                select(burst);
+                onSelect.accept(burst);
             });
             markerGroup.getChildren().add(marker);
             markerNodes.put(burst.grbName(), marker);
@@ -186,7 +224,6 @@ public final class CelestialSpherePane extends Pane {
     private void rebuildGrid() {
         gridGroup.getChildren().clear();
 
-        // Equatore celeste.
         SkyPoint3D previous = null;
         for (int ra = 0; ra <= 360; ra += 5) {
             SkyPoint3D current = SkyCoordinates.onSphere(ra % 360, 0, RADIUS + 0.5);
@@ -196,7 +233,6 @@ public final class CelestialSpherePane extends Pane {
             previous = current;
         }
 
-        // Due paralleli di declinazione per aiutare l'orientamento senza appesantire la vista.
         for (double dec : new double[]{-45.0, 45.0}) {
             previous = null;
             for (int ra = 0; ra <= 360; ra += 8) {
@@ -261,6 +297,7 @@ public final class CelestialSpherePane extends Pane {
         });
         subScene.setOnMouseReleased(event -> setCursor(Cursor.HAND));
         subScene.setOnMouseDragged(event -> {
+            markerInteractionPending = false;
             if (!event.isPrimaryButtonDown()) {
                 return;
             }
@@ -273,13 +310,14 @@ public final class CelestialSpherePane extends Pane {
             event.consume();
         });
         subScene.setOnScroll(event -> {
-            // Delta positivo = avvicinamento, negativo = allontanamento.
             double next = camera.getTranslateZ() + event.getDeltaY() * 0.85;
             camera.setTranslateZ(clamp(next, -1550.0, -470.0));
+            updateZoomLabel();
             event.consume();
         });
         subScene.setOnMouseClicked(event -> {
             if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() == 2) {
+                markerInteractionPending = false;
                 resetView();
                 event.consume();
             }

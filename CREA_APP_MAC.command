@@ -15,7 +15,8 @@ INPUT_DIR="$SCRIPT_DIR/target/jpackage-input"
 OUTPUT_DIR="$SCRIPT_DIR/dist"
 ICONSET_DIR="$SCRIPT_DIR/target/SwiftBAT.iconset"
 ICNS_FILE="$SCRIPT_DIR/target/SwiftBAT.icns"
-APP_JAR="swiftbat-explorer-1.2.0.jar"
+APP_VERSION="1.3.0"
+APP_JAR="swiftbat-explorer-$APP_VERSION.jar"
 
 cp "$SCRIPT_DIR/target/$APP_JAR" "$INPUT_DIR/$APP_JAR"
 rm -rf "$OUTPUT_DIR/SwiftBAT Explorer.app" "$ICONSET_DIR"
@@ -40,7 +41,7 @@ jpackage \
   --name "SwiftBAT Explorer" \
   --main-jar "$APP_JAR" \
   --main-class it.casiraghi.swiftbat.Launcher \
-  --app-version 1.2.0 \
+  --app-version "$APP_VERSION" \
   --vendor "Matteo Casiraghi" \
   --description "Esplorazione e confronto dei dati Swift/BAT GRB" \
   --copyright "2026 Matteo Casiraghi" \

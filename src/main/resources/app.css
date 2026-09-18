@@ -1063,10 +1063,24 @@
 .fullscreen-toolbar {
     -fx-background-color: rgba(8, 13, 27, 0.96);
     -fx-border-color: transparent transparent rgba(118, 142, 190, 0.13) transparent;
+    -fx-alignment: center-left;
+    -fx-padding: 12 18;
+    -fx-min-height: 58px;
+}
+
+.fullscreen-title {
+    -fx-text-fill: #f5f7fb;
+    -fx-font-size: 19px;
+    -fx-font-weight: bold;
+}
+
+.in-place-fullscreen,
+.fullscreen-layout {
+    -fx-background-color: #050810;
 }
 
 /* ========================================================================== */
-/* SwiftBAT Explorer 1.2.0 — Event Horizon UI                                */
+/* SwiftBAT Explorer 1.3.0                                                    */
 /* ========================================================================== */
 .root {
     -fx-font-family: "Avenir Next", "SF Pro Text", "Segoe UI", "Inter", sans-serif;
@@ -1487,3 +1501,910 @@
     -fx-control-inner-background: #090d15;
     -fx-control-inner-background-alt: #0b1019;
 }
+
+/* ---------- Analisi di popolazione ---------- */
+.catalog-science {
+    -fx-text-fill: #9a83c8;
+    -fx-font-size: 8px;
+}
+
+.filter-value {
+    -fx-text-fill: #ffbd75;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-min-width: 82px;
+}
+
+.population-filter-card {
+    -fx-spacing: 14px;
+}
+
+.population-filter-grid {
+    -fx-alignment: center-left;
+}
+
+.population-filter-group {
+    -fx-background-color: rgba(255, 255, 255, 0.025);
+    -fx-border-color: rgba(255, 255, 255, 0.055);
+    -fx-background-radius: 11px;
+    -fx-border-radius: 11px;
+    -fx-padding: 10px;
+}
+
+.filter-detail {
+    -fx-text-fill: #626d7f;
+    -fx-font-size: 9px;
+}
+
+.population-filter-section {
+    -fx-background-color: rgba(255, 174, 74, 0.035);
+    -fx-border-color: rgba(255, 174, 74, 0.10);
+    -fx-background-radius: 12px;
+    -fx-border-radius: 12px;
+    -fx-padding: 12px;
+}
+
+.population-section-title {
+    -fx-text-fill: #e8ecf3;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+
+.population-preview {
+    -fx-text-fill: #9adcbf;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.explorer-filter-grid {
+    -fx-background-color: rgba(255, 255, 255, 0.018);
+    -fx-border-color: rgba(255, 255, 255, 0.05);
+    -fx-background-radius: 11px;
+    -fx-border-radius: 11px;
+    -fx-padding: 9px;
+}
+
+.slider .track {
+    -fx-background-color: rgba(255, 255, 255, 0.09);
+    -fx-background-radius: 999px;
+}
+
+.slider .thumb {
+    -fx-background-color: linear-gradient(to bottom right, #ffae4a, #a66bdd);
+    -fx-effect: dropshadow(gaussian, rgba(255, 174, 74, 0.20), 8, 0.15, 0, 2);
+}
+
+.population-chart .chart-series-line {
+    -fx-stroke-line-cap: round;
+}
+
+.population-chart-card {
+    -fx-background-color: rgba(8, 13, 25, 0.42);
+}
+
+.population-insight-card {
+    -fx-background-color: linear-gradient(to bottom right, rgba(18, 31, 50, 0.92), rgba(20, 15, 35, 0.92));
+    -fx-border-color: rgba(93, 215, 238, 0.18), rgba(174, 117, 226, 0.11);
+    -fx-border-insets: 0, 1;
+    -fx-background-radius: 13px;
+    -fx-border-radius: 13px;
+    -fx-padding: 14px;
+}
+
+.population-insight-title {
+    -fx-text-fill: #edf5ff;
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.population-insight-badge {
+    -fx-text-fill: #62dfba;
+    -fx-font-size: 8px;
+    -fx-font-weight: bold;
+}
+
+.population-insight-headline {
+    -fx-text-fill: #dbe9fb;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-line-spacing: 2px;
+}
+
+.population-insight-list,
+.population-insight-cautions {
+    -fx-padding: 2 0 0 0;
+}
+
+.population-insight-dot {
+    -fx-text-fill: #59d7f2;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.population-insight-warning {
+    -fx-text-fill: #ffb55e;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+
+.population-insight-text {
+    -fx-text-fill: #9aaac3;
+    -fx-font-size: 9px;
+    -fx-line-spacing: 1.5px;
+}
+
+.population-insight-caution-title {
+    -fx-text-fill: #efb66d;
+    -fx-font-size: 9px;
+    -fx-font-weight: bold;
+}
+
+.population-insight-footnote {
+    -fx-text-fill: #68758d;
+    -fx-font-size: 8px;
+    -fx-font-style: italic;
+}
+
+.population-histogram-card {
+    -fx-min-width: 0;
+}
+
+.population-profile-legend {
+    -fx-alignment: center-left;
+    -fx-padding: 2 0 4 0;
+}
+
+.population-legend-item {
+    -fx-background-color: rgba(255, 255, 255, 0.025);
+    -fx-border-color: rgba(255, 255, 255, 0.055);
+    -fx-background-radius: 9px;
+    -fx-border-radius: 9px;
+    -fx-padding: 7 10;
+}
+
+.population-legend-line {
+    -fx-stroke-width: 3px;
+    -fx-stroke-line-cap: round;
+}
+
+.population-legend-single {
+    -fx-stroke: rgba(84, 215, 255, 0.72);
+}
+
+.population-legend-median {
+    -fx-stroke: #ffae4a;
+    -fx-stroke-width: 4px;
+}
+
+.population-legend-quartile {
+    -fx-stroke: #aa78db;
+    -fx-stroke-dash-array: 7 5;
+}
+
+.population-legend-title {
+    -fx-text-fill: #e9edf5;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+.population-legend-detail {
+    -fx-text-fill: #74819a;
+    -fx-font-size: 9px;
+}
+
+.population-fullscreen-content {
+    -fx-background-color: rgba(7, 11, 21, 0.82);
+    -fx-background-radius: 14px;
+    -fx-border-color: rgba(108, 136, 192, 0.13);
+    -fx-border-radius: 14px;
+    -fx-padding: 14px;
+}
+
+.bar-chart {
+    -fx-background-color: rgba(8, 13, 25, 0.50);
+    -fx-background-radius: 12px;
+}
+
+.bar-chart .chart-plot-background {
+    -fx-background-color: rgba(8, 14, 28, 0.72);
+}
+
+.bar-chart .chart-vertical-grid-lines,
+.bar-chart .chart-horizontal-grid-lines {
+    -fx-stroke: rgba(128, 148, 186, 0.12);
+}
+
+.bar-chart .axis,
+.bar-chart .axis-label {
+    -fx-tick-label-fill: #71819f;
+    -fx-text-fill: #91a1bf;
+}
+
+.bar-chart .chart-bar {
+    -fx-bar-fill: #7767d7;
+    -fx-background-radius: 5px 5px 0 0;
+}
+
+
+/* FRACEXP numeric steppers */
+.percentage-control {
+    -fx-background-color: rgba(255, 255, 255, 0.025);
+    -fx-border-color: rgba(255, 174, 74, 0.10);
+    -fx-background-radius: 11px;
+    -fx-border-radius: 11px;
+    -fx-padding: 10 12;
+}
+
+.percentage-field {
+    -fx-background-color: rgba(6, 10, 17, 0.92);
+    -fx-text-fill: #fff2e2;
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-background-radius: 9px;
+    -fx-border-radius: 9px;
+    -fx-border-color: rgba(255, 174, 74, 0.18);
+    -fx-padding: 8 10;
+}
+
+.percentage-field:focused {
+    -fx-border-color: rgba(255, 183, 101, 0.72);
+    -fx-effect: dropshadow(gaussian, rgba(255, 174, 74, 0.13), 10, 0.18, 0, 0);
+}
+
+.percentage-step-button {
+    -fx-background-color: rgba(255, 174, 74, 0.08);
+    -fx-text-fill: #ffc47e;
+    -fx-border-color: rgba(255, 174, 74, 0.15);
+    -fx-background-radius: 9px;
+    -fx-border-radius: 9px;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-min-width: 36px;
+    -fx-min-height: 36px;
+    -fx-padding: 5px;
+    -fx-cursor: hand;
+}
+
+.percentage-step-button:hover {
+    -fx-background-color: rgba(255, 174, 74, 0.15);
+    -fx-border-color: rgba(255, 190, 118, 0.30);
+}
+
+.percentage-unit {
+    -fx-text-fill: #ffbd75;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-min-width: 18px;
+}
+
+
+/* ---------- Layout compatto Explorer / Popolazione ---------- */
+.population-filter-card-compact {
+    -fx-spacing: 9px;
+}
+
+.population-filter-card-compact .population-filter-group {
+    -fx-padding: 7 9;
+}
+
+.population-filter-card-compact .choice-box-modern {
+    -fx-padding: 7 10;
+}
+
+.population-filter-section-compact {
+    -fx-padding: 9 11;
+}
+
+.population-filter-section-compact .sky-filter-help {
+    -fx-font-size: 9px;
+}
+
+.percentage-control {
+    -fx-padding: 7 9;
+}
+
+.percentage-field {
+    -fx-font-size: 13px;
+    -fx-padding: 5 7;
+}
+
+.fracexp-slider {
+    -fx-padding: 0 4 0 4;
+}
+
+.fracexp-slider .track {
+    -fx-background-color: rgba(255, 255, 255, 0.10);
+    -fx-background-radius: 999px;
+    -fx-pref-height: 5px;
+}
+
+.fracexp-slider .thumb {
+    -fx-background-color: linear-gradient(to bottom right, #ffae4a, #a66bdd);
+    -fx-background-radius: 999px;
+    -fx-pref-width: 15px;
+    -fx-pref-height: 15px;
+    -fx-effect: dropshadow(gaussian, rgba(255, 174, 74, 0.24), 7, 0.18, 0, 1);
+}
+
+.filter-reset-button {
+    -fx-background-color: rgba(255, 174, 74, 0.08);
+    -fx-text-fill: #ffc47e;
+    -fx-border-color: rgba(255, 174, 74, 0.18);
+    -fx-background-radius: 8px;
+    -fx-border-radius: 8px;
+    -fx-min-width: 29px;
+    -fx-min-height: 29px;
+    -fx-padding: 3px;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+.filter-reset-button:hover {
+    -fx-background-color: rgba(255, 174, 74, 0.16);
+}
+
+.explorer-extra-toggle {
+    -fx-padding: 7 10;
+}
+
+.explorer-extra-filters {
+    -fx-background-color: rgba(255, 255, 255, 0.018);
+    -fx-border-color: rgba(255, 255, 255, 0.055);
+    -fx-background-radius: 10px;
+    -fx-border-radius: 10px;
+    -fx-padding: 9px;
+}
+
+.explorer-extra-filters .choice-box-modern,
+.explorer-compact-field {
+    -fx-padding: 6 8;
+}
+
+.explorer-metrics {
+    -fx-padding: 0;
+}
+
+.metric-card-compact {
+    -fx-padding: 9 11;
+    -fx-background-radius: 13px;
+    -fx-border-radius: 13px;
+}
+
+.metric-card-compact .metric-eyebrow {
+    -fx-font-size: 8px;
+}
+
+.metric-card-compact .metric-value {
+    -fx-font-size: 15px;
+}
+
+.metric-card-compact .metric-detail {
+    -fx-font-size: 8px;
+}
+
+.overview-chart-card {
+    -fx-padding: 12px;
+}
+
+
+/* ---------- Refinements 1.3.0 ---------- */
+.fracexp-slider {
+    -fx-background-color: transparent;
+    -fx-padding: 0 2 0 2;
+}
+.fracexp-slider .track {
+    -fx-background-color: rgba(255,255,255,0.10);
+    -fx-background-radius: 999px;
+    -fx-pref-height: 6px;
+}
+.fracexp-slider .thumb {
+    -fx-background-color: linear-gradient(to bottom right, #ffb15c, #a866dc);
+    -fx-background-radius: 999px;
+    -fx-pref-width: 16px;
+    -fx-pref-height: 16px;
+    -fx-effect: dropshadow(gaussian, rgba(255,177,92,0.24), 8, 0.18, 0, 1);
+}
+.fracexp-slider .increment-button,
+.fracexp-slider .decrement-button,
+.fracexp-slider .increment-arrow,
+.fracexp-slider .decrement-arrow {
+    -fx-background-color: transparent;
+    -fx-padding: 0;
+    -fx-shape: "";
+    -fx-pref-width: 0;
+    -fx-pref-height: 0;
+}
+.overview-action-card {
+    -fx-background-color: rgba(255,255,255,0.025);
+    -fx-border-color: rgba(255,177,92,0.10);
+}
+.three-d-footer {
+    -fx-padding: 9px 12px;
+}
+
+
+/* ---------- Layout refinements population + sky ---------- */
+.population-filter-side {
+    -fx-padding: 9px 10px;
+}
+.population-filter-side .percentage-control {
+    -fx-padding: 7px 8px;
+}
+.sky-metric-row {
+    -fx-alignment: center-left;
+}
+.sky-metric-row .sky-metric-card {
+    -fx-padding: 13px 18px;
+}
+
+/* ---------- Rifiniture leggibilità / fullscreen ---------- */
+.info-static-card {
+    -fx-background-color: linear-gradient(to bottom right, rgba(14, 17, 25, 0.96), rgba(9, 12, 19, 0.98));
+    -fx-border-color: rgba(255, 255, 255, 0.075);
+    -fx-background-radius: 18px;
+    -fx-border-radius: 18px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.24), 17, 0.10, 0, 6);
+}
+
+.population-insight-expanded {
+    -fx-padding: 22px;
+}
+
+.population-insight-expanded .population-insight-title {
+    -fx-font-size: 20px;
+}
+
+.population-insight-expanded .population-insight-badge {
+    -fx-font-size: 10px;
+}
+
+.population-insight-expanded .population-insight-headline {
+    -fx-font-size: 15px;
+    -fx-line-spacing: 3px;
+}
+
+.population-insight-expanded .population-insight-text {
+    -fx-font-size: 13px;
+    -fx-line-spacing: 3px;
+}
+
+.population-insight-expanded .population-insight-dot,
+.population-insight-expanded .population-insight-warning {
+    -fx-font-size: 14px;
+}
+
+.population-insight-expanded .population-insight-caution-title {
+    -fx-font-size: 13px;
+}
+
+.population-insight-expanded .population-insight-footnote {
+    -fx-font-size: 10px;
+    -fx-line-spacing: 2px;
+}
+
+.sky-fullscreen-details .sky-selected-title {
+    -fx-font-size: 24px;
+}
+
+.sky-fullscreen-details .card-subtitle {
+    -fx-font-size: 11px;
+}
+
+.sky-fullscreen-details .info-key {
+    -fx-font-size: 11px;
+}
+
+.sky-fullscreen-details .info-value {
+    -fx-font-size: 13px;
+    -fx-line-spacing: 2px;
+}
+
+.sky-fullscreen-details .sky-detail-note,
+.sky-fullscreen-details .sky-fullscreen-note {
+    -fx-font-size: 12px;
+    -fx-line-spacing: 3px;
+}
+
+.three-d-zoom-label,
+.sky-zoom-label {
+    -fx-background-color: rgba(8, 15, 29, 0.82);
+    -fx-text-fill: #8fa8ca;
+    -fx-background-radius: 8px;
+    -fx-border-color: rgba(116, 151, 215, 0.18);
+    -fx-border-radius: 8px;
+    -fx-padding: 5 8;
+    -fx-font-size: 10px;
+    -fx-font-weight: bold;
+}
+
+
+
+/* ---------- Rifiniture tabelle / zoom / fullscreen round 3 ---------- */
+.table-view .corner,
+.data-table .corner {
+    -fx-background-color: #090d15;
+}
+
+.scroll-pane .corner {
+    -fx-background-color: transparent;
+}
+
+.sky-zoom-label,
+.three-d-zoom-inline {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-text-fill: #7187aa;
+    -fx-padding: 0;
+    -fx-font-size: 10px;
+    -fx-font-weight: normal;
+}
+
+.three-d-panel-fullscreen .overlay-title {
+    -fx-font-size: 22px;
+}
+
+.three-d-panel-fullscreen .overlay-caption {
+    -fx-font-size: 13px;
+    -fx-line-spacing: 3px;
+}
+
+.three-d-panel-fullscreen .legend-item {
+    -fx-font-size: 12px;
+}
+
+.three-d-panel-fullscreen .three-d-context {
+    -fx-font-size: 13px;
+    -fx-padding: 6 10;
+}
+
+.three-d-panel-fullscreen .three-d-zoom-inline {
+    -fx-font-size: 12px;
+}
+
+.data-toolbar {
+    -fx-background-color: rgba(255, 255, 255, 0.018);
+    -fx-border-color: rgba(255, 255, 255, 0.055);
+    -fx-background-radius: 11px;
+    -fx-border-radius: 11px;
+    -fx-padding: 10px;
+}
+
+.excel-export-button:hover {
+    -fx-background-color: rgba(45, 151, 103, 0.18);
+    -fx-border-color: rgba(74, 190, 132, 0.42);
+    -fx-text-fill: #bcefd2;
+}
+
+/* ---------- Spectroscopy ---------- */
+.spectroscopy-pane, .spectroscopy-content {
+    -fx-background-color: transparent;
+}
+
+.spectroscopy-controls {
+    -fx-background-color: rgba(11, 18, 33, 0.78);
+    -fx-background-radius: 15px;
+    -fx-border-color: rgba(105, 139, 201, 0.18);
+    -fx-border-radius: 15px;
+    -fx-padding: 12;
+}
+
+.spectroscopy-control-box {
+    -fx-min-width: 210px;
+}
+
+.spectroscopy-tabs {
+    -fx-background-color: transparent;
+}
+
+.spectroscopy-metric {
+    -fx-min-height: 104px;
+    -fx-background-color: linear-gradient(to bottom right, rgba(17, 30, 52, 0.94), rgba(12, 20, 37, 0.94));
+}
+
+.spectroscopy-responsive-grid {
+    -fx-background-color: transparent;
+}
+
+.spectroscopy-chart-card {
+    -fx-min-width: 0px;
+    -fx-pref-width: 560px;
+}
+
+.spectroscopy-detail-card {
+    -fx-min-width: 0px;
+    -fx-pref-width: 380px;
+}
+
+.spectroscopy-chart-actions {
+    -fx-alignment: center-left;
+    -fx-padding: 2px 0 3px 0;
+}
+
+.spectroscopy-assistant {
+    -fx-background-color: linear-gradient(to bottom right, rgba(18, 40, 60, 0.96), rgba(31, 23, 58, 0.96));
+    -fx-border-color: rgba(92, 212, 239, 0.24);
+}
+
+.spectroscopy-table {
+    -fx-background-color: rgba(8, 15, 28, 0.54);
+    -fx-background-radius: 10px;
+    -fx-padding: 10;
+}
+
+.spectroscopy-note {
+    -fx-text-fill: #90a3c5;
+    -fx-font-size: 11px;
+    -fx-background-color: rgba(29, 42, 70, 0.52);
+    -fx-background-radius: 10px;
+    -fx-padding: 10 12;
+}
+
+.spectroscopy-empty {
+    -fx-background-color: rgba(10, 18, 33, 0.72);
+    -fx-background-radius: 16px;
+    -fx-border-color: rgba(116, 145, 196, 0.20);
+    -fx-border-radius: 16px;
+}
+
+.time-energy-card {
+    -fx-min-height: 430px;
+}
+
+.spectral-model-chart .chart-series-line {
+    -fx-stroke: #ffad52;
+    -fx-stroke-width: 3px;
+    -fx-effect: dropshadow(gaussian, rgba(255, 157, 66, 0.25), 8, 0.25, 0, 0);
+}
+
+.spectral-flux-chart .default-color0.chart-bar {
+    /* Conserva il colore interno standard di Modena e personalizza solo il riempimento visibile. */
+    -fx-background-color: linear-gradient(to top, #3bbada, #9b75ef);
+}
+
+.spectroscopy-control-help {
+    -fx-text-fill: #7f91b1;
+    -fx-font-size: 10px;
+    -fx-line-spacing: 1px;
+}
+
+.spectroscopy-reading-intro {
+    -fx-text-fill: #c8d5ec;
+    -fx-font-size: 12px;
+    -fx-line-spacing: 2px;
+    -fx-background-color: rgba(34, 52, 82, 0.58);
+    -fx-background-radius: 11px;
+    -fx-border-color: rgba(88, 210, 237, 0.18);
+    -fx-border-radius: 11px;
+    -fx-padding: 10 12;
+}
+
+
+/* ---------- Feedback relatori: dense expert UI ---------- */
+.table-view .column-header .label,
+.tree-table-view .column-header .label {
+    -fx-alignment: CENTER-LEFT;
+    -fx-text-alignment: left;
+}
+
+.language-switch {
+    -fx-background-color: rgba(20, 30, 54, 0.78);
+    -fx-background-radius: 10px;
+    -fx-border-color: rgba(110, 145, 210, 0.22);
+    -fx-border-radius: 10px;
+    -fx-padding: 2px;
+}
+
+.language-toggle {
+    -fx-background-color: transparent;
+    -fx-text-fill: #8494b4;
+    -fx-font-weight: bold;
+    -fx-font-size: 10px;
+    -fx-padding: 6 9;
+    -fx-background-radius: 8px;
+}
+
+.language-toggle:selected {
+    -fx-background-color: linear-gradient(to right, rgba(45, 190, 225, 0.32), rgba(121, 91, 225, 0.34));
+    -fx-text-fill: #f4f8ff;
+}
+
+.compact-radio-group {
+    -fx-alignment: center-left;
+    -fx-spacing: 8px;
+}
+
+.compact-radio {
+    -fx-text-fill: #c8d5ef;
+    -fx-font-size: 11px;
+    -fx-padding: 7 9;
+    -fx-background-color: rgba(23, 34, 59, 0.72);
+    -fx-background-radius: 9px;
+    -fx-border-color: rgba(105, 139, 201, 0.20);
+    -fx-border-radius: 9px;
+}
+
+.compact-radio:selected {
+    -fx-text-fill: #ffffff;
+    -fx-background-color: rgba(101, 84, 205, 0.35);
+    -fx-border-color: rgba(130, 114, 244, 0.50);
+}
+
+.help-toggle {
+    -fx-font-size: 10px;
+    -fx-padding: 8 11;
+}
+
+.population-analysis-overlay {
+    -fx-background-color: rgba(5, 9, 20, 0.94);
+    -fx-background-radius: 18px;
+    -fx-border-color: rgba(88, 210, 243, 0.22);
+    -fx-border-radius: 18px;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 28, 0.25, 0, 8);
+}
+
+.compare-match-count {
+    -fx-text-fill: #6f7f9f;
+    -fx-font-size: 9px;
+    -fx-padding: 0 2;
+}
+
+
+.collapsible-help {
+    -fx-spacing: 6px;
+    -fx-padding: 0;
+}
+
+.compact-radio-group .radio-button {
+    -fx-cursor: hand;
+}
+
+.in-place-fullscreen .help-toggle {
+    -fx-padding: 7 11;
+}
+
+
+/* ---------- UX polish 1.3.0 ---------- */
+.home-action-card { -fx-cursor: hand; }
+
+.closable-column-header {
+    -fx-alignment: center-left;
+    -fx-padding: 0 1 0 0;
+}
+.column-close-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #6f7887;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-padding: 0 2 0 4;
+    -fx-cursor: hand;
+}
+.column-close-button:hover {
+    -fx-text-fill: #ffb15c;
+    -fx-background-color: rgba(255,177,92,0.08);
+    -fx-background-radius: 7px;
+}
+.hidden-column-bar {
+    -fx-alignment: center-left;
+    -fx-padding: 1 0 1 0;
+}
+.hidden-column-chip {
+    -fx-background-color: rgba(255,255,255,0.035);
+    -fx-border-color: rgba(255,177,92,0.14);
+    -fx-text-fill: #aab2c0;
+    -fx-background-radius: 999px;
+    -fx-border-radius: 999px;
+    -fx-font-size: 9px;
+    -fx-padding: 4 8;
+    -fx-cursor: hand;
+}
+.hidden-column-chip:hover {
+    -fx-background-color: rgba(255,177,92,0.09);
+    -fx-text-fill: #ffd2a0;
+}
+
+.compare-combo,
+.compare-combo:editable,
+.compare-combo .text-field {
+    -fx-background-color: #0c111b;
+    -fx-control-inner-background: #0c111b;
+    -fx-text-fill: #edf1f7;
+    -fx-prompt-text-fill: #616b7b;
+    -fx-border-color: rgba(255,255,255,0.09);
+    -fx-background-radius: 10px;
+    -fx-border-radius: 10px;
+}
+.compare-combo:focused,
+.compare-combo .text-field:focused {
+    -fx-border-color: rgba(91,220,255,0.55);
+}
+.compare-combo .arrow-button {
+    -fx-background-color: rgba(255,255,255,0.035);
+    -fx-background-radius: 0 10px 10px 0;
+}
+.compare-combo .list-cell {
+    -fx-background-color: #0d131e;
+    -fx-text-fill: #dfe5ef;
+    -fx-padding: 8 10;
+}
+.compare-combo .list-view {
+    -fx-background-color: #0b1019;
+    -fx-border-color: rgba(255,255,255,0.10);
+}
+.compare-ghost-text {
+    -fx-text-fill: rgba(147, 164, 190, 0.48);
+    -fx-font-size: 13px;
+}
+.compare-match-count {
+    -fx-text-fill: #687487;
+    -fx-font-size: 9px;
+}
+
+.population-fracexp-inline {
+    -fx-padding: 7 8;
+}
+.population-fracexp-inline .percentage-control {
+    -fx-padding: 5 7;
+}
+.population-fracexp-inline .percentage-field {
+    -fx-font-size: 12px;
+    -fx-padding: 4 6;
+}
+.population-fracexp-inline .filter-reset-button {
+    -fx-min-width: 25px;
+    -fx-min-height: 25px;
+    -fx-padding: 2px;
+}
+
+
+/* ---------- UX stabilization 1.3.0 ---------- */
+.compact-radio {
+    -fx-padding: 6px 7px;
+    -fx-font-size: 9.5px;
+}
+.population-fracexp-inline {
+    -fx-padding: 7px 8px;
+}
+.population-fracexp-inline .percentage-control {
+    -fx-padding: 5px 6px;
+}
+.population-fracexp-inline .percentage-field {
+    -fx-min-width: 48px;
+    -fx-pref-width: 52px;
+    -fx-max-width: 56px;
+}
+.population-fracexp-inline .filter-reset-button {
+    -fx-min-width: 25px;
+    -fx-min-height: 25px;
+    -fx-pref-width: 25px;
+    -fx-pref-height: 25px;
+}
+.compare-combo, .compare-combo .text-field, .compare-combo > .list-cell {
+    -fx-background-color: #0b1019;
+    -fx-text-fill: #e7ebf2;
+}
+.compare-combo .arrow-button {
+    -fx-background-color: rgba(255,255,255,0.045);
+}
+.compare-combo .combo-box-popup .list-view {
+    -fx-background-color: #090d15;
+    -fx-control-inner-background: #090d15;
+}
+.compare-combo .combo-box-popup .list-cell {
+    -fx-background-color: #090d15;
+    -fx-text-fill: #dfe5ee;
+}
+.compare-combo .combo-box-popup .list-cell:hover,
+.compare-combo .combo-box-popup .list-cell:selected {
+    -fx-background-color: rgba(255,174,91,0.12);
+    -fx-text-fill: #fff3e4;
+}
+
+
+/* Runtime polish 1.3.0 */
+.bar-chart .chart-bar { -fx-bar-fill: #4fd5ef; }
+.population-fracexp-inline { -fx-padding: 8px 9px; }
+.population-fracexp-inline .percentage-control { -fx-padding: 5px 6px; }
+.population-fracexp-inline .percentage-field { -fx-font-size: 12px; -fx-padding: 4px 5px; }
+.population-fracexp-inline .percentage-step-button { -fx-min-width: 28px; -fx-min-height: 28px; -fx-pref-width: 28px; -fx-pref-height: 28px; }
+.compare-combo, .compare-combo .text-field { -fx-background-color: rgba(255,255,255,0.045); -fx-text-fill: #e7eaf0; -fx-prompt-text-fill: #646d7d; }
+.compare-combo:focused, .compare-combo .text-field:focused { -fx-border-color: rgba(86,216,250,0.70); }

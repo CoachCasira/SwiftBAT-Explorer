@@ -289,7 +289,7 @@ public final class MollweideSkyPane extends Pane {
 
     private void handleReleased(MouseEvent event) {
         if (event.getButton() == MouseButton.PRIMARY) {
-            setCursor(Cursor.HAND);
+            setCursor(hovered == null ? Cursor.HAND : Cursor.CROSSHAIR);
         }
     }
 
@@ -312,6 +312,9 @@ public final class MollweideSkyPane extends Pane {
             selected = hit;
             onSelect.accept(hit);
             redraw();
+            // Selecting a GRB is an interaction with the plot, not a request to
+            // open the surrounding visualization card fullscreen.
+            event.consume();
         }
     }
 

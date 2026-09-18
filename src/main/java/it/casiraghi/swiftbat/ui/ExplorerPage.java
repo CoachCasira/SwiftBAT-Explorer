@@ -5,19 +5,22 @@ import it.casiraghi.swiftbat.model.FieldDefinition;
 import it.casiraghi.swiftbat.model.GrbData;
 import it.casiraghi.swiftbat.model.MetadataItem;
 import it.casiraghi.swiftbat.model.SummaryItem;
+import it.casiraghi.swiftbat.model.SkyBurst;
+import it.casiraghi.swiftbat.model.SpectralData;
 import it.casiraghi.swiftbat.model.TabularData;
+import it.casiraghi.swiftbat.service.ExcelExportService;
 import it.casiraghi.swiftbat.ui.components.ThreeDChartPane;
+import javafx.animation.PauseTransition;
+import javafx.application.Platform;
 import javafx.application.HostServices;
 import javafx.beans.property.ReadOnlyStringWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
-import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
-import javafx.scene.SnapshotParameters;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
@@ -25,6 +28,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -39,7 +43,7 @@ import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
 import javafx.scene.control.Tooltip;
-import javafx.scene.image.WritableImage;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.GridPane;
@@ -49,8 +53,8 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
+import javafx.util.Duration;
 
-import javax.imageio.ImageIO;
 import java.io.File;
 import java.io.IOException;
 import java.text.DecimalFormat;
@@ -69,20 +73,39 @@ public final class ExplorerPage extends BorderPane {
     private final HostServices hostServices;
     private final BiConsumer<CatalogEntry, Boolean> loadRequest;
     private final Predicate<CatalogEntry> cacheLookup;
+    private final ExcelExportService excelExportService = new ExcelExportService();
     private final ObservableList<CatalogEntry> catalog = FXCollections.observableArrayList();
     private final FilteredList<CatalogEntry> filteredCatalog = new FilteredList<>(catalog, ignored -> true);
     private final ListView<CatalogEntry> catalogList = new ListView<>(filteredCatalog);
     private final TextField catalogSearch = new TextField();
+    private final GrbSearchAssist catalogSearchAssist;
+    private final MultiSelectMenuButton durationFilter = new MultiSelectMenuButton(
+            "Tutte", List.of("Short ≤ 2 s", "Long > 2 s", "T90 n.d."));
+    private final MultiSelectMenuButton redshiftFilter = new MultiSelectMenuButton(
+            "Tutti", List.of("Con z", "Senza z"));
+    private final ComboBox<String> cacheFilter = new ComboBox<>();
+    private final TextField t90MinFilter = compactFilterField("min");
+    private final TextField t90MaxFilter = compactFilterField("max");
+    private final TextField redshiftMinFilter = compactFilterField("min");
+    private final TextField redshiftMaxFilter = compactFilterField("max");
+    private final Map<String, SkyBurst> scientificMetadata = new LinkedHashMap<>();
+    private Map<String, SpectralData> spectralCatalog = Map.of();
     private final Label catalogCount = UiFactory.label("Catalogo in caricamento…", "sidebar-caption");
     private final StackPane workspace = new StackPane();
     private CatalogEntry selectedEntry;
     private GrbData currentData;
+    private String preferredTab = "Curva 2D";
+    private final PauseTransition catalogFilterDebounce = new PauseTransition(Duration.millis(140));
 
     public ExplorerPage(HostServices hostServices, BiConsumer<CatalogEntry, Boolean> loadRequest,
                         Predicate<CatalogEntry> cacheLookup) {
         this.hostServices = hostServices;
         this.loadRequest = loadRequest;
         this.cacheLookup = cacheLookup == null ? ignored -> false : cacheLookup;
+        catalogSearchAssist = new GrbSearchAssist(
+                catalogSearch,
+                () -> catalog.stream().map(CatalogEntry::grbName).toList(),
+                this::selectCatalogSearchMatch);
         getStyleClass().add("page-root");
         setPadding(new Insets(20, 24, 24, 24));
         setTop(buildHeader());
@@ -94,7 +117,38 @@ public final class ExplorerPage extends BorderPane {
 
     public void setCatalog(List<CatalogEntry> entries, boolean fallback) {
         catalog.setAll(entries);
-        catalogCount.setText(entries.size() + (fallback ? " GRB di emergenza" : " GRB nel catalogo online"));
+        catalogSearchAssist.refresh();
+        applyCatalogFilters();
+        I18n.setText(catalogCount,
+                entries.size() + (fallback ? " GRB di emergenza" : " GRB nel catalogo online"),
+                entries.size() + (fallback ? " fallback GRBs" : " GRBs in the online catalog"));
+    }
+
+    public void setScientificMetadata(List<SkyBurst> bursts) {
+        scientificMetadata.clear();
+        if (bursts != null) {
+            for (SkyBurst burst : bursts) {
+                scientificMetadata.put(burst.grbName().toUpperCase(Locale.ROOT), burst);
+            }
+        }
+        applyCatalogFilters();
+        catalogList.refresh();
+    }
+
+    public void setSpectralCatalog(Map<String, SpectralData> catalog) {
+        spectralCatalog = catalog == null ? Map.of() : Map.copyOf(catalog);
+        if (currentData != null) {
+            setWorkspace(buildDashboard(currentData));
+        }
+    }
+
+    public void showTab(String title) {
+        preferredTab = title == null || title.isBlank() ? "Curva 2D" : title;
+        if (currentData != null) {
+            setWorkspace(buildDashboard(currentData));
+        } else {
+            showEmptyState();
+        }
     }
 
     public void setSelectedEntry(CatalogEntry entry) {
@@ -132,10 +186,16 @@ public final class ExplorerPage extends BorderPane {
         box.getStyleClass().addAll("empty-state", "error-state");
         box.setAlignment(Pos.CENTER);
         Label icon = UiFactory.label("!", "error-symbol");
-        Label title = UiFactory.label("Dati non disponibili per " + entry.grbName(), "empty-title");
-        Label message = UiFactory.wrappedLabel(
-                readableError(error) + "\n\nL'evento rimane nel catalogo, ma la struttura online può essere incompleta o diversa da quella standard.",
-                "empty-message");
+        Label title = UiFactory.label(
+                I18n.dynamic("Dati non disponibili per " + entry.grbName(),
+                        "Data unavailable for " + entry.grbName()), "empty-title");
+        String technicalError = readableError(error);
+        Label message = UiFactory.wrappedLabel("", "empty-message");
+        I18n.setText(message,
+                technicalError
+                        + "\n\nL'evento rimane nel catalogo, ma la struttura online può essere incompleta o diversa da quella standard.",
+                I18n.english(technicalError)
+                        + "\n\nThe event remains in the catalog, but its online structure may be incomplete or differ from the standard layout.");
         message.setMaxWidth(720);
         HBox actions = new HBox(10);
         actions.setAlignment(Pos.CENTER);
@@ -158,25 +218,110 @@ public final class ExplorerPage extends BorderPane {
         header.setAlignment(Pos.CENTER_LEFT);
         VBox copy = new VBox(5,
                 UiFactory.label("Esplora", "page-title"),
-                UiFactory.wrappedLabel(
-                        "Cerca un GRB e apri curve di luce, dati e metadati senza gestire file manualmente.",
-                        "page-subtitle"));
+                UiFactory.label("", "page-subtitle"));
         HBox.setHgrow(copy, Priority.ALWAYS);
         header.getChildren().add(copy);
         return header;
     }
 
     private Node buildBody() {
-        VBox sidebar = new VBox(12);
+        VBox sidebar = new VBox(9);
         sidebar.getStyleClass().add("catalog-panel");
-        sidebar.setPadding(new Insets(17));
+        sidebar.setPadding(new Insets(14));
         sidebar.setMinWidth(290);
         sidebar.setPrefWidth(320);
         sidebar.setMinHeight(0);
 
         Label title = UiFactory.label("GRB", "panel-title");
-        catalogSearch.setPromptText("Cerca GRB o Trigger ID…");
         catalogSearch.getStyleClass().add("search-field");
+        StackPane catalogSearchNode = catalogSearchAssist.node();
+        catalogSearchNode.setMaxWidth(Double.MAX_VALUE);
+        durationFilter.setMaxWidth(Double.MAX_VALUE);
+        redshiftFilter.setMaxWidth(Double.MAX_VALUE);
+
+        GridPane filterGrid = new GridPane();
+        filterGrid.getStyleClass().add("explorer-filter-grid");
+        filterGrid.setHgap(8);
+        filterGrid.setVgap(5);
+        filterGrid.add(UiFactory.label("Durata", "filter-label"), 0, 0);
+        filterGrid.add(UiFactory.label("Redshift", "filter-label"), 1, 0);
+        filterGrid.add(durationFilter, 0, 1);
+        filterGrid.add(redshiftFilter, 1, 1);
+        var firstColumn = new javafx.scene.layout.ColumnConstraints();
+        firstColumn.setPercentWidth(50);
+        firstColumn.setHgrow(Priority.ALWAYS);
+        var secondColumn = new javafx.scene.layout.ColumnConstraints();
+        secondColumn.setPercentWidth(50);
+        secondColumn.setHgrow(Priority.ALWAYS);
+        filterGrid.getColumnConstraints().addAll(firstColumn, secondColumn);
+
+        cacheFilter.setItems(FXCollections.observableArrayList("Tutti", "Solo in cache", "Da scaricare"));
+        cacheFilter.setValue("Tutti");
+        cacheFilter.getStyleClass().add("choice-box-modern");
+        cacheFilter.setMaxWidth(Double.MAX_VALUE);
+
+        ChoiceBox<String> t90Preset = new ChoiceBox<>(FXCollections.observableArrayList(
+                "Tutti", "≤ 2 s", "2–10 s", "10–50 s", "50–100 s", "> 100 s", "Manuale…"));
+        ChoiceBox<String> redshiftPreset = new ChoiceBox<>(FXCollections.observableArrayList(
+                "Tutti", "0–1", "1–2", "2–3", "3–4", "4–6", "> 6", "Manuale…"));
+        for (ChoiceBox<String> preset : List.of(t90Preset, redshiftPreset)) {
+            preset.getStyleClass().add("choice-box-modern");
+            preset.setMaxWidth(Double.MAX_VALUE);
+            UiFactory.autoTooltip(preset);
+        }
+        t90Preset.setValue("Tutti");
+        redshiftPreset.setValue("Tutti");
+        HBox t90Manual = filterRange(t90MinFilter, t90MaxFilter);
+        HBox redshiftManual = filterRange(redshiftMinFilter, redshiftMaxFilter);
+        t90Manual.setVisible(false); t90Manual.setManaged(false);
+        redshiftManual.setVisible(false); redshiftManual.setManaged(false);
+        t90Preset.valueProperty().addListener((obs, oldValue, value) ->
+                applyRangePreset(value, t90MinFilter, t90MaxFilter, t90Manual, true));
+        redshiftPreset.valueProperty().addListener((obs, oldValue, value) ->
+                applyRangePreset(value, redshiftMinFilter, redshiftMaxFilter, redshiftManual, false));
+
+        GridPane extraGrid = new GridPane();
+        extraGrid.setHgap(8);
+        extraGrid.setVgap(6);
+        extraGrid.add(UiFactory.label("T90 (s)", "filter-label"), 0, 0);
+        extraGrid.add(UiFactory.label("Redshift z", "filter-label"), 1, 0);
+        extraGrid.add(new VBox(5, t90Preset, t90Manual), 0, 1);
+        extraGrid.add(new VBox(5, redshiftPreset, redshiftManual), 1, 1);
+        var extraFirst = new javafx.scene.layout.ColumnConstraints();
+        extraFirst.setPercentWidth(50);
+        extraFirst.setHgrow(Priority.ALWAYS);
+        var extraSecond = new javafx.scene.layout.ColumnConstraints();
+        extraSecond.setPercentWidth(50);
+        extraSecond.setHgrow(Priority.ALWAYS);
+        extraGrid.getColumnConstraints().addAll(extraFirst, extraSecond);
+
+        Button clearExtra = UiFactory.button("Azzera filtri extra", "ghost-button");
+        clearExtra.setOnAction(event -> {
+            cacheFilter.setValue("Tutti");
+            t90MinFilter.clear();
+            t90MaxFilter.clear();
+            redshiftMinFilter.clear();
+            redshiftMaxFilter.clear();
+            t90Preset.setValue("Tutti");
+            redshiftPreset.setValue("Tutti");
+            applyCatalogFilters();
+        });
+        VBox extraBox = new VBox(8,
+                UiFactory.label("Cache locale", "filter-label"), cacheFilter,
+                extraGrid, clearExtra);
+        extraBox.getStyleClass().add("explorer-extra-filters");
+        extraBox.setVisible(false);
+        extraBox.setManaged(false);
+
+        ToggleButton extraToggle = new ToggleButton("Altri filtri ▾");
+        extraToggle.getStyleClass().addAll("sky-toggle", "explorer-extra-toggle");
+        extraToggle.setMaxWidth(Double.MAX_VALUE);
+        extraToggle.selectedProperty().addListener((obs, oldValue, selected) -> {
+            extraBox.setVisible(selected);
+            extraBox.setManaged(selected);
+            extraToggle.setText(selected ? "Nascondi filtri ▴" : "Altri filtri ▾");
+        });
+
         catalogList.getStyleClass().add("catalog-list");
         catalogList.setCellFactory(ignored -> new CatalogCell());
         catalogList.setMinHeight(140);
@@ -185,10 +330,8 @@ public final class ExplorerPage extends BorderPane {
 
         Separator separator = new Separator(Orientation.HORIZONTAL);
         separator.getStyleClass().add("soft-separator");
-        Label hint = UiFactory.wrappedLabel(
-                "Gli eventi già aperti restano in memoria per tutta la sessione.",
-                "sidebar-hint");
-        sidebar.getChildren().addAll(title, catalogSearch, catalogCount, catalogList, separator, hint);
+        sidebar.getChildren().addAll(title, catalogSearchNode, filterGrid, extraToggle, extraBox,
+                catalogCount, catalogList, separator);
 
         workspace.getStyleClass().add("workspace-host");
         workspace.setMinWidth(0);
@@ -201,19 +344,149 @@ public final class ExplorerPage extends BorderPane {
     }
 
     private void wireCatalog() {
-        catalogSearch.textProperty().addListener((observable, oldValue, newValue) -> {
-            String query = newValue == null ? "" : newValue.trim().toLowerCase(Locale.ROOT);
-            filteredCatalog.setPredicate(entry -> query.isBlank()
-                    || entry.grbName().toLowerCase(Locale.ROOT).contains(query)
-                    || entry.triggerId().toLowerCase(Locale.ROOT).contains(query));
-            catalogCount.setText(filteredCatalog.size() + " GRB visualizzati");
-        });
+        catalogFilterDebounce.setOnFinished(event -> applyCatalogFilters());
+        catalogSearch.textProperty().addListener((observable, oldValue, newValue) -> scheduleCatalogFilters());
+        durationFilter.setOnSelectionChanged(this::scheduleCatalogFilters);
+        redshiftFilter.setOnSelectionChanged(this::scheduleCatalogFilters);
+        cacheFilter.valueProperty().addListener((obs, oldValue, newValue) -> scheduleCatalogFilters());
+        for (TextField field : List.of(t90MinFilter, t90MaxFilter, redshiftMinFilter, redshiftMaxFilter)) {
+            field.textProperty().addListener((obs, oldValue, newValue) -> scheduleCatalogFilters());
+        }
         catalogList.getSelectionModel().selectedItemProperty().addListener((observable, oldValue, newValue) -> {
             if (newValue != null && newValue != selectedEntry) {
                 selectedEntry = newValue;
                 loadRequest.accept(newValue, false);
             }
         });
+    }
+
+    private void scheduleCatalogFilters() {
+        catalogFilterDebounce.stop();
+        catalogFilterDebounce.playFromStart();
+    }
+
+    private void selectCatalogSearchMatch(String grbName) {
+        catalogFilterDebounce.stop();
+        applyCatalogFilters();
+        CatalogEntry match = catalog.stream()
+                .filter(entry -> entry.grbName().equalsIgnoreCase(grbName))
+                .findFirst()
+                .orElse(null);
+        if (match == null || !filteredCatalog.contains(match)) return;
+        catalogList.getSelectionModel().select(match);
+        catalogList.scrollTo(match);
+    }
+
+    private void applyCatalogFilters() {
+        String rawQuery = catalogSearch.getText() == null
+                ? "" : catalogSearch.getText().trim().toLowerCase(Locale.ROOT);
+        String query = rawQuery.equals("grb") ? "" : rawQuery;
+        java.util.Set<String> durations = durationFilter.selectedValues();
+        java.util.Set<String> redshifts = redshiftFilter.selectedValues();
+        boolean durationAll = durationFilter.isAllSelected();
+        boolean redshiftAll = redshiftFilter.isAllSelected();
+        String cache = cacheFilter.getValue() == null ? "Tutti" : cacheFilter.getValue();
+        Double t90Min = optionalNumber(t90MinFilter);
+        Double t90Max = optionalNumber(t90MaxFilter);
+        Double zMin = optionalNumber(redshiftMinFilter);
+        Double zMax = optionalNumber(redshiftMaxFilter);
+
+        filteredCatalog.setPredicate(entry -> {
+            if (!query.isBlank()
+                    && !entry.grbName().toLowerCase(Locale.ROOT).contains(query)
+                    && !entry.triggerId().toLowerCase(Locale.ROOT).contains(query)) {
+                return false;
+            }
+            if (!cache.equals("Tutti")) {
+                boolean cached = cacheLookup.test(entry);
+                if (cache.equals("Solo in cache") && !cached) return false;
+                if (cache.equals("Da scaricare") && cached) return false;
+            }
+
+            SkyBurst burst = scientificMetadata.get(entry.grbName().toUpperCase(Locale.ROOT));
+            boolean hasNumericFilters = t90Min != null || t90Max != null || zMin != null || zMax != null;
+            if (burst == null) {
+                return durationAll && redshiftAll && !hasNumericFilters;
+            }
+            if (!durationAll) {
+                boolean durationMatches = (durations.contains("Short ≤ 2 s") && burst.isShort())
+                        || (durations.contains("Long > 2 s") && burst.isLong())
+                        || (durations.contains("T90 n.d.") && !burst.hasT90());
+                if (!durationMatches) return false;
+            }
+            if (!redshiftAll) {
+                boolean redshiftMatches = (redshifts.contains("Con z") && burst.redshift().available())
+                        || (redshifts.contains("Senza z") && !burst.redshift().available());
+                if (!redshiftMatches) return false;
+            }
+
+            Double t90 = burst.t90Sec();
+            if (t90Min != null && (t90 == null || t90 < t90Min)) return false;
+            if (t90Max != null && (t90 == null || t90 > t90Max)) return false;
+            Double z = burst.redshift().representativeValue();
+            if (zMin != null && (z == null || z < zMin)) return false;
+            return zMax == null || (z != null && z <= zMax);
+        });
+        I18n.setText(catalogCount, filteredCatalog.size() + " GRB visualizzati", filteredCatalog.size() + " GRBs shown");
+    }
+
+    private static TextField compactFilterField(String prompt) {
+        TextField field = new TextField();
+        field.setPromptText(prompt);
+        field.getStyleClass().addAll("search-field", "explorer-compact-field");
+        field.setPrefWidth(70);
+        field.setMaxWidth(Double.MAX_VALUE);
+        return field;
+    }
+
+    private static HBox filterRange(TextField minimum, TextField maximum) {
+        HBox box = new HBox(5, minimum, UiFactory.label("–", "filter-label"), maximum);
+        box.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(minimum, Priority.ALWAYS);
+        HBox.setHgrow(maximum, Priority.ALWAYS);
+        return box;
+    }
+
+    private void applyRangePreset(String preset, TextField minimum, TextField maximum,
+                                  HBox manualBox, boolean t90) {
+        String value = preset == null ? "Tutti" : preset;
+        boolean manual = "Manuale…".equals(value);
+        manualBox.setVisible(manual);
+        manualBox.setManaged(manual);
+        if (manual) return;
+        minimum.clear();
+        maximum.clear();
+        if (t90) {
+            switch (value) {
+                case "≤ 2 s" -> maximum.setText("2");
+                case "2–10 s" -> { minimum.setText("2"); maximum.setText("10"); }
+                case "10–50 s" -> { minimum.setText("10"); maximum.setText("50"); }
+                case "50–100 s" -> { minimum.setText("50"); maximum.setText("100"); }
+                case "> 100 s" -> minimum.setText("100");
+                default -> { }
+            }
+        } else {
+            switch (value) {
+                case "0–1" -> { minimum.setText("0"); maximum.setText("1"); }
+                case "1–2" -> { minimum.setText("1"); maximum.setText("2"); }
+                case "2–3" -> { minimum.setText("2"); maximum.setText("3"); }
+                case "3–4" -> { minimum.setText("3"); maximum.setText("4"); }
+                case "4–6" -> { minimum.setText("4"); maximum.setText("6"); }
+                case "> 6" -> minimum.setText("6");
+                default -> { }
+            }
+        }
+        scheduleCatalogFilters();
+    }
+
+    private static Double optionalNumber(TextField field) {
+        String text = field.getText();
+        if (text == null || text.isBlank()) return null;
+        try {
+            return Double.parseDouble(text.trim().replace(',', '.'));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private void showEmptyState() {
@@ -230,14 +503,17 @@ public final class ExplorerPage extends BorderPane {
     }
 
     private Node buildDashboard(GrbData data) {
-        VBox dashboard = new VBox(18);
+        VBox dashboard = new VBox(10);
         dashboard.getStyleClass().add("dashboard");
+        SkyBurst scientific = scientificMetadata.get(data.grbName().toUpperCase(Locale.ROOT));
+        String scientificLine = scientific == null ? ""
+                : " · " + scientific.durationClass() + " · " + scientific.redshift().displayValue();
 
         HBox eventHeader = new HBox(14);
         eventHeader.setAlignment(Pos.CENTER_LEFT);
         VBox identity = new VBox(4,
                 UiFactory.label(data.grbName(), "grb-title"),
-                UiFactory.label("Trigger " + data.triggerId() + " · in memoria nella sessione", "grb-subtitle"));
+                UiFactory.label("Trigger " + data.triggerId() + scientificLine + " · in memoria nella sessione", "grb-subtitle"));
         HBox.setHgrow(identity, Priority.ALWAYS);
         Label status = UiFactory.label(data.availability().statusText(), "status-pill",
                 data.availability().asciiAvailable() && data.availability().fitsAvailable() ? "status-online" : "status-warning");
@@ -247,25 +523,62 @@ public final class ExplorerPage extends BorderPane {
         source.setOnAction(event -> hostServices.showDocument(data.availability().dataProductUrl()));
         eventHeader.getChildren().addAll(identity, status, reload, source);
 
-        FlowPane metrics = new FlowPane(12, 12);
+        FlowPane metrics = new FlowPane(8, 8);
+        metrics.getStyleClass().add("explorer-metrics");
         metrics.getChildren().addAll(
                 metric(data, "PEAK_RATE", "Picco", "RATE massimo"),
                 metric(data, "PEAK_TIME", "Tempo del picco", "rispetto al trigger"),
                 metric(data, "PEAK_SNR", "Segnale / errore", "indicatore descrittivo"),
                 metric(data, "FULL_EXPOSURE_FRACTION", "Esposizione completa", "bin con FRACEXP ≈ 1"),
                 metric(data, "HARDNESS_PROXY", "Durezza", "proxy alte / basse energie"));
+        if (scientific != null) {
+            metrics.getChildren().addAll(
+                    compactMetricCard("T90", scientific.formattedT90(), scientific.durationClass()),
+                    compactMetricCard("Redshift", scientific.redshift().available()
+                            ? scientific.redshift().rawValue() : "n.d.", "z cosmologico · valore BAT"));
+        }
 
-        TabPane tabs = new TabPane();
+        TabPane tabs = new TabPane() {
+            @Override public javafx.geometry.Orientation getContentBias() {
+                return javafx.geometry.Orientation.HORIZONTAL;
+            }
+            @Override protected double computeMinHeight(double width) {
+                return overviewSelected() ? computePrefHeight(width) : 520;
+            }
+            @Override protected double computePrefHeight(double width) {
+                if (!overviewSelected()) return 610;
+                Node content = getSelectionModel().getSelectedItem().getContent();
+                Node header = lookup(".tab-header-area");
+                double headerHeight = header == null ? 65 : header.prefHeight(width);
+                return content.prefHeight(Math.max(1, width - snappedLeftInset() - snappedRightInset()))
+                        + headerHeight + snappedTopInset() + snappedBottomInset() + 4;
+            }
+            private boolean overviewSelected() {
+                Tab selected = getSelectionModel().getSelectedItem();
+                return selected != null && selected.getContent() instanceof ExplorerOverviewPane;
+            }
+        };
         tabs.getStyleClass().add("main-tabs");
         tabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
-        tabs.setMinHeight(590);
-        tabs.setPrefHeight(680);
+        tabs.setMaxHeight(Double.MAX_VALUE);
         tabs.getTabs().addAll(
                 tab("Curva 2D", buildOverview(data)),
                 tab("Vista 3D", buildThreeD(data)),
+                tab("Spettroscopia", new SpectroscopyPane(data,
+                        spectralCatalog.get(data.grbName().toUpperCase(Locale.ROOT)), hostServices)),
                 tab("Dati", buildDataWorkspace(data)),
                 tab("Metadati", buildMetadata(data)),
                 tab("Guida", buildUnderstand(data)));
+        tabs.getTabs().stream()
+                .filter(candidate -> candidate.getText().equals(preferredTab))
+                .findFirst()
+                .ifPresent(tabs.getSelectionModel()::select);
+        tabs.getSelectionModel().selectedItemProperty().addListener((observable, previous, selected) -> {
+            if (selected != null) {
+                preferredTab = selected.getText();
+                tabs.requestLayout();
+            }
+        });
         VBox.setVgrow(tabs, Priority.ALWAYS);
 
         dashboard.getChildren().addAll(eventHeader, metrics, tabs);
@@ -275,17 +588,28 @@ public final class ExplorerPage extends BorderPane {
         scroll.setFitToWidth(true);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scroll.setPannable(false);
+        scroll.viewportBoundsProperty().addListener((obs, oldBounds, bounds) ->
+                dashboard.setMinHeight(Math.max(0, bounds.getHeight())));
         return scroll;
     }
 
     private VBox metric(GrbData data, String key, String title, String detail) {
         SummaryItem item = data.summaryByKey().get(key);
         String value = DisplayFormat.summary(key, item);
-        VBox card = UiFactory.metricCard(title, value, detail);
+        VBox card = compactMetricCard(title, value, detail);
         if (item != null && item.value() != null && !item.value().isBlank()) {
             String complete = item.value() + (item.unit().isBlank() ? "" : " " + item.unit());
-            Tooltip.install(card, new Tooltip("Valore completo: " + complete));
+            Tooltip.install(card, UiFactory.quickTooltip(I18n.dynamic("Valore completo: " + complete, "Full value: " + complete)));
         }
+        return card;
+    }
+
+    private VBox compactMetricCard(String eyebrow, String value, String detail) {
+        VBox card = UiFactory.metricCard(eyebrow, value, detail);
+        card.getStyleClass().add("metric-card-compact");
+        card.setMinWidth(128);
+        card.setPrefWidth(146);
+        card.setMaxWidth(168);
         return card;
     }
 
@@ -295,11 +619,11 @@ public final class ExplorerPage extends BorderPane {
     }
 
     private Node buildOverview(GrbData data) {
-        BorderPane pane = new BorderPane();
-        pane.setPadding(new Insets(18));
-        VBox chartCard = new VBox(14);
-        chartCard.getStyleClass().add("card");
-        HBox controls = new HBox(11);
+        VBox chartCard = new VBox(9);
+        chartCard.getStyleClass().addAll("card", "overview-chart-card", "responsive-overview-chart");
+        chartCard.setMinWidth(0);
+        chartCard.setPadding(new Insets(12));
+        ResponsiveRow controls = new ResponsiveRow(9);
         controls.setAlignment(Pos.CENTER_LEFT);
 
         ChoiceBox<String> channelChoice = new ChoiceBox<>(FXCollections.observableArrayList(CHANNELS.keySet()));
@@ -312,14 +636,58 @@ public final class ExplorerPage extends BorderPane {
         ChoiceBox<String> windowChoice = new ChoiceBox<>(FXCollections.observableArrayList(WINDOWS.keySet()));
         windowChoice.getStyleClass().add("choice-box-modern");
         windowChoice.setValue("±60 s dal trigger");
+        UiFactory.autoTooltip(channelChoice);
+        UiFactory.autoTooltip(windowChoice);
         CheckBox smooth = new CheckBox("Media mobile 5 bin");
         smooth.getStyleClass().add("modern-check");
-        Label help = UiFactory.label("Il tratteggio verticale indica il trigger (t = 0).", "subtle-text");
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-        Button export = UiFactory.button("Esporta PNG", "ghost-button");
-        controls.getChildren().addAll(channelChoice, windowChoice, smooth, spacer, help, export);
+        UiFactory.autoTooltip(smooth);
+        Label help = UiFactory.label("t = 0 indica il trigger", "subtle-text");
+        controls.getChildren().addAll(channelChoice, windowChoice, smooth, help);
+        ResponsiveRow.basis(channelChoice, 205);
+        ResponsiveRow.basis(windowChoice, 195);
+        ResponsiveRow.basis(smooth, 165);
+        ResponsiveRow.basis(help, 140);
 
+        LineChart<Number, Number> chart = createLightCurveChart();
+        chart.setMinSize(0, 320);
+        chart.setPrefHeight(480);
+        chart.setMaxHeight(Double.MAX_VALUE);
+        VBox.setVgrow(chart, Priority.ALWAYS);
+
+        Runnable refresh = () -> populateChart(chart, data, channelChoice.getValue(), windowChoice.getValue(), smooth.isSelected());
+        channelChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refresh.run());
+        windowChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refresh.run());
+        smooth.selectedProperty().addListener((obs, oldValue, newValue) -> refresh.run());
+        refresh.run();
+
+        Button export = UiFactory.button("Esporta PNG", "ghost-button");
+        export.setOnAction(event -> exportNode(chart, data.grbName()
+                + I18n.dynamic("_curva_1s.png", "_1s_light_curve.png")));
+        Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
+        Button information = UiFactory.button("Nascondi informazioni", "ghost-button");
+        information.getStyleClass().add("overview-information-toggle");
+        fullscreen.setOnAction(event -> openOverviewFullscreen(
+                data, channelChoice.getValue(), windowChoice.getValue(), smooth.isSelected()));
+        chartCard.getChildren().addAll(controls, chart);
+        ResponsiveRow graphActions = new ResponsiveRow(8, export, information, fullscreen);
+        graphActions.setAlignment(Pos.CENTER_RIGHT);
+        VBox actionCard = new VBox(7,
+                UiFactory.label("Azioni grafico", "card-subtitle"), graphActions);
+        actionCard.getStyleClass().addAll("card", "overview-action-card");
+        actionCard.setPadding(new Insets(12));
+
+        VBox right = new VBox(10);
+        right.setPrefWidth(310);
+        right.getChildren().addAll(
+                actionCard,
+                summaryCard(data, "In breve", List.of("BIN_SIZE", "ENERGY_RANGE", "TIME_RANGE", "ASCII_ROWS", "FITS_ROWS")),
+                plainConceptCard("Trigger", "Il punto zero dell'allerta", "Tempi negativi: prima del trigger. Tempi positivi: dopo il trigger. Il trigger non coincide necessariamente con l'inizio fisico esatto del burst."));
+        ExplorerBandSelectionEnhancer.prepareOverviewControls(controls);
+        return new ExplorerOverviewPane(chartCard, controls, right, actionCard, graphActions,
+                export, information, fullscreen);
+    }
+
+    private LineChart<Number, Number> createLightCurveChart() {
         NumberAxis xAxis = new NumberAxis();
         NumberAxis yAxis = new NumberAxis();
         xAxis.setLabel("Tempo dal trigger (s)");
@@ -330,31 +698,25 @@ public final class ExplorerPage extends BorderPane {
         chart.setCreateSymbols(false);
         chart.setLegendVisible(true);
         chart.setTitle("Curva di luce a binning di 1 secondo");
-        VBox.setVgrow(chart, Priority.ALWAYS);
+        return chart;
+    }
 
-        Runnable refresh = () -> populateChart(chart, data, channelChoice.getValue(), windowChoice.getValue(), smooth.isSelected());
-        channelChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refresh.run());
-        windowChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refresh.run());
-        smooth.selectedProperty().addListener((obs, oldValue, newValue) -> refresh.run());
-        export.setOnAction(event -> exportNode(chart, data.grbName() + "_curva_1s.png"));
-        refresh.run();
-
-        chartCard.getChildren().addAll(controls, chart);
-        pane.setCenter(chartCard);
-
-        VBox right = new VBox(13);
-        right.setPrefWidth(330);
-        right.getChildren().addAll(
-                summaryCard(data, "In breve", List.of("BIN_SIZE", "ENERGY_RANGE", "TIME_RANGE", "ASCII_ROWS", "FITS_ROWS")),
-                plainConceptCard("Trigger", "Il punto zero dell'allerta", "Tempi negativi: prima del trigger. Tempi positivi: dopo il trigger. Il trigger non coincide necessariamente con l'inizio fisico esatto del burst."));
-        pane.setRight(right);
-        BorderPane.setMargin(right, new Insets(0, 0, 0, 16));
-        return pane;
+    private void openOverviewFullscreen(GrbData data, String channel, String window, boolean smooth) {
+        LineChart<Number, Number> enlarged = createLightCurveChart();
+        enlarged.setMinHeight(0);
+        enlarged.setMaxHeight(Double.MAX_VALUE);
+        enlarged.setPrefHeight(760);
+        populateChart(enlarged, data, channel, window, smooth);
+        VBox content = new VBox(8, enlarged);
+        content.setMinWidth(0);
+        content.setMaxWidth(Double.MAX_VALUE);
+        VBox.setVgrow(enlarged, Priority.ALWAYS);
+        InPlaceFullscreen.show(this, data.grbName() + " · Curva 2D", content);
     }
 
     private Node buildThreeD(GrbData data) {
         VBox box = new VBox(13);
-        box.setPadding(new Insets(18));
+        box.setPadding(new Insets(10, 12, 10, 12));
         if (data.asciiData().isEmpty()) {
             box.getChildren().add(UiFactory.card("Vista 3D non disponibile",
                     "Per costruire il paesaggio tempo–energia servono le quattro bande del file ASCII.", null));
@@ -373,48 +735,95 @@ public final class ExplorerPage extends BorderPane {
         pane.setPadding(new Insets(18));
 
         ChoiceBox<String> sourceChoice = new ChoiceBox<>();
-        if (!data.asciiData().isEmpty()) {
-            sourceChoice.getItems().add("ASCII — quattro bande");
-        }
-        if (!data.fitsData().isEmpty()) {
-            sourceChoice.getItems().add("FITS — un canale e qualità");
-        }
+        if (!data.asciiData().isEmpty()) sourceChoice.getItems().add("ASCII — quattro bande");
+        if (!data.fitsData().isEmpty()) sourceChoice.getItems().add("FITS — un canale e qualità");
         sourceChoice.getStyleClass().add("choice-box-modern");
-        if (!sourceChoice.getItems().isEmpty()) {
-            sourceChoice.setValue(sourceChoice.getItems().get(0));
-        }
+        sourceChoice.setMinWidth(190);
+        sourceChoice.setPrefWidth(215);
+        sourceChoice.setMaxWidth(250);
+        UiFactory.autoTooltip(sourceChoice);
+        if (!sourceChoice.getItems().isEmpty()) sourceChoice.setValue(sourceChoice.getItems().get(0));
 
         TextField filter = new TextField();
         filter.setPromptText("Filtra le righe per valore testuale…");
         filter.getStyleClass().add("search-field");
-        filter.setPrefWidth(300);
+        filter.setMinWidth(170);
+        filter.setPrefWidth(360);
+        filter.setMaxWidth(Double.MAX_VALUE);
 
-        ChoiceBox<String> fieldChoice = new ChoiceBox<>();
-        fieldChoice.getStyleClass().add("choice-box-modern");
-        fieldChoice.setPrefWidth(260);
+        Button exportAscii = UiFactory.button("ASCII → Excel", "ghost-button");
+        exportAscii.getStyleClass().add("excel-export-button");
+        exportAscii.setDisable(data.asciiData().isEmpty());
+        exportAscii.setOnAction(event -> exportExcel(data, true));
+        Button exportFits = UiFactory.button("FITS + metadati → Excel", "ghost-button");
+        exportFits.getStyleClass().add("excel-export-button");
+        exportFits.setDisable(data.fitsData().isEmpty());
+        exportFits.setOnAction(event -> exportExcel(data, false));
 
-        HBox toolbar = new HBox(10, sourceChoice, filter, UiFactory.spacer(), UiFactory.label("Spiega:", "toolbar-label"), fieldChoice);
+        HBox toolbar = new HBox(10, sourceChoice, filter, exportAscii, exportFits);
+        toolbar.getStyleClass().add("data-toolbar");
         toolbar.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(filter, Priority.ALWAYS);
         pane.setTop(toolbar);
-        BorderPane.setMargin(toolbar, new Insets(0, 0, 14, 0));
+        BorderPane.setMargin(toolbar, new Insets(0, 0, 12, 0));
 
         TableView<ObservableList<String>> table = new TableView<>();
         table.getStyleClass().add("data-table");
         table.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+        FlowPane hiddenColumns = TablePreferences.install(table, "explorer.data." + data.grbName());
+
+        ChoiceBox<String> fieldChoice = new ChoiceBox<>();
+        fieldChoice.getStyleClass().add("choice-box-modern");
+        fieldChoice.setMinWidth(220);
+        fieldChoice.setPrefWidth(300);
+        fieldChoice.setMaxWidth(Double.MAX_VALUE);
+        UiFactory.autoTooltip(fieldChoice);
 
         VBox explanation = new VBox(12);
         explanation.getStyleClass().add("field-explanation-panel");
-        explanation.setPadding(new Insets(18));
-        explanation.setPrefWidth(350);
+        explanation.setPadding(new Insets(16));
+        VBox side = new VBox(10,
+                UiFactory.label("Campo da spiegare", "filter-label"), fieldChoice, explanation);
+        side.setPadding(new Insets(4, 0, 4, 10));
+        side.setMinWidth(300);
+        side.setPrefWidth(365);
+        side.setMaxWidth(410);
+        ScrollPane explanationScroll = scrollableSide(side);
+        explanationScroll.setMinWidth(300);
+        explanationScroll.setPrefWidth(365);
+        explanationScroll.setMaxWidth(410);
+
+        ToggleButton explanationToggle = new ToggleButton(I18n.t("Mostra spiegazione"));
+        explanationToggle.getStyleClass().addAll("ghost-button", "help-toggle");
+        HBox tableTools = new HBox(8, hiddenColumns, UiFactory.spacer(), explanationToggle);
+        tableTools.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(hiddenColumns, Priority.ALWAYS);
+        VBox tableArea = new VBox(7, tableTools, table);
+        VBox.setVgrow(table, Priority.ALWAYS);
+        BorderPane content = new BorderPane(tableArea);
+        content.setMinWidth(0);
+
+        explanationToggle.selectedProperty().addListener((obs, oldValue, selected) -> {
+            explanationToggle.setText(I18n.t(selected ? "Nascondi spiegazione" : "Mostra spiegazione"));
+            if (selected) {
+                content.setRight(explanationScroll);
+                BorderPane.setMargin(explanationScroll, new Insets(0, 0, 0, 10));
+            } else {
+                content.setRight(null);
+            }
+        });
+        I18n.languageProperty().addListener((obs, oldValue, newValue) ->
+                explanationToggle.setText(I18n.t(explanationToggle.isSelected()
+                        ? "Nascondi spiegazione" : "Mostra spiegazione")));
 
         Runnable refresh = () -> {
             TabularData selected = sourceChoice.getValue() != null && sourceChoice.getValue().startsWith("FITS")
                     ? data.fitsData() : data.asciiData();
             populateTable(table, selected, data, filter.getText());
+            String previous = fieldChoice.getValue();
             fieldChoice.setItems(FXCollections.observableArrayList(selected.headers()));
-            if (!selected.headers().isEmpty()) {
-                fieldChoice.setValue(selected.headers().get(0));
-            }
+            if (previous != null && selected.headers().contains(previous)) fieldChoice.setValue(previous);
+            else if (!selected.headers().isEmpty()) fieldChoice.setValue(selected.headers().get(0));
         };
         sourceChoice.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, newValue) -> refresh.run());
         filter.textProperty().addListener((obs, oldValue, newValue) -> refresh.run());
@@ -422,11 +831,7 @@ public final class ExplorerPage extends BorderPane {
                 showFieldExplanation(explanation, data.definition(newValue), newValue));
         refresh.run();
 
-        ScrollPane explanationScroll = scrollableSide(explanation);
-        SplitPane split = new SplitPane(table, explanationScroll);
-        split.getStyleClass().add("clean-split");
-        split.setDividerPositions(0.72);
-        pane.setCenter(split);
+        pane.setCenter(content);
         return pane;
     }
 
@@ -437,11 +842,12 @@ public final class ExplorerPage extends BorderPane {
         search.setPromptText("Cerca keyword, valore, HDU o commento…");
         search.getStyleClass().add("search-field");
         pane.setTop(search);
-        BorderPane.setMargin(search, new Insets(0, 0, 13, 0));
+        BorderPane.setMargin(search, new Insets(0, 0, 12, 0));
 
         TableView<MetadataItem> table = new TableView<>();
         table.getStyleClass().add("data-table");
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        FlowPane hiddenColumns = TablePreferences.install(table, "explorer.metadata." + data.grbName());
         TableColumn<MetadataItem, String> hdu = metadataColumn("HDU", item -> item.hduName(), 95);
         hdu.setMinWidth(75);
         TableColumn<MetadataItem, String> keyword = metadataColumn("Keyword", item -> item.keyword(), 145);
@@ -450,7 +856,8 @@ public final class ExplorerPage extends BorderPane {
         value.setMinWidth(165);
         TableColumn<MetadataItem, String> comment = metadataColumn("Commento originale", item -> item.comment(), 440);
         comment.setMinWidth(240);
-        table.getColumns().addAll(hdu, keyword, value, comment);
+        table.getColumns().addAll(List.of(hdu, keyword, value, comment));
+
         FilteredList<MetadataItem> filtered = new FilteredList<>(FXCollections.observableArrayList(data.metadata()), ignored -> true);
         table.setItems(filtered);
         search.textProperty().addListener((obs, oldValue, newValue) -> {
@@ -460,24 +867,68 @@ public final class ExplorerPage extends BorderPane {
                     .toLowerCase(Locale.ROOT).contains(query));
         });
 
-        VBox side = new VBox(12);
-        side.setPrefWidth(380);
-        side.setMinWidth(320);
-        side.getStyleClass().add("field-explanation-panel");
-        side.setPadding(new Insets(18));
-        showMetadataIntro(side);
-        table.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, item) -> {
-            if (item != null) {
-                FieldDefinition definition = findMetadataDefinition(data, item.keyword());
-                showMetadataExplanation(side, item, definition);
-            }
-        });
+        ChoiceBox<String> metadataField = new ChoiceBox<>();
+        metadataField.getStyleClass().add("choice-box-modern");
+        metadataField.setItems(FXCollections.observableArrayList(
+                data.metadata().stream().map(MetadataItem::keyword).filter(valueText -> valueText != null && !valueText.isBlank())
+                        .distinct().toList()));
+        metadataField.setMinWidth(220);
+        metadataField.setPrefWidth(300);
+        metadataField.setMaxWidth(Double.MAX_VALUE);
+        UiFactory.autoTooltip(metadataField);
 
+        VBox explanation = new VBox(12);
+        explanation.setPadding(new Insets(16));
+        explanation.setStyle("-fx-background-color: transparent; -fx-border-color: transparent;");
+        showMetadataIntro(explanation);
+        VBox side = new VBox(10,
+                UiFactory.label("Campo metadata", "filter-label"), metadataField, explanation);
+        side.setPadding(new Insets(4, 0, 4, 10));
+        side.setMinWidth(300);
+        side.setPrefWidth(380);
+        side.setMaxWidth(420);
         ScrollPane sideScroll = scrollableSide(side);
-        SplitPane split = new SplitPane(table, sideScroll);
-        split.getStyleClass().add("clean-split");
-        split.setDividerPositions(0.70);
-        pane.setCenter(split);
+        sideScroll.setMinWidth(300);
+        sideScroll.setPrefWidth(380);
+        sideScroll.setMaxWidth(420);
+
+        table.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, item) -> {
+            if (item == null) return;
+            if (!item.keyword().equals(metadataField.getValue())) metadataField.setValue(item.keyword());
+            FieldDefinition definition = findMetadataDefinition(data, item.keyword());
+            showMetadataExplanation(explanation, item, definition);
+        });
+        metadataField.getSelectionModel().selectedItemProperty().addListener((obs, oldValue, selectedField) -> {
+            if (selectedField == null) return;
+            data.metadata().stream().filter(item -> selectedField.equals(item.keyword())).findFirst().ifPresent(item -> {
+                table.getSelectionModel().select(item);
+                table.scrollTo(item);
+                showMetadataExplanation(explanation, item, findMetadataDefinition(data, item.keyword()));
+            });
+        });
+        if (!metadataField.getItems().isEmpty()) metadataField.setValue(metadataField.getItems().get(0));
+
+        ToggleButton explanationToggle = new ToggleButton(I18n.t("Mostra spiegazione"));
+        explanationToggle.getStyleClass().addAll("ghost-button", "help-toggle");
+        HBox tableTools = new HBox(8, hiddenColumns, UiFactory.spacer(), explanationToggle);
+        tableTools.setAlignment(Pos.CENTER_LEFT);
+        HBox.setHgrow(hiddenColumns, Priority.ALWAYS);
+        VBox tableArea = new VBox(7, tableTools, table);
+        VBox.setVgrow(table, Priority.ALWAYS);
+        BorderPane content = new BorderPane(tableArea);
+        content.setMinWidth(0);
+        explanationToggle.selectedProperty().addListener((obs, oldValue, selected) -> {
+            explanationToggle.setText(I18n.t(selected ? "Nascondi spiegazione" : "Mostra spiegazione"));
+            if (selected) {
+                content.setRight(sideScroll);
+                BorderPane.setMargin(sideScroll, new Insets(0, 0, 0, 10));
+            } else content.setRight(null);
+        });
+        I18n.languageProperty().addListener((obs, oldValue, newValue) ->
+                explanationToggle.setText(I18n.t(explanationToggle.isSelected()
+                        ? "Nascondi spiegazione" : "Mostra spiegazione")));
+
+        pane.setCenter(content);
         return pane;
     }
 
@@ -657,6 +1108,7 @@ public final class ExplorerPage extends BorderPane {
                         return;
                     }
                     setText(value);
+                    TablePreferences.alignCell(this, value);
                     double numeric = parse(value);
                     if (header.contains("RATE") && Double.isFinite(numeric) && numeric < 0) {
                         getStyleClass().add("negative-cell");
@@ -705,6 +1157,7 @@ public final class ExplorerPage extends BorderPane {
                         "explanation-text"),
                 miniExplanation("HDU", "Un FITS può contenere più sezioni. PRIMARY è l'intestazione generale; RATE è la tabella della curva di luce."),
                 miniExplanation("Keyword", "È il nome breve del parametro, per esempio OBS_ID, TRIGTIME o TIMEDEL."),
+                miniExplanation("Valore", "È il contenuto associato alla keyword nella riga selezionata: può essere un numero, una data, un identificativo, una stringa o un valore logico."),
                 miniExplanation("Commento originale", "È la descrizione scritta dal software che ha prodotto il FITS."));
     }
 
@@ -756,6 +1209,7 @@ public final class ExplorerPage extends BorderPane {
                     setTooltip(null);
                 } else {
                     setText(value);
+                    TablePreferences.alignCell(this, value);
                     setTooltip(value.length() > 20 ? new Tooltip(value) : null);
                 }
             }
@@ -774,26 +1228,56 @@ public final class ExplorerPage extends BorderPane {
     }
 
     private void exportNode(Node node, String suggestedName) {
+        ExportSupport.exportPng(this, node, suggestedName);
+    }
+
+    private void exportExcel(GrbData data, boolean asciiOnly) {
         FileChooser chooser = new FileChooser();
-        chooser.setTitle("Esporta il grafico");
-        chooser.setInitialFileName(suggestedName);
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Immagine PNG", "*.png"));
+        chooser.setTitle(I18n.dynamic(
+                asciiOnly ? "Esporta ASCII in Excel" : "Esporta FITS e metadati in Excel",
+                asciiOnly ? "Export ASCII to Excel" : "Export FITS and metadata to Excel"));
+        chooser.setInitialFileName(data.grbName() + (asciiOnly ? "_ASCII_4CH_1S.xlsx" : "_FITS_METADATA.xlsx"));
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter(
+                I18n.dynamic("File Excel", "Excel file"), "*.xlsx"));
         File file = chooser.showSaveDialog(getScene().getWindow());
         if (file == null) {
             return;
         }
-        try {
-            WritableImage image = node.snapshot(new SnapshotParameters(), null);
-            ImageIO.write(SwingFXUtils.fromFXImage(image, null), "png", file);
-        } catch (IOException error) {
-            Alert alert = new Alert(Alert.AlertType.ERROR, "Esportazione non riuscita: " + error.getMessage());
-            alert.showAndWait();
+        if (!file.getName().toLowerCase(Locale.ROOT).endsWith(".xlsx")) {
+            file = new File(file.getParentFile(), file.getName() + ".xlsx");
         }
+        try {
+            if (asciiOnly) {
+                excelExportService.exportAscii(data, file.toPath());
+            } else {
+                excelExportService.exportFitsAndMetadata(data, file.toPath());
+            }
+            showExportAlert(Alert.AlertType.INFORMATION,
+                    I18n.dynamic("Esportazione completata", "Export completed"),
+                    I18n.dynamic("File creato correttamente:\n", "File created successfully:\n")
+                            + file.getAbsolutePath());
+        } catch (IOException error) {
+            showExportAlert(Alert.AlertType.ERROR,
+                    I18n.dynamic("Esportazione Excel non riuscita", "Excel export failed"),
+                    UiTranslations.t(error.getMessage()));
+        }
+    }
+
+    private void showExportAlert(Alert.AlertType type, String title, String message) {
+        Alert alert = new Alert(type);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message == null ? "" : message);
+        if (getScene() != null && getScene().getWindow() != null) {
+            alert.initOwner(getScene().getWindow());
+        }
+        alert.showAndWait();
     }
 
     private void setWorkspace(Node node) {
         workspace.getChildren().setAll(node);
         StackPane.setAlignment(node, Pos.CENTER);
+        Platform.runLater(() -> I18n.localizeTree(node));
     }
 
     private String readableError(Throwable error) {
@@ -866,10 +1350,15 @@ public final class ExplorerPage extends BorderPane {
             VBox copy = new VBox(2,
                     UiFactory.label(item.grbName(), "catalog-name"),
                     UiFactory.label("Trigger " + item.triggerId(), "catalog-trigger"));
+            SkyBurst burst = scientificMetadata.get(item.grbName().toUpperCase(Locale.ROOT));
+            if (burst != null) {
+                copy.getChildren().add(UiFactory.label(
+                        burst.formattedT90() + " · " + burst.redshift().displayValue(), "catalog-science"));
+            }
             HBox.setHgrow(copy, Priority.ALWAYS);
             row.getChildren().addAll(star, copy);
             if (cacheLookup.test(item)) {
-                Label cached = UiFactory.label("IN MEMORIA", "cache-badge");
+                Label cached = UiFactory.label("IN CACHE", "cache-badge");
                 row.getChildren().add(cached);
             }
             setGraphic(row);

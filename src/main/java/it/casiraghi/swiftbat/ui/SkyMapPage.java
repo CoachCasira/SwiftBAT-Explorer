@@ -5,6 +5,7 @@ import it.casiraghi.swiftbat.model.SkyBurst;
 import it.casiraghi.swiftbat.service.SkyCoordinates;
 import it.casiraghi.swiftbat.ui.components.CelestialSpherePane;
 import it.casiraghi.swiftbat.ui.components.MollweideSkyPane;
+import javafx.animation.PauseTransition;
 import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -23,6 +24,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.util.Duration;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -45,6 +47,8 @@ public final class SkyMapPage extends BorderPane {
     private List<SkyBurst> allBursts = List.of();
     private List<SkyBurst> visibleBursts = List.of();
     private SkyBurst selectedBurst;
+    private boolean sphereView;
+    private final PauseTransition filterDebounce = new PauseTransition(Duration.millis(140));
 
     private final MollweideSkyPane mollweide = new MollweideSkyPane();
     private final CelestialSpherePane sphere = new CelestialSpherePane();
@@ -57,11 +61,16 @@ public final class SkyMapPage extends BorderPane {
     private final Label noT90Metric = UiFactory.label("0", "sky-metric-value");
 
     private final TextField search = new TextField();
-    private final ComboBox<String> durationFilter = new ComboBox<>();
+    private final GrbSearchAssist searchAssist;
+    private final MultiSelectMenuButton durationFilter = new MultiSelectMenuButton(
+            FILTER_ALL, List.of(FILTER_SHORT, FILTER_LONG, FILTER_UNKNOWN));
+    private final ComboBox<String> redshiftFilter = new ComboBox<>();
     private final TextField raMin = compactField("0");
     private final TextField raMax = compactField("360");
     private final TextField decMin = compactField("-90");
     private final TextField decMax = compactField("90");
+    private final TextField zMin = compactField("0");
+    private final TextField zMax = compactField("10");
     private final CheckBox galacticPlane = new CheckBox("Piano galattico");
 
     private final Label selectedName = UiFactory.label("Nessun GRB selezionato", "sky-selected-title");
@@ -70,11 +79,15 @@ public final class SkyMapPage extends BorderPane {
     private final Label selectedDec = UiFactory.label("—", "info-value");
     private final Label selectedT90 = UiFactory.label("—", "info-value");
     private final Label selectedClass = UiFactory.wrappedLabel("—", "info-value");
-    private final Label selectedCatalog = UiFactory.wrappedLabel("Seleziona un punto sulla mappa.", "sky-detail-note");
+    private final Label selectedRedshift = UiFactory.wrappedLabel("—", "info-value");
     private final Button openButton = UiFactory.button("Apri curve di luce →", "primary-button");
 
     public SkyMapPage(Consumer<CatalogEntry> openGrb) {
         this.openGrb = openGrb == null ? entry -> { } : openGrb;
+        searchAssist = new GrbSearchAssist(
+                search,
+                () -> allBursts.stream().map(SkyBurst::grbName).toList(),
+                this::selectSkySearchMatch);
         getStyleClass().add("page-root");
         setCenter(buildPage());
         mollweide.setOnSelect(this::selectBurst);
@@ -108,62 +121,78 @@ public final class SkyMapPage extends BorderPane {
         setStatusStyle("status-warning");
     }
 
+    public void showWarning(String message) {
+        status.setText(message == null || message.isBlank() ? "Dati scientifici caricati parzialmente" : message);
+        setStatusStyle("status-warning");
+    }
+
     public void setSkyBursts(List<SkyBurst> bursts) {
         allBursts = bursts == null ? List.of() : List.copyOf(bursts);
+        searchAssist.refresh();
         status.setText(allBursts.size() + " GRB con coordinate BAT caricati");
         setStatusStyle("status-online");
         applyFilters();
     }
 
     private Node buildPage() {
-        VBox page = new VBox(18);
-        page.setPadding(new Insets(30, 34, 36, 34));
+        VBox page = new VBox(12);
+        page.setPadding(new Insets(20, 26, 24, 26));
         page.getStyleClass().add("page-content");
 
         HBox titleRow = new HBox(16);
         titleRow.setAlignment(Pos.CENTER_LEFT);
         VBox titleText = new VBox(5,
-                UiFactory.label("Mappa celeste", "page-title"),
-                UiFactory.wrappedLabel(
-                        "Esplora la distribuzione dei GRB nel cielo con Mollweide 2D e sfera 3D interattiva.",
-                        "page-subtitle"));
+                UiFactory.label("Mappa celeste", "page-title"));
         HBox.setHgrow(titleText, Priority.ALWAYS);
         titleRow.getChildren().addAll(titleText, status);
 
-        FlowPane metrics = new FlowPane(12, 12);
-        metrics.getChildren().addAll(
-                skyMetric("VISIBILI", shownMetric, "dopo i filtri"),
-                skyMetric("SHORT", shortMetric, "T90 ≤ 2 s"),
-                skyMetric("LONG", longMetric, "T90 > 2 s"),
-                skyMetric("SENZA T90", noT90Metric, "durata non disponibile"));
+        HBox metrics = new HBox(12);
+        metrics.getStyleClass().add("sky-metric-row");
+        VBox visibleMetric = skyMetric("VISIBILI", shownMetric, "dopo i filtri");
+        VBox shortMetricCard = skyMetric("SHORT", shortMetric, "T90 ≤ 2 s");
+        VBox longMetricCard = skyMetric("LONG", longMetric, "T90 > 2 s");
+        VBox unknownMetricCard = skyMetric("SENZA T90", noT90Metric, "durata non disponibile");
+        for (VBox metric : List.of(visibleMetric, shortMetricCard, longMetricCard, unknownMetricCard)) {
+            metric.setMinWidth(0);
+            metric.setMaxWidth(Double.MAX_VALUE);
+            HBox.setHgrow(metric, Priority.ALWAYS);
+        }
+        metrics.getChildren().addAll(visibleMetric, shortMetricCard, longMetricCard, unknownMetricCard);
 
         VBox filters = buildFilters();
         HBox viewSwitch = buildViewSwitch();
 
         HBox content = new HBox(16);
-        VBox mapCard = new VBox(12);
+        VBox mapCard = new VBox(8);
         mapCard.getStyleClass().add("card");
-        mapCard.setPadding(new Insets(15));
+        mapCard.setPadding(new Insets(12));
         Button resetView = UiFactory.button("Centra", "ghost-button");
         resetView.setOnAction(event -> {
             mollweide.resetView();
             sphere.resetView();
         });
-        HBox mapHead = new HBox(12,
+        Button exportPng = UiFactory.button("Esporta PNG", "ghost-button");
+        exportPng.setOnAction(event -> exportMapNode(
+                sphereView ? sphere : mollweide,
+                sphereView
+                        ? I18n.dynamic("mappa_celeste_sfera_3D.png", "sky_map_3D_sphere.png")
+                        : I18n.dynamic("mappa_celeste_mollweide_2D.png", "sky_map_2D_mollweide.png")));
+        Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
+        fullscreen.setOnAction(event -> openMapFullscreen());
+        HBox mapHead = new HBox(10,
                 UiFactory.label("Cielo", "card-title"),
-                UiFactory.spacer(),
                 resetView,
+                exportPng,
+                fullscreen,
+                UiFactory.spacer(),
                 viewSwitch);
         mapHead.setAlignment(Pos.CENTER_LEFT);
         mapHost.getChildren().setAll(mollweide);
-        mapHost.setMinHeight(500);
-        mapHost.setPrefHeight(650);
+        mapHost.setMinHeight(390);
+        mapHost.setPrefHeight(500);
         VBox.setVgrow(mapHost, Priority.ALWAYS);
         HBox.setHgrow(mapCard, Priority.ALWAYS);
-        mapCard.getChildren().addAll(mapHead, buildSkyLegend(), mapHost,
-                UiFactory.wrappedLabel(
-                        "Rotellina: zoom · trascina: sposta/ruota · doppio clic: centra. Viola = piano galattico.",
-                        "sky-map-caption"));
+        mapCard.getChildren().addAll(mapHead, buildSkyLegend(), mapHost);
 
         VBox details = buildDetailsPanel();
         details.setPrefWidth(330);
@@ -182,54 +211,93 @@ public final class SkyMapPage extends BorderPane {
     }
 
     private VBox buildFilters() {
-        VBox card = new VBox(10);
+        VBox card = new VBox(7);
         card.getStyleClass().add("card");
-        card.setPadding(new Insets(13, 15, 13, 15));
+        card.setPadding(new Insets(12, 14, 12, 14));
 
-        HBox firstRow = new HBox(9);
-        firstRow.setAlignment(Pos.CENTER_LEFT);
-        search.setPromptText("Cerca GRB…");
+        HBox row = new HBox(7);
+        row.setAlignment(Pos.CENTER_LEFT);
+
         search.getStyleClass().add("modern-text-field");
-        search.setPrefWidth(220);
+        search.setMinWidth(145);
+        search.setPrefWidth(190);
+        search.setMaxWidth(220);
+        StackPane searchNode = searchAssist.node();
+        searchNode.setMinWidth(145);
+        searchNode.setPrefWidth(190);
+        searchNode.setMaxWidth(220);
 
-        durationFilter.setItems(FXCollections.observableArrayList(
-                FILTER_ALL, FILTER_SHORT, FILTER_LONG, FILTER_UNKNOWN));
-        durationFilter.setValue(FILTER_ALL);
-        durationFilter.getStyleClass().add("choice-box-modern");
-        durationFilter.setPrefWidth(190);
+        durationFilter.setMinWidth(135);
+        durationFilter.setPrefWidth(145);
+
+        redshiftFilter.setItems(FXCollections.observableArrayList(
+                "Con e senza redshift", "Solo con redshift", "Solo senza redshift"));
+        redshiftFilter.setValue("Con e senza redshift");
+        redshiftFilter.getStyleClass().add("choice-box-modern");
+        redshiftFilter.setMinWidth(145);
+        redshiftFilter.setPrefWidth(155);
 
         galacticPlane.getStyleClass().add("modern-check");
-        ToggleButton advanced = new ToggleButton("RA / DEC");
-        advanced.getStyleClass().add("sky-toggle");
-        Button apply = UiFactory.button("Applica", "secondary-button");
+        Node redshiftControl = compactRedshiftRadios();
         Button reset = UiFactory.button("Reset", "ghost-button");
-        apply.setOnAction(event -> applyFilters());
         reset.setOnAction(event -> resetFilters());
-        search.setOnAction(event -> applyFilters());
-        durationFilter.setOnAction(event -> applyFilters());
-        firstRow.getChildren().addAll(search, durationFilter, galacticPlane,
-                UiFactory.spacer(), advanced, apply, reset);
-
-        HBox rangeRow = new HBox(9);
-        rangeRow.getStyleClass().add("advanced-filter-row");
-        rangeRow.setAlignment(Pos.CENTER_LEFT);
-        Label raLabel = UiFactory.label("RA", "filter-label");
-        Label decLabel = UiFactory.label("DEC", "filter-label");
-        Label help = UiFactory.wrappedLabel("Intervalli in gradi. RA può attraversare 0°.", "sky-filter-help");
-        HBox.setHgrow(help, Priority.ALWAYS);
-        rangeRow.getChildren().addAll(
-                raLabel, raMin, UiFactory.label("–", "filter-label"), raMax,
-                decLabel, decMin, UiFactory.label("–", "filter-label"), decMax,
-                help);
-        rangeRow.setVisible(false);
-        rangeRow.setManaged(false);
-        advanced.selectedProperty().addListener((obs, oldValue, selected) -> {
-            rangeRow.setVisible(selected);
-            rangeRow.setManaged(selected);
+        search.setOnAction(event -> {
+            filterDebounce.stop();
+            applyFilters();
         });
 
-        card.getChildren().addAll(firstRow, rangeRow);
+        HBox raRange = compactSkyRange("RA", raMin, raMax);
+        HBox decRange = compactSkyRange("DEC", decMin, decMax);
+        HBox zRange = compactSkyRange("z", zMin, zMax);
+        row.getChildren().addAll(searchNode, durationFilter, redshiftControl,
+                raRange, decRange, zRange, galacticPlane, reset);
+        card.getChildren().add(row);
         return card;
+    }
+
+    private Node compactRedshiftRadios() {
+        ToggleGroup group = new ToggleGroup();
+        HBox row = new HBox(4);
+        row.getStyleClass().add("compact-radio-group");
+        String[] values = {"Con e senza redshift", "Solo con redshift", "Solo senza redshift"};
+        String[] labels = {"Tutti", "Con z", "Senza z"};
+        for (int index = 0; index < values.length; index++) {
+            final String value = values[index];
+            final String label = labels[index];
+            javafx.scene.control.RadioButton radio = new javafx.scene.control.RadioButton(I18n.t(label));
+            radio.getStyleClass().add("compact-radio");
+            radio.setToggleGroup(group);
+            radio.setUserData(value);
+            radio.setSelected(value.equals(redshiftFilter.getValue()));
+            radio.setOnAction(event -> redshiftFilter.setValue(value));
+            I18n.languageProperty().addListener((obs, oldLanguage, newLanguage) -> radio.setText(I18n.t(label)));
+            row.getChildren().add(radio);
+        }
+        redshiftFilter.valueProperty().addListener((obs, oldValue, newValue) -> {
+            for (javafx.scene.control.Toggle toggle : group.getToggles()) {
+                if (java.util.Objects.equals(toggle.getUserData(), newValue)) {
+                    group.selectToggle(toggle);
+                    break;
+                }
+            }
+        });
+        return row;
+    }
+
+    private HBox compactSkyRange(String label, TextField minimum, TextField maximum) {
+        minimum.setMinWidth(42);
+        minimum.setPrefWidth(46);
+        minimum.setMaxWidth(52);
+        maximum.setMinWidth(42);
+        maximum.setPrefWidth(46);
+        maximum.setMaxWidth(52);
+        HBox box = new HBox(4,
+                UiFactory.label(label, "filter-label"),
+                minimum,
+                UiFactory.label("–", "filter-label"),
+                maximum);
+        box.setAlignment(Pos.CENTER_LEFT);
+        return box;
     }
 
 
@@ -265,9 +333,151 @@ public final class SkyMapPage extends BorderPane {
                 mollweideButton.setSelected(true);
                 return;
             }
-            mapHost.getChildren().setAll(newToggle == sphereButton ? sphere : mollweide);
+            boolean showSphere = newToggle == sphereButton;
+            sphereView = showSphere;
+            mapHost.getChildren().setAll(showSphere ? sphere : mollweide);
+            javafx.application.Platform.runLater(() -> {
+                if (showSphere) sphere.resetView(); else mollweide.resetView();
+            });
         });
         return new HBox(6, mollweideButton, sphereButton);
+    }
+
+    private void openMapFullscreen() {
+        if (getScene() == null) {
+            return;
+        }
+        FullscreenDetails details = createFullscreenDetails();
+        HBox layout = new HBox(14);
+        layout.setAlignment(Pos.CENTER_LEFT);
+        layout.setMinSize(0, 0);
+
+        if (sphereView) {
+            CelestialSpherePane enlarged = new CelestialSpherePane();
+            enlarged.setBursts(visibleBursts);
+            enlarged.setShowGalacticPlane(galacticPlane.isSelected());
+            enlarged.setOnSelect(burst -> {
+                enlarged.select(burst);
+                selectBurst(burst);
+                details.update().accept(burst);
+            });
+            if (selectedBurst != null) enlarged.select(selectedBurst);
+            enlarged.setMinSize(520, 420);
+            enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+            HBox.setHgrow(enlarged, Priority.ALWAYS);
+            details.export().setOnAction(event -> exportMapNode(enlarged,
+                    I18n.dynamic("mappa_celeste_sfera_3D.png", "sky_map_3D_sphere.png")));
+            layout.getChildren().addAll(enlarged, details.node());
+            InPlaceFullscreen.show(this, "Mappa celeste · Sfera 3D", layout);
+        } else {
+            MollweideSkyPane enlarged = new MollweideSkyPane();
+            enlarged.setBursts(visibleBursts);
+            enlarged.setShowGalacticPlane(galacticPlane.isSelected());
+            enlarged.setOnSelect(burst -> {
+                enlarged.select(burst);
+                selectBurst(burst);
+                details.update().accept(burst);
+            });
+            if (selectedBurst != null) enlarged.select(selectedBurst);
+            enlarged.setMinSize(520, 420);
+            enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
+            HBox.setHgrow(enlarged, Priority.ALWAYS);
+            details.export().setOnAction(event -> exportMapNode(enlarged,
+                    I18n.dynamic("mappa_celeste_mollweide_2D.png", "sky_map_2D_mollweide.png")));
+            layout.getChildren().addAll(enlarged, details.node());
+            InPlaceFullscreen.show(this, "Mappa celeste · Mollweide 2D", layout);
+        }
+    }
+
+    private FullscreenDetails createFullscreenDetails() {
+        Label name = UiFactory.label("Nessun GRB selezionato", "sky-selected-title");
+        Label trigger = UiFactory.label("—", "info-value");
+        Label ra = UiFactory.wrappedLabel("—", "info-value");
+        Label dec = UiFactory.wrappedLabel("—", "info-value");
+        Label t90 = UiFactory.label("—", "info-value");
+        Label clazz = UiFactory.wrappedLabel("—", "info-value");
+        Label redshift = UiFactory.wrappedLabel("—", "info-value");
+        Label catalogInfo = UiFactory.wrappedLabel("Seleziona un punto sulla mappa.", "sky-detail-note");
+        Button open = UiFactory.button("Apri curve di luce →", "primary-button");
+        open.setMaxWidth(Double.MAX_VALUE);
+        open.setDisable(true);
+        Button export = UiFactory.button("Esporta PNG", "ghost-button");
+        export.setMaxWidth(Double.MAX_VALUE);
+        final SkyBurst[] current = new SkyBurst[1];
+
+        VBox rows = new VBox(14,
+                detailRow("Trigger", trigger),
+                detailRow("RA (J2000)", ra),
+                detailRow("DEC (J2000)", dec),
+                detailRow("T90", t90),
+                detailRow("Classe descrittiva", clazz),
+                detailRow("Redshift", redshift));
+        Label note = UiFactory.wrappedLabel(
+                "Seleziona un GRB direttamente nella vista a schermo intero. RA e DEC descrivono la direzione sulla volta celeste; T90 riassume la durata dell'evento e il redshift, quando disponibile, fornisce l'informazione cosmologica. I dettagli rimangono visibili mentre esplori la mappa e puoi aprire subito le relative curve di luce.",
+                "sky-science-note", "sky-fullscreen-note");
+        VBox panel = new VBox(18,
+                UiFactory.label("GRB selezionato", "card-subtitle"),
+                name, rows, catalogInfo, open, export,
+                UiFactory.label("Come leggere la selezione", "card-title"), note);
+        panel.getStyleClass().addAll("card", "sky-fullscreen-details");
+        panel.setPadding(new Insets(22));
+        panel.setMinWidth(360);
+        panel.setPrefWidth(410);
+        panel.setMaxWidth(450);
+        panel.setMinHeight(0);
+        panel.setMaxHeight(Double.MAX_VALUE);
+
+        Consumer<SkyBurst> updater = burst -> {
+            current[0] = burst;
+            if (burst == null) {
+                name.setText("Nessun GRB selezionato");
+                trigger.setText("—");
+                ra.setText("—");
+                dec.setText("—");
+                t90.setText("—");
+                clazz.setText("—");
+                redshift.setText("—");
+                catalogInfo.setText("Seleziona un punto sulla mappa.");
+                open.setDisable(true);
+                return;
+            }
+            name.setText(burst.grbName());
+            trigger.setText(burst.triggerId().isBlank() ? "n.d." : burst.triggerId());
+            ra.setText(String.format(Locale.ITALY, "%.5f°", burst.raDeg())
+                    + "  ·  " + SkyCoordinates.raToHms(burst.raDeg()));
+            dec.setText(String.format(Locale.ITALY, "%+.5f°", burst.decDeg())
+                    + "  ·  " + SkyCoordinates.decToDms(burst.decDeg()));
+            t90.setText(burst.formattedT90());
+            clazz.setText(I18n.t(burst.durationClass()));
+            redshift.setText(localizedRedshift(burst));
+            CatalogEntry entry = baseCatalog.get(burst.grbName().toUpperCase(Locale.ROOT));
+            if (entry != null) {
+                catalogInfo.setText("Evento presente nel catalogo Swift/BAT: puoi aprire direttamente curve, FITS e metadati.");
+                open.setDisable(false);
+            } else {
+                catalogInfo.setText("Coordinate disponibili, ma l'evento non è presente nel catalogo BAT caricato dall'Explorer.");
+                open.setDisable(true);
+            }
+        };
+        open.setOnAction(event -> {
+            SkyBurst burst = current[0];
+            if (burst == null) return;
+            CatalogEntry entry = baseCatalog.get(burst.grbName().toUpperCase(Locale.ROOT));
+            if (entry != null) {
+                InPlaceFullscreen.close(open);
+                openGrb.accept(entry);
+            }
+        });
+        updater.accept(selectedBurst);
+        return new FullscreenDetails(panel, updater, export);
+    }
+
+    private void exportMapNode(Node node, String suggestedName) {
+        if (node == null || getScene() == null || node.getBoundsInLocal().getWidth() <= 1
+                || node.getBoundsInLocal().getHeight() <= 1) {
+            return;
+        }
+        ExportSupport.exportPng(this, node, suggestedName);
     }
 
     private VBox buildDetailsPanel() {
@@ -281,19 +491,30 @@ public final class SkyMapPage extends BorderPane {
                 detailRow("RA (J2000)", selectedRa),
                 detailRow("DEC (J2000)", selectedDec),
                 detailRow("T90", selectedT90),
-                detailRow("Classe descrittiva", selectedClass));
+                detailRow("Classe descrittiva", selectedClass),
+                detailRow("Redshift", selectedRedshift));
 
-        Label scientificNote = UiFactory.wrappedLabel(
-                "La soglia a 2 s è mostrata soltanto come riferimento descrittivo tradizionale. La mappa non assegna da sola una classificazione scientifica definitiva.",
-                "sky-science-note");
         openButton.setDisable(true);
         openButton.setMaxWidth(Double.MAX_VALUE);
 
         details.getChildren().addAll(
                 UiFactory.label("GRB selezionato", "card-subtitle"),
-                selectedName, rows, selectedCatalog, openButton,
-                UiFactory.label("Nota scientifica", "card-title"), scientificNote);
+                selectedName, rows, openButton);
         return details;
+    }
+
+    private String localizedRedshift(SkyBurst burst) {
+        if (burst == null || !burst.redshift().available()) {
+            return I18n.dynamic("Redshift non disponibile nella tabella BAT.", "Redshift unavailable in the BAT table.");
+        }
+        StringBuilder value = new StringBuilder("z = ").append(burst.redshift().rawValue());
+        if (!burst.redshift().method().isBlank() && !burst.redshift().method().equalsIgnoreCase("N/A")) {
+            value.append(I18n.dynamic(" · metodo ", " · method ")).append(burst.redshift().method());
+        }
+        if (burst.redshift().uncertain()) {
+            value.append(I18n.dynamic(" · valore indicato come incerto", " · value marked as uncertain"));
+        }
+        return value.toString();
     }
 
     private HBox detailRow(String key, Label value) {
@@ -312,16 +533,23 @@ public final class SkyMapPage extends BorderPane {
                 value,
                 UiFactory.label(detail, "sky-metric-detail"));
         box.getStyleClass().add("sky-metric-card");
-        box.setPrefWidth(190);
+        box.setPrefWidth(230);
         return box;
     }
 
     private void configureFilters() {
-        search.textProperty().addListener((obs, oldValue, newValue) -> {
-            if (newValue == null || newValue.length() < 2 || newValue.length() > oldValue.length()) {
-                applyFilters();
-            }
-        });
+        filterDebounce.setOnFinished(event -> applyFilters());
+        search.textProperty().addListener((obs, oldValue, newValue) -> scheduleFilterApply());
+        durationFilter.setOnSelectionChanged(this::scheduleFilterApply);
+        redshiftFilter.valueProperty().addListener((obs, oldValue, newValue) -> scheduleFilterApply());
+        for (TextField field : List.of(raMin, raMax, decMin, decMax, zMin, zMax)) {
+            field.textProperty().addListener((obs, oldValue, newValue) -> scheduleFilterApply());
+        }
+    }
+
+    private void scheduleFilterApply() {
+        filterDebounce.stop();
+        filterDebounce.playFromStart();
     }
 
     private void configureOpenButton() {
@@ -337,13 +565,17 @@ public final class SkyMapPage extends BorderPane {
     }
 
     private void resetFilters() {
-        search.clear();
-        durationFilter.setValue(FILTER_ALL);
+        searchAssist.reset();
+        durationFilter.selectAll();
+        redshiftFilter.setValue("Con e senza redshift");
         raMin.setText("0");
         raMax.setText("360");
         decMin.setText("-90");
         decMax.setText("90");
+        zMin.setText("0");
+        zMax.setText("10");
         galacticPlane.setSelected(true);
+        filterDebounce.stop();
         applyFilters();
     }
 
@@ -357,20 +589,43 @@ public final class SkyMapPage extends BorderPane {
             return;
         }
 
-        String query = search.getText() == null ? "" : search.getText().trim().toUpperCase(Locale.ROOT);
-        String duration = durationFilter.getValue() == null ? FILTER_ALL : durationFilter.getValue();
+        String rawQuery = search.getText() == null ? "" : search.getText().trim().toUpperCase(Locale.ROOT);
+        String query = rawQuery.equals("GRB") ? "" : rawQuery;
+        java.util.Set<String> durations = durationFilter.selectedValues();
+        boolean allDurations = durationFilter.isAllSelected();
+        String redshift = redshiftFilter.getValue() == null ? "Con e senza redshift" : redshiftFilter.getValue();
+        double minimumZ;
+        double maximumZ;
+        try {
+            minimumZ = parseField(zMin, 0.0, "Redshift minimo");
+            maximumZ = parseField(zMax, 10.0, "Redshift massimo");
+            if (minimumZ < 0.0 || minimumZ > maximumZ) {
+                throw new IllegalArgumentException("Controlla il range del redshift.");
+            }
+        } catch (IllegalArgumentException exception) {
+            status.setText(exception.getMessage());
+            setStatusStyle("status-warning");
+            return;
+        }
         List<SkyBurst> filtered = new ArrayList<>();
         for (SkyBurst burst : allBursts) {
             if (!query.isEmpty() && !burst.grbName().contains(query) && !burst.triggerId().contains(query)) {
                 continue;
             }
-            if (duration.equals(FILTER_SHORT) && !burst.isShort()) {
+            if (!allDurations) {
+                boolean matchesDuration = (durations.contains(FILTER_SHORT) && burst.isShort())
+                        || (durations.contains(FILTER_LONG) && burst.isLong())
+                        || (durations.contains(FILTER_UNKNOWN) && !burst.hasT90());
+                if (!matchesDuration) continue;
+            }
+            boolean hasRedshift = burst.redshift().available();
+            if (redshift.equals("Solo con redshift") && !hasRedshift) {
                 continue;
             }
-            if (duration.equals(FILTER_LONG) && !burst.isLong()) {
+            if (redshift.equals("Solo senza redshift") && hasRedshift) {
                 continue;
             }
-            if (duration.equals(FILTER_UNKNOWN) && burst.hasT90()) {
+            if (hasRedshift && !burst.redshift().matches(minimumZ, maximumZ)) {
                 continue;
             }
             if (!range.containsRa(burst.raDeg()) || burst.decDeg() < range.decMin() || burst.decDeg() > range.decMax()) {
@@ -392,6 +647,15 @@ public final class SkyMapPage extends BorderPane {
             status.setText(visibleBursts.size() + " / " + allBursts.size() + " GRB visualizzati");
             setStatusStyle("status-online");
         }
+    }
+
+    private void selectSkySearchMatch(String grbName) {
+        filterDebounce.stop();
+        applyFilters();
+        visibleBursts.stream()
+                .filter(burst -> burst.grbName().equalsIgnoreCase(grbName))
+                .findFirst()
+                .ifPresent(this::selectBurst);
     }
 
     private Range readRange() {
@@ -435,7 +699,7 @@ public final class SkyMapPage extends BorderPane {
             selectedDec.setText("—");
             selectedT90.setText("—");
             selectedClass.setText("—");
-            selectedCatalog.setText("Seleziona un punto sulla mappa.");
+            selectedRedshift.setText("—");
             openButton.setDisable(true);
             return;
         }
@@ -446,13 +710,12 @@ public final class SkyMapPage extends BorderPane {
         selectedDec.setText(String.format(Locale.ITALY, "%+.5f°", selectedBurst.decDeg())
                 + "  ·  " + SkyCoordinates.decToDms(selectedBurst.decDeg()));
         selectedT90.setText(selectedBurst.formattedT90());
-        selectedClass.setText(selectedBurst.durationClass());
+        selectedClass.setText(I18n.t(selectedBurst.durationClass()));
+        selectedRedshift.setText(localizedRedshift(selectedBurst));
         CatalogEntry entry = baseCatalog.get(selectedBurst.grbName().toUpperCase(Locale.ROOT));
         if (entry != null) {
-            selectedCatalog.setText("Questo evento è presente nel catalogo Swift/BAT usato dall'app: puoi aprire direttamente curve, FITS e metadati.");
             openButton.setDisable(false);
         } else {
-            selectedCatalog.setText("Coordinate disponibili nella tabella generale, ma questo evento non è presente nel catalogo BAT caricato dall'Explorer.");
             openButton.setDisable(true);
         }
     }
@@ -477,6 +740,9 @@ public final class SkyMapPage extends BorderPane {
         field.getStyleClass().add("sky-range-field");
         field.setPrefWidth(62);
         return field;
+    }
+
+    private record FullscreenDetails(VBox node, Consumer<SkyBurst> update, Button export) {
     }
 
     private record Range(double raMin, double raMax, double decMin, double decMax) {

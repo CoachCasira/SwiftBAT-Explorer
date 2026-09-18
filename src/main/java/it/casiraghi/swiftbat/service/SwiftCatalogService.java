@@ -15,7 +15,7 @@ import java.util.Locale;
 
 public final class SwiftCatalogService {
     public static final String CATALOG_URL = "https://swift.gsfc.nasa.gov/results/batgrbcat/";
-    private static final String USER_AGENT = "SwiftBAT-Explorer/1.2.0 (academic thesis application; JavaFX)";
+    private static final String USER_AGENT = "SwiftBAT-Explorer/1.3.0 (academic thesis application; JavaFX)";
 
     public List<CatalogEntry> fetchCatalog() throws IOException {
         Document document = Jsoup.connect(CATALOG_URL)

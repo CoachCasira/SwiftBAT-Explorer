@@ -25,7 +25,8 @@ public final class DisplayFormat {
         if (item.unit() == null || item.unit().isBlank()) {
             return value;
         }
-        return value + (item.unit().equals("%") ? "%" : " " + item.unit());
+        String unit = I18n.t(item.unit());
+        return value + (item.unit().equals("%") ? "%" : " " + unit);
     }
 
     public static String value(String key, String rawValue) {
