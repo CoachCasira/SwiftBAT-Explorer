@@ -3,16 +3,17 @@ param(
 )
 
 # Windows PowerShell 5.1, disponibile di serie in Windows 10 e 11.
-# Non usa Java e Maven di sistema; le dipendenze restano nel profilo dell'utente.
+# Non usa Java e Maven di sistema; runtime, librerie e log restano accanto all'app.
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$cacheRoot = Join-Path $env:LOCALAPPDATA 'SwiftBAT-Explorer\expert-runtime'
+$cacheRoot = Join-Path $scriptDir '.swiftbat-runtime'
 $jdkRoot = Join-Path $cacheRoot 'jdk-17'
 $mavenVersion = '3.9.16'
 $mavenHome = Join-Path $cacheRoot ("apache-maven-" + $mavenVersion)
 $m2Repo = Join-Path $cacheRoot 'm2-repository'
-$logDir = Join-Path $env:LOCALAPPDATA 'SwiftBAT-Explorer\Logs'
+$logDir = Join-Path $cacheRoot 'logs'
+$tmpRoot = Join-Path $cacheRoot 'tmp'
 $logFile = Join-Path $logDir 'expert-launcher.log'
 $transcribing = $false
 
@@ -32,7 +33,7 @@ function Get-Download {
 
 function Install-Jdk {
     Write-Host '[1/3] Scarico Eclipse Temurin JDK 17 per Windows x64...'
-    $tmp = Join-Path $env:TEMP ("swiftbat-jdk-" + [guid]::NewGuid().ToString('N'))
+    $tmp = Join-Path $tmpRoot ("swiftbat-jdk-" + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $tmp -Force | Out-Null
     try {
         $zip = Join-Path $tmp 'temurin17.zip'
@@ -60,7 +61,7 @@ function Install-Jdk {
 
 function Install-Maven {
     Write-Host ("[2/3] Scarico Apache Maven {0}..." -f $mavenVersion)
-    $tmp = Join-Path $env:TEMP ("swiftbat-maven-" + [guid]::NewGuid().ToString('N'))
+    $tmp = Join-Path $tmpRoot ("swiftbat-maven-" + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $tmp -Force | Out-Null
     try {
         $filename = "apache-maven-$mavenVersion-bin.zip"
@@ -120,7 +121,9 @@ try {
         throw 'Pacchetto incompleto: mancano pom.xml o src\main\java.'
     }
 
-    New-Item -ItemType Directory -Path $cacheRoot, $m2Repo, $logDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $cacheRoot, $m2Repo, $logDir, $tmpRoot -Force | Out-Null
+    $env:TEMP = $tmpRoot
+    $env:TMP = $tmpRoot
     Start-Transcript -Path $logFile -Append | Out-Null
     $transcribing = $true
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -129,7 +132,7 @@ try {
     Write-Host ' SwiftBAT Explorer 1.3.0 - ambiente Windows isolato'
     Write-Host '============================================================'
     Write-Host 'Non servono Java, Maven, GitHub o privilegi amministrativi.'
-    Write-Host ("Cache locale: {0}" -f $cacheRoot)
+    Write-Host ("Ambiente nella cartella applicazione: {0}" -f $cacheRoot)
     Write-Host ''
 
     $javaExe = Join-Path $jdkRoot 'bin\java.exe'
@@ -142,7 +145,7 @@ try {
             $needsJdk = $true
         }
     }
-    if ($needsJdk) { Install-Jdk } else { Write-Host '[1/3] Java 17 gia'' disponibile nella cache.' }
+    if ($needsJdk) { Install-Jdk } else { Write-Host '[1/3] Java 17 gia'' disponibile nella cartella dell'app.' }
 
     $env:JAVA_HOME = $jdkRoot
     $env:PATH = (Join-Path $jdkRoot 'bin') + ';' + $env:PATH
@@ -154,7 +157,7 @@ try {
     if (-not (Test-Path -LiteralPath $mavenCmd -PathType Leaf)) {
         Install-Maven
     } else {
-        Write-Host ("[2/3] Maven {0} gia' disponibile nella cache." -f $mavenVersion)
+        Write-Host ("[2/3] Maven {0} gia' disponibile nella cartella dell'app." -f $mavenVersion)
     }
     & $mavenCmd -version
     if ($LASTEXITCODE -ne 0) { throw 'Maven non si avvia.' }
