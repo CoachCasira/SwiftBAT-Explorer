@@ -27,7 +27,7 @@ done
 tmp_dir="$(mktemp -d "/tmp/swiftbat-windows-package.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT
 package_dir="$tmp_dir/SwiftBAT Explorer"
-app_dir="$app_dir/Applicazione"
+app_dir="$package_dir/Applicazione"
 mkdir -p "$app_dir" "$DIST_DIR"
 
 echo "Creo lo ZIP Windows per i relatori..."

@@ -28,7 +28,7 @@ tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/swiftbat-experts-package.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT
 
 package_dir="$tmp_dir/SwiftBAT Explorer"
-app_dir="$app_dir/Applicazione"
+app_dir="$package_dir/Applicazione"
 mkdir -p "$app_dir" "$DIST_DIR"
 
 echo "Creo il pacchetto per gli esperti..."
