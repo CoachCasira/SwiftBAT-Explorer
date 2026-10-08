@@ -145,7 +145,7 @@ try {
             $needsJdk = $true
         }
     }
-    if ($needsJdk) { Install-Jdk } else { Write-Host '[1/3] Java 17 gia'' disponibile nella cartella dell'app.' }
+    if ($needsJdk) { Install-Jdk } else { Write-Host '[1/3] Java 17 gia'' disponibile nella cartella applicativa.' }
 
     $env:JAVA_HOME = $jdkRoot
     $env:PATH = (Join-Path $jdkRoot 'bin') + ';' + $env:PATH
@@ -157,7 +157,7 @@ try {
     if (-not (Test-Path -LiteralPath $mavenCmd -PathType Leaf)) {
         Install-Maven
     } else {
-        Write-Host ("[2/3] Maven {0} gia' disponibile nella cartella dell'app." -f $mavenVersion)
+        Write-Host ("[2/3] Maven {0} gia' disponibile nella cartella applicativa." -f $mavenVersion)
     }
     & $mavenCmd -version
     if ($LASTEXITCODE -ne 0) { throw 'Maven non si avvia.' }
