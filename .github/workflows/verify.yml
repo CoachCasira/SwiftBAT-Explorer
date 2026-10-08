@@ -109,9 +109,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Scarica lo ZIP generato per Windows
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
-          name: SwiftBAT-Explorer-Relatori-Windows
+          name: SwiftBAT-Explorer-Relatori-Windows.zip
           path: packaged
 
       - name: Estrai e valida lo script PowerShell nel pacchetto
