@@ -24,5 +24,10 @@ jobs:
           java-version: "17"
           cache: maven
 
+      - name: Verifica sintassi launcher macOS esperti
+        run: |
+          bash -n AVVIA_ESPERTI_MAC.command
+          bash -n CREA_PACCHETTO_ESPERTI_MAC.command
+
       - name: Verifica Maven
         run: mvn --batch-mode --no-transfer-progress verify
