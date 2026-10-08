@@ -1,0 +1,84 @@
+name: One-time cleanup of verified legacy branches
+on:
+  push:
+    branches:
+      - feature/cross-platform-expert-bootstrap
+permissions:
+  contents: write
+jobs:
+  prune:
+    if: github.ref == 'refs/heads/feature/cross-platform-expert-bootstrap'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete only pre-verified legacy remote branches
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          branches=(
+            'feature/analysis-population-1.3.0-fix-temp'
+            'feature/analysis-population-1.3.0-hotfix-v3'
+            'feature/analysis-population-1.3.0-hotfix-v4'
+            'feature/analysis-population-1.3.0-hotfix-v5'
+            'feature/analysis-population-1.3.0-hotfix-v6'
+            'feature/analysis-population-1.3.0-hotfix-v7'
+            'feature/analysis-population-1.3.0-hotfix-v8'
+            'feature/analysis-population-1.3.0-hotfix-v9'
+            'feature/analysis-population-1.3.0-hotfix-v10'
+            'feature/analysis-population-1.3.0-temp2'
+            'feature/analysis-population-1.3.0-ui-hotfix'
+            'feature/analysis-population-1.3.0'
+            'feature/black-hole-ui-redesign'
+            'feature/mac-expert-bootstrap'
+          )
+          expected_heads=(
+            'a5b8a8fff32099dbf3382a9392a24c4ebe9fda2d'
+            'a5b8a8fff32099dbf3382a9392a24c4ebe9fda2d'
+            'a5b8a8fff32099dbf3382a9392a24c4ebe9fda2d'
+            'a5b8a8fff32099dbf3382a9392a24c4ebe9fda2d'
+            'a5b8a8fff32099dbf3382a9392a24c4ebe9fda2d'
+            'a5b8a8fff32099dbf3382a9392a24c4ebe9fda2d'
+            'a5b8a8fff32099dbf3382a9392a24c4ebe9fda2d'
+            'a5b8a8fff32099dbf3382a9392a24c4ebe9fda2d'
+            'a5b8a8fff32099dbf3382a9392a24c4ebe9fda2d'
+            'a5b8a8fff32099dbf3382a9392a24c4ebe9fda2d'
+            'a5b8a8fff32099dbf3382a9392a24c4ebe9fda2d'
+            '739aaafee2f37ea64cfacbac0d794952a3328d28'
+            'b4e361c6c93cd8c323635a008648c3dedc379ffc'
+            'dae538d2d1e04e524b3b14c6c7bd074efd4162de'
+          )
+          echo 'Preflight: validate that no branch has changed since the audit.'
+          for i in "${!branches[@]}"; do
+            branch="${branches[$i]}"
+            case "$branch" in
+              main|feature/cross-platform-expert-bootstrap) echo 'Protected branch was in the whitelist'; exit 1 ;;
+            esac
+            actual="$(gh api "repos/$GH_REPO/branches/$branch" --jq '.commit.sha' 2>/dev/null || true)"
+            if [[ -z "$actual" ]]; then
+              echo "Already absent: $branch"
+            elif [[ "$actual" != "${expected_heads[$i]}" ]]; then
+              echo "ABORT: unexpected commit on $branch: $actual"
+              exit 1
+            else
+              echo "Verified: $branch"
+            fi
+          done
+          echo 'Deleting whitelisted refs only.'
+          for i in "${!branches[@]}"; do
+            branch="${branches[$i]}"
+            actual="$(gh api "repos/$GH_REPO/branches/$branch" --jq '.commit.sha' 2>/dev/null || true)"
+            if [[ -z "$actual" ]]; then continue; fi
+            if [[ "$actual" != "${expected_heads[$i]}" ]]; then
+              echo "ABORT: $branch changed while cleaning"; exit 1
+            fi
+            gh api -X DELETE "repos/$GH_REPO/git/refs/heads/$branch"
+            echo "Deleted remote branch: $branch"
+          done
+          echo 'Remaining remote branches:'
+          gh api --paginate "repos/$GH_REPO/branches?per_page=100" --jq '.[].name' | sort
+          remaining="$(gh api --paginate "repos/$GH_REPO/branches?per_page=100" --jq '.[].name' | sort)"
+          expected="$(printf '%s\n' 'main' 'feature/cross-platform-expert-bootstrap' | sort)"
+          [[ "$remaining" == "$expected" ]] || { echo 'Unexpected remaining branches'; exit 1; }
+          echo 'Exactly the two required branches remain.'
