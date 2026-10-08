@@ -11,7 +11,7 @@ if [ "$(uname -s)" != "Darwin" ]; then
   echo "[ERRORE] Il pacchetto Windows viene preparato da macOS con ditto."
   exit 2
 fi
-for tool in ditto shasum awk; do
+for tool in ditto shasum awk rsync; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "[ERRORE] Manca il comando necessario: $tool"
     exit 3
@@ -30,8 +30,10 @@ package_dir="$tmp_dir/SwiftBAT Explorer"
 mkdir -p "$DIST_DIR"
 
 echo "Creo lo ZIP Windows per i relatori..."
-ditto --norsrc "$SCRIPT_DIR" "$package_dir"
-rm -rf "$package_dir/.git" "$package_dir/.github" "$package_dir/target" \
+rsync -a --exclude='/.git/' --exclude='/.github/' --exclude='/.swiftbat-runtime/' \
+  --exclude='/target/' --exclude='/dist/' --exclude='/.idea/' \
+  --exclude='/.vscode/' "$SCRIPT_DIR/" "$package_dir/"
+rm -rf "$package_dir/.git" "$package_dir/.github" "$package_dir/.swiftbat-runtime" "$package_dir/target" \
   "$package_dir/dist" "$package_dir/.idea" "$package_dir/.vscode"
 rm -f "$package_dir/.DS_Store" "$package_dir/AVVIA_APP.bat" \
   "$package_dir/AVVIA_APP_MAC.command" "$package_dir/AVVIA_ESPERTI_MAC.command" \
