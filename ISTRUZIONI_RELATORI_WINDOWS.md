@@ -7,12 +7,12 @@ Il launcher usa Windows PowerShell 5.1 incluso in Windows 10/11. **Non** richied
 ## Funzionamento
 
 1. Controlla che il pacchetto includa il codice applicativo e il file Maven pom.xml.
-2. Crea la cache isolata dell'utente: `%LOCALAPPDATA%\SwiftBAT-Explorer\expert-runtime`.
+2. Crea un ambiente isolato nella sottocartella `.swiftbat-runtime` della cartella `SwiftBAT Explorer` estratta dallo ZIP.
 3. Se non esiste, scarica il JDK 17 Temurin ufficiale per **Windows x64 Intel/AMD** e controlla che sia Java 17.
 4. Se non esiste, scarica Maven 3.9.16 dagli indirizzi Apache e verifica **SHA-512**.
-5. Scarica le dipendenze Maven/JavaFX nella stessa cache, compila e avvia SwiftBAT Explorer.
+5. Scarica le dipendenze Maven/JavaFX nella stessa cartella .swiftbat-runtime, compila e avvia SwiftBAT Explorer.
 
-Gli avvii successivi riutilizzano gli strumenti e le librerie scaricati. Una connessione Internet è indispensabile al primo avvio e per consultare i servizi online Swift/BAT.
+Gli avvii successivi riutilizzano gli strumenti e le librerie scaricati nella cartella estratta. Estrarre lo ZIP in una cartella su cui si abbiano permessi di scrittura. Una connessione Internet è indispensabile al primo avvio e per consultare i servizi online Swift/BAT.
 
 **Compatibilità dichiarata:** Windows 10 e 11 a 64 bit su processori Intel/AMD (x64). Windows ARM e Windows a 32 bit **non sono stati abilitati o verificati**; non è corretto affermare che il pacchetto funzioni su qualsiasi PC.
 
@@ -35,7 +35,7 @@ Non inviare i singoli launcher da soli: lo ZIP contiene il codice e i file neces
 
 ## Sicurezza e accessi
 
-L'ambiente Java/Maven è mantenuto nella cache dell'utente. Non viene eseguito `sudo`, non viene richiesto l'accesso a GitHub e non vengono modificati Java o variabili d'ambiente globali.
+L'ambiente Java/Maven, le dipendenze, i temporanei e i log sono mantenuti nella cartella `.swiftbat-runtime` accanto all'applicazione. Non viene eseguito `sudo`, non viene richiesto l'accesso a GitHub e non vengono modificati Java o variabili d'ambiente globali.
 
 `AVVIA_SWIFTBAT.bat` lancia il file PowerShell incluso nello ZIP con `-ExecutionPolicy Bypass`, limitatamente al **singolo processo di avvio**: le policy permanenti del sistema non vengono cambiate. Alcune postazioni aziendali/universitarie possono applicare policy più restrittive o blocchi antivirus; in tali casi contattare l'amministratore e non aggirare i controlli di sicurezza.
 
@@ -45,11 +45,11 @@ Il pacchetto non è firmato digitalmente: Windows può mostrare una richiesta di
 
 In caso di errore, il launcher mostra il messaggio e lascia aperta la finestra fino alla pressione di un tasto. Il log si trova qui:
 
-    %LOCALAPPDATA%\SwiftBAT-Explorer\Logs\expert-launcher.log
+    SwiftBAT Explorer\.swiftbat-runtime\logs\expert-launcher.log
 
-Per provare un primo avvio da zero, **chiudere prima l'applicazione**, poi spostare o cancellare soltanto questa directory di cache:
+Per provare un primo avvio da zero, **chiudere prima l'applicazione**, poi eliminare soltanto `SwiftBAT Explorer\.swiftbat-runtime` dalla cartella estratta.
 
-    %LOCALAPPDATA%\SwiftBAT-Explorer\expert-runtime
+Per rimuovere runtime, librerie e log dopo la prova, eliminare la cartella estratta. Windows o l’applicazione potrebbero comunque creare proprie cache o impostazioni esterne.
 
 ## Limiti e test
 
