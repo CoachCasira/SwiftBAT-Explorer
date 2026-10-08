@@ -4,6 +4,9 @@ on:
   pull_request:
     branches:
       - main
+  push:
+    branches:
+      - feature/cross-platform-expert-bootstrap
   workflow_dispatch:
 
 permissions:
@@ -28,6 +31,68 @@ jobs:
         run: |
           bash -n AVVIA_ESPERTI_MAC.command
           bash -n CREA_PACCHETTO_ESPERTI_MAC.command
+          bash -n CREA_PACCHETTO_RELATORI_WINDOWS_MAC.command
+          bash -n CREA_PACCHETTI_DISTRIBUZIONE_MAC.command
 
       - name: Verifica Maven
         run: mvn --batch-mode --no-transfer-progress verify
+
+  windows-bootstrap:
+    name: Bootstrap isolato e build Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Scarica il progetto
+        uses: actions/checkout@v4
+
+      - name: Controlla sintassi PowerShell
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path '.\AVVIA_ESPERTI_WINDOWS.ps1'),
+            [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List
+            exit 1
+          }
+
+      - name: Scarica Java e Maven con il launcher Windows
+        shell: powershell
+        run: |
+          & .\AVVIA_ESPERTI_WINDOWS.ps1 -PrepareOnly
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Verifica build Maven con le dipendenze locali
+        shell: powershell
+        run: |
+          $root = Join-Path $env:LOCALAPPDATA 'SwiftBAT-Explorer\expert-runtime'
+          $env:JAVA_HOME = Join-Path $root 'jdk-17'
+          $env:PATH = (Join-Path $env:JAVA_HOME 'bin') + ';' + $env:PATH
+          $mvn = Join-Path $root 'apache-maven-3.9.16\bin\mvn.cmd'
+          $repo = Join-Path $root 'm2-repository'
+          & $mvn '--batch-mode' "--no-transfer-progress" "-Dmaven.repo.local=$repo" 'verify'
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+  packaging-macos:
+    name: Crea entrambi gli ZIP da macOS
+    runs-on: macos-latest
+    steps:
+      - name: Scarica il progetto
+        uses: actions/checkout@v4
+
+      - name: Genera i pacchetti
+        run: bash CREA_PACCHETTI_DISTRIBUZIONE_MAC.command
+
+      - name: Verifica contenuto e checksum
+        run: |
+          set -e
+          test -s dist/SwiftBAT-Explorer-Esperti-macOS.zip
+          test -s dist/SwiftBAT-Explorer-Relatori-Windows.zip
+          (cd dist && shasum -a 256 -c SwiftBAT-Explorer-Esperti-macOS.sha256.txt)
+          (cd dist && shasum -a 256 -c SwiftBAT-Explorer-Relatori-Windows.sha256.txt)
+          unzip -Z -1 dist/SwiftBAT-Explorer-Esperti-macOS.zip | grep -F 'SwiftBAT Explorer/AVVIA_SWIFTBAT.command'
+          unzip -Z -1 dist/SwiftBAT-Explorer-Relatori-Windows.zip | grep -F 'SwiftBAT Explorer/AVVIA_SWIFTBAT.bat'
+          unzip -Z -1 dist/SwiftBAT-Explorer-Relatori-Windows.zip | grep -F 'SwiftBAT Explorer/AVVIA_ESPERTI_WINDOWS.ps1'

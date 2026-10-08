@@ -66,6 +66,8 @@ dist/SwiftBAT-Explorer-Esperti-macOS.sha256.txt
 
 Lo ZIP mantiene il bit eseguibile del launcher grazie a `ditto`.
 
+Per generare **con un unico doppio clic sia il pacchetto Mac sia quello Windows** per i relatori, utilizzare `CREA_PACCHETTI_DISTRIBUZIONE_MAC.command`; i due ZIP verranno creati nella stessa cartella `dist/`.
+
 ## Test consigliato prima dell'invio
 
 Estrarre lo ZIP in una cartella nuova e avviare `AVVIA_SWIFTBAT.command`.

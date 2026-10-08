@@ -35,7 +35,12 @@ ditto --norsrc "$SCRIPT_DIR" "$package_dir"
 
 rm -rf   "$package_dir/.git"   "$package_dir/.github"   "$package_dir/target"   "$package_dir/dist"   "$package_dir/.idea"   "$package_dir/.vscode"
 
-rm -f   "$package_dir/.DS_Store"   "$package_dir/AVVIA_APP_MAC.command"   "$package_dir/CREA_APP_MAC.command"   "$package_dir/CREA_PACCHETTO_ESPERTI_MAC.command"   "$package_dir/AVVIA_APP.bat"   "$package_dir/CREA_APP_WINDOWS.bat"
+rm -f   "$package_dir/.DS_Store"   "$package_dir/AVVIA_APP_MAC.command"   "$package_dir/CREA_APP_MAC.command"   "$package_dir/CREA_PACCHETTO_ESPERTI_MAC.command"   "$package_dir/AVVIA_APP.bat"   "$package_dir/CREA_APP_WINDOWS.bat" \
+  "$package_dir/AVVIA_ESPERTI_WINDOWS.bat" \
+  "$package_dir/AVVIA_ESPERTI_WINDOWS.ps1" \
+  "$package_dir/CREA_PACCHETTO_RELATORI_WINDOWS_MAC.command" \
+  "$package_dir/CREA_PACCHETTI_DISTRIBUZIONE_MAC.command" \
+  "$package_dir/ISTRUZIONI_RELATORI_WINDOWS.md"
 
 mv "$package_dir/AVVIA_ESPERTI_MAC.command" "$package_dir/AVVIA_SWIFTBAT.command"
 chmod 755 "$package_dir/AVVIA_SWIFTBAT.command"
