@@ -12,7 +12,7 @@ if [ "$(uname -s)" != "Darwin" ]; then
   exit 2
 fi
 
-for tool in ditto shasum; do
+for tool in ditto shasum rsync; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "[ERRORE] Comando macOS richiesto non trovato: $tool"
     exit 3
@@ -31,9 +31,11 @@ package_dir="$tmp_dir/SwiftBAT Explorer"
 mkdir -p "$DIST_DIR"
 
 echo "Creo il pacchetto per gli esperti..."
-ditto --norsrc "$SCRIPT_DIR" "$package_dir"
+rsync -a --exclude='/.git/' --exclude='/.github/' --exclude='/.swiftbat-runtime/' \
+  --exclude='/target/' --exclude='/dist/' --exclude='/.idea/' \
+  --exclude='/.vscode/' "$SCRIPT_DIR/" "$package_dir/"
 
-rm -rf   "$package_dir/.git"   "$package_dir/.github"   "$package_dir/target"   "$package_dir/dist"   "$package_dir/.idea"   "$package_dir/.vscode"
+rm -rf   "$package_dir/.git"   "$package_dir/.github"   "$package_dir/.swiftbat-runtime"   "$package_dir/target"   "$package_dir/dist"   "$package_dir/.idea"   "$package_dir/.vscode"
 
 rm -f   "$package_dir/.DS_Store"   "$package_dir/AVVIA_APP_MAC.command"   "$package_dir/CREA_APP_MAC.command"   "$package_dir/CREA_PACCHETTO_ESPERTI_MAC.command"   "$package_dir/AVVIA_APP.bat"   "$package_dir/CREA_APP_WINDOWS.bat" \
   "$package_dir/AVVIA_ESPERTI_WINDOWS.bat" \
