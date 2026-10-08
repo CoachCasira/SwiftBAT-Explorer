@@ -68,11 +68,12 @@ jobs:
       - name: Verifica build Maven con le dipendenze locali
         shell: powershell
         run: |
-          $root = Join-Path $env:LOCALAPPDATA 'SwiftBAT-Explorer\expert-runtime'
+          $root = Join-Path (Get-Location).Path '.swiftbat-runtime'
           $env:JAVA_HOME = Join-Path $root 'jdk-17'
           $env:PATH = (Join-Path $env:JAVA_HOME 'bin') + ';' + $env:PATH
           $mvn = Join-Path $root 'apache-maven-3.9.16\bin\mvn.cmd'
           $repo = Join-Path $root 'm2-repository'
+          if (-not (Test-Path -LiteralPath (Join-Path $root 'logs\expert-launcher.log'))) { throw 'Log Windows non locale' }
           & $mvn '--batch-mode' "--no-transfer-progress" "-Dmaven.repo.local=$repo" 'verify'
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
@@ -82,6 +83,13 @@ jobs:
     steps:
       - name: Scarica il progetto
         uses: actions/checkout@v4
+
+      - name: Verifica bootstrap portabile macOS senza avviare JavaFX
+        run: |
+          SWIFTBAT_PREPARE_ONLY=1 bash AVVIA_ESPERTI_MAC.command
+          test -x .swiftbat-runtime/jdk-17/bin/java
+          test -x .swiftbat-runtime/apache-maven-3.9.16/bin/mvn
+          test -s .swiftbat-runtime/logs/expert-launcher.log
 
       - name: Genera i pacchetti
         run: bash CREA_PACCHETTI_DISTRIBUZIONE_MAC.command
@@ -96,6 +104,8 @@ jobs:
           unzip -Z -1 dist/SwiftBAT-Explorer-Esperti-macOS.zip | grep -F 'SwiftBAT Explorer/AVVIA_SWIFTBAT.command'
           unzip -Z -1 dist/SwiftBAT-Explorer-Relatori-Windows.zip | grep -F 'SwiftBAT Explorer/AVVIA_SWIFTBAT.bat'
           unzip -Z -1 dist/SwiftBAT-Explorer-Relatori-Windows.zip | grep -F 'SwiftBAT Explorer/AVVIA_ESPERTI_WINDOWS.ps1'
+          if unzip -Z -1 dist/SwiftBAT-Explorer-Esperti-macOS.zip | grep -F '.swiftbat-runtime/'; then exit 1; fi
+          if unzip -Z -1 dist/SwiftBAT-Explorer-Relatori-Windows.zip | grep -F '.swiftbat-runtime/'; then exit 1; fi
 
       - name: Pubblica il pacchetto Windows per i relatori
         uses: actions/upload-artifact@v7
