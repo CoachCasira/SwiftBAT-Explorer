@@ -112,7 +112,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: SwiftBAT-Explorer-Relatori-Windows.zip
-          path: packaged/SwiftBAT-Explorer-Relatori-Windows.zip
+          path: packaged
           skip-decompress: true
 
       - name: Estrai e valida lo script PowerShell nel pacchetto
