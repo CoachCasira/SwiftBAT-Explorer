@@ -4,10 +4,14 @@ Il relatore riceve il file **SwiftBAT-Explorer-Relatori-Windows.zip**, lo estrae
 
 Il launcher usa Windows PowerShell 5.1 incluso in Windows 10/11. **Non** richiede l'installazione preventiva di Java, Maven, GitHub, Python, Visual Studio o privilegi amministrativi.
 
+## Struttura semplificata dello ZIP
+
+Nella cartella estratta `SwiftBAT Explorer` si vedono soltanto `AVVIA_SWIFTBAT.bat` e la cartella `Applicazione`. Tutti gli altri file, compreso il launcher PowerShell e l'ambiente creato al primo avvio, sono nella cartella `Applicazione`; non occorre aprirla.
+
 ## Funzionamento
 
 1. Controlla che il pacchetto includa il codice applicativo e il file Maven pom.xml.
-2. Crea un ambiente isolato nella sottocartella `.swiftbat-runtime` della cartella `SwiftBAT Explorer` estratta dallo ZIP.
+2. Crea un ambiente isolato nella sottocartella `.swiftbat-runtime` della cartella `Applicazione` interna alla cartella `SwiftBAT Explorer` estratta dallo ZIP.
 3. Se non esiste, scarica il JDK 17 Temurin ufficiale per **Windows x64 Intel/AMD** e controlla che sia Java 17.
 4. Se non esiste, scarica Maven 3.9.16 dagli indirizzi Apache e verifica **SHA-512**.
 5. Scarica le dipendenze Maven/JavaFX nella stessa cartella .swiftbat-runtime, compila e avvia SwiftBAT Explorer.
@@ -45,9 +49,9 @@ Il pacchetto non è firmato digitalmente: Windows può mostrare una richiesta di
 
 In caso di errore, il launcher mostra il messaggio e lascia aperta la finestra fino alla pressione di un tasto. Il log si trova qui:
 
-    SwiftBAT Explorer\.swiftbat-runtime\logs\expert-launcher.log
+    SwiftBAT Explorer\Applicazione\.swiftbat-runtime\logs\expert-launcher.log
 
-Per provare un primo avvio da zero, **chiudere prima l'applicazione**, poi eliminare soltanto `SwiftBAT Explorer\.swiftbat-runtime` dalla cartella estratta.
+Per provare un primo avvio da zero, **chiudere prima l'applicazione**, poi eliminare soltanto `SwiftBAT Explorer\Applicazione\.swiftbat-runtime` dalla cartella estratta.
 
 Per rimuovere runtime, librerie e log dopo la prova, eliminare la cartella estratta. Windows o l’applicazione potrebbero comunque creare proprie cache o impostazioni esterne.
 

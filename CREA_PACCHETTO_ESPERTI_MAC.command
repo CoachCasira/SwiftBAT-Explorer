@@ -28,28 +28,41 @@ tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/swiftbat-experts-package.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT
 
 package_dir="$tmp_dir/SwiftBAT Explorer"
-mkdir -p "$DIST_DIR"
+app_dir="$app_dir/Applicazione"
+mkdir -p "$app_dir" "$DIST_DIR"
 
 echo "Creo il pacchetto per gli esperti..."
 rsync -a --exclude='/.git/' --exclude='/.github/' --exclude='/.swiftbat-runtime/' \
   --exclude='/target/' --exclude='/dist/' --exclude='/.idea/' \
-  --exclude='/.vscode/' "$SCRIPT_DIR/" "$package_dir/"
+  --exclude='/.vscode/' --exclude='.DS_Store' "$SCRIPT_DIR/" "$app_dir/"
 
-rm -rf   "$package_dir/.git"   "$package_dir/.github"   "$package_dir/.swiftbat-runtime"   "$package_dir/target"   "$package_dir/dist"   "$package_dir/.idea"   "$package_dir/.vscode"
+rm -rf   "$app_dir/.git"   "$app_dir/.github"   "$app_dir/.swiftbat-runtime"   "$app_dir/target"   "$app_dir/dist"   "$app_dir/.idea"   "$app_dir/.vscode"
 
-rm -f   "$package_dir/.DS_Store"   "$package_dir/AVVIA_APP_MAC.command"   "$package_dir/CREA_APP_MAC.command"   "$package_dir/CREA_PACCHETTO_ESPERTI_MAC.command"   "$package_dir/AVVIA_APP.bat"   "$package_dir/CREA_APP_WINDOWS.bat" \
-  "$package_dir/AVVIA_ESPERTI_WINDOWS.bat" \
-  "$package_dir/AVVIA_ESPERTI_WINDOWS.ps1" \
-  "$package_dir/CREA_PACCHETTO_RELATORI_WINDOWS_MAC.command" \
-  "$package_dir/CREA_PACCHETTI_DISTRIBUZIONE_MAC.command" \
-  "$package_dir/ISTRUZIONI_RELATORI_WINDOWS.md"
+rm -f   "$app_dir/.DS_Store"   "$app_dir/AVVIA_APP_MAC.command"   "$app_dir/CREA_APP_MAC.command"   "$app_dir/CREA_PACCHETTO_ESPERTI_MAC.command"   "$app_dir/AVVIA_APP.bat"   "$app_dir/CREA_APP_WINDOWS.bat" \
+  "$app_dir/AVVIA_ESPERTI_WINDOWS.bat" \
+  "$app_dir/AVVIA_ESPERTI_WINDOWS.ps1" \
+  "$app_dir/CREA_PACCHETTO_RELATORI_WINDOWS_MAC.command" \
+  "$app_dir/CREA_PACCHETTI_DISTRIBUZIONE_MAC.command" \
+  "$app_dir/ISTRUZIONI_RELATORI_WINDOWS.md"
 
-mv "$package_dir/AVVIA_ESPERTI_MAC.command" "$package_dir/AVVIA_SWIFTBAT.command"
+chmod 755 "$app_dir/AVVIA_ESPERTI_MAC.command"
+cat > "$package_dir/AVVIA_SWIFTBAT.command" <<'LAUNCHER'
+#!/bin/bash
+set -euo pipefail
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+INTERNAL="$ROOT_DIR/Applicazione/AVVIA_ESPERTI_MAC.command"
+if [ ! -f "$INTERNAL" ]; then
+  echo "[ERRORE] Manca Applicazione/AVVIA_ESPERTI_MAC.command."
+  read -r -p "Premi INVIO per chiudere..." _unused || true
+  exit 1
+fi
+exec /bin/bash "$INTERNAL" "$@"
+LAUNCHER
 chmod 755 "$package_dir/AVVIA_SWIFTBAT.command"
-[ -f "$package_dir/mvnw" ] && chmod 755 "$package_dir/mvnw" || true
+[ -f "$app_dir/mvnw" ] && chmod 755 "$app_dir/mvnw" || true
 
 rm -f "$ZIP_FILE" "$SHA_FILE"
-ditto -c -k --sequesterRsrc --keepParent "$package_dir" "$ZIP_FILE"
+ditto -c -k --norsrc --keepParent "$package_dir" "$ZIP_FILE"
 (
   cd "$DIST_DIR"
   shasum -a 256 "${PACKAGE_NAME}.zip" > "${PACKAGE_NAME}.sha256.txt"

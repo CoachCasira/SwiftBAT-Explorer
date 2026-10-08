@@ -2,6 +2,10 @@
 
 Questa variante serve a distribuire SwiftBAT Explorer 1.3.0 a un esperto che usa macOS senza assumere che Java, JDK o Maven siano già installati.
 
+## Struttura semplificata dello ZIP
+
+Nella cartella estratta `SwiftBAT Explorer` si vedono soltanto `AVVIA_SWIFTBAT.command` e la cartella `Applicazione`. Tutti gli altri file (codice, Maven, documentazione e il runtime creato al primo avvio) rimangono in `Applicazione`; non occorre aprirla.
+
 ## Obiettivo
 
 L'esperto deve:
@@ -13,7 +17,7 @@ L'esperto deve:
 Il launcher non usa né modifica Java/Maven installati nel sistema. Crea invece un ambiente isolato nella stessa cartella del programma estratto:
 
 ```text
-SwiftBAT Explorer/.swiftbat-runtime/
+SwiftBAT Explorer/Applicazione/.swiftbat-runtime/
 ```
 
 Qui vengono salvati JDK, Maven, dipendenze, file temporanei e log. Non sono necessarie installazioni globali. Estrarre lo ZIP in una cartella su cui si abbiano permessi di scrittura.
@@ -76,7 +80,7 @@ Estrarre lo ZIP in una cartella nuova e avviare `AVVIA_SWIFTBAT.command`.
 
 Il launcher è deliberatamente indipendente dal Java installato sul Mac di sviluppo: anche se il computer possiede già Java 17, 21 o 26, viene usato il JDK 17 scaricato nella cartella .swiftbat-runtime.
 
-Per simulare un primo avvio pulito, chiudere l’app, eliminare soltanto `SwiftBAT Explorer/.swiftbat-runtime/` dalla cartella estratta e riaprire il launcher. Per rimuovere il runtime dopo la prova, basta eliminare la cartella estratta (inclusi i log locali).
+Per simulare un primo avvio pulito, chiudere l’app, eliminare soltanto `SwiftBAT Explorer/Applicazione/.swiftbat-runtime/` dalla cartella estratta e riaprire il launcher. Per rimuovere il runtime dopo la prova, basta eliminare la cartella estratta (inclusi i log locali).
 
 ## Sicurezza e isolamento
 
@@ -101,7 +105,7 @@ Il pacchetto non è notarizzato con un certificato Apple commerciale. Se macOS i
 Il launcher salva un log persistente in:
 
 ```text
-SwiftBAT Explorer/.swiftbat-runtime/logs/expert-launcher.log
+SwiftBAT Explorer/Applicazione/.swiftbat-runtime/logs/expert-launcher.log
 ```
 
 In caso di errore è sufficiente inviare quel file per capire in quale fase si è fermato il bootstrap.

@@ -17,7 +17,7 @@ for tool in ditto shasum awk rsync; do
     exit 3
   fi
 done
-for path in "AVVIA_ESPERTI_WINDOWS.bat" "AVVIA_ESPERTI_WINDOWS.ps1" "pom.xml" "src/main/java"; do
+for path in "AVVIA_ESPERTI_WINDOWS.ps1" "pom.xml" "src/main/java"; do
   if [ ! -e "$SCRIPT_DIR/$path" ]; then
     echo "[ERRORE] Pacchetto incompleto: manca $path"
     exit 4
@@ -27,27 +27,50 @@ done
 tmp_dir="$(mktemp -d "/tmp/swiftbat-windows-package.XXXXXX")"
 trap 'rm -rf "$tmp_dir"' EXIT
 package_dir="$tmp_dir/SwiftBAT Explorer"
-mkdir -p "$DIST_DIR"
+app_dir="$app_dir/Applicazione"
+mkdir -p "$app_dir" "$DIST_DIR"
 
 echo "Creo lo ZIP Windows per i relatori..."
 rsync -a --exclude='/.git/' --exclude='/.github/' --exclude='/.swiftbat-runtime/' \
   --exclude='/target/' --exclude='/dist/' --exclude='/.idea/' \
-  --exclude='/.vscode/' "$SCRIPT_DIR/" "$package_dir/"
-rm -rf "$package_dir/.git" "$package_dir/.github" "$package_dir/.swiftbat-runtime" "$package_dir/target" \
-  "$package_dir/dist" "$package_dir/.idea" "$package_dir/.vscode"
-rm -f "$package_dir/.DS_Store" "$package_dir/AVVIA_APP.bat" \
-  "$package_dir/AVVIA_APP_MAC.command" "$package_dir/AVVIA_ESPERTI_MAC.command" \
-  "$package_dir/CREA_APP_MAC.command" "$package_dir/CREA_PACCHETTO_ESPERTI_MAC.command" \
-  "$package_dir/CREA_PACCHETTO_RELATORI_WINDOWS_MAC.command" \
-  "$package_dir/CREA_PACCHETTI_DISTRIBUZIONE_MAC.command" \
-  "$package_dir/ISTRUZIONI_ESPERTI_MAC.md" \
-  "$package_dir/BUILD_ESEGUIBILI.md"
+  --exclude='/.vscode/' --exclude='.DS_Store' "$SCRIPT_DIR/" "$app_dir/"
+rm -rf "$app_dir/.git" "$app_dir/.github" "$app_dir/.swiftbat-runtime" "$app_dir/target" \
+  "$app_dir/dist" "$app_dir/.idea" "$app_dir/.vscode"
+rm -f "$app_dir/.DS_Store" "$app_dir/AVVIA_APP.bat" \
+  "$app_dir/AVVIA_APP_MAC.command" "$app_dir/AVVIA_ESPERTI_MAC.command" "$app_dir/AVVIA_ESPERTI_WINDOWS.bat" \
+  "$app_dir/CREA_APP_MAC.command" "$app_dir/CREA_PACCHETTO_ESPERTI_MAC.command" \
+  "$app_dir/CREA_PACCHETTO_RELATORI_WINDOWS_MAC.command" \
+  "$app_dir/CREA_PACCHETTI_DISTRIBUZIONE_MAC.command" \
+  "$app_dir/ISTRUZIONI_ESPERTI_MAC.md" \
+  "$app_dir/BUILD_ESEGUIBILI.md"
 
-mv "$package_dir/AVVIA_ESPERTI_WINDOWS.bat" "$package_dir/AVVIA_SWIFTBAT.bat"
-# cmd.exe deve ricevere terminatori di riga Windows CRLF.
+# Tutto il codice e' nella cartella Applicazione; un solo .bat all'esterno.
+cat > "$tmp_dir/launcher-lf.bat" <<'LAUNCHER'
+@echo off
+setlocal EnableExtensions
+title SwiftBAT Explorer 1.3.0 - Windows
+if not exist "%~dp0Applicazione\AVVIA_ESPERTI_WINDOWS.ps1" (
+  echo [ERRORE] Manca la cartella Applicazione o il launcher interno.
+  pause
+  exit /b 1
+)
+cd /d "%~dp0Applicazione"
+if errorlevel 1 (
+  echo [ERRORE] Non riesco ad aprire la cartella Applicazione.
+  pause
+  exit /b 1
+)
+"%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File "%~dp0Applicazione\AVVIA_ESPERTI_WINDOWS.ps1" %*
+set "RESULT=%ERRORLEVEL%"
+if not "%RESULT%"=="0" (
+  echo.
+  echo [ERRORE] Avvio non riuscito. Consulta il log nella cartella Applicazione.
+  pause
+)
+exit /b %RESULT%
+LAUNCHER
 awk '{sub(/\r$/, ""); printf "%s\r\n", $0}' \
-  "$package_dir/AVVIA_SWIFTBAT.bat" > "$tmp_dir/launcher-crlf.bat"
-mv "$tmp_dir/launcher-crlf.bat" "$package_dir/AVVIA_SWIFTBAT.bat"
+  "$tmp_dir/launcher-lf.bat" > "$package_dir/AVVIA_SWIFTBAT.bat"
 
 rm -f "$ZIP_FILE" "$SHA_FILE"
 ditto -c -k --norsrc --keepParent "$package_dir" "$ZIP_FILE"

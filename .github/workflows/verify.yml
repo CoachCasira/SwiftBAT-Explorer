@@ -37,75 +37,52 @@ jobs:
       - name: Verifica Maven
         run: mvn --batch-mode --no-transfer-progress verify
 
-  windows-bootstrap:
-    name: Bootstrap isolato e build Windows x64
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - name: Scarica il progetto
-        uses: actions/checkout@v4
-
-      - name: Controlla sintassi PowerShell
-        shell: powershell
-        run: |
-          $tokens = $null
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path '.\AVVIA_ESPERTI_WINDOWS.ps1'),
-            [ref]$tokens, [ref]$errors
-          ) | Out-Null
-          if ($errors.Count -gt 0) {
-            $errors | Format-List
-            exit 1
-          }
-
-      - name: Scarica Java e Maven con il launcher Windows
-        shell: powershell
-        run: |
-          & .\AVVIA_ESPERTI_WINDOWS.ps1 -PrepareOnly
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-
-      - name: Verifica build Maven con le dipendenze locali
-        shell: powershell
-        run: |
-          $root = Join-Path (Get-Location).Path '.swiftbat-runtime'
-          $env:JAVA_HOME = Join-Path $root 'jdk-17'
-          $env:PATH = (Join-Path $env:JAVA_HOME 'bin') + ';' + $env:PATH
-          $mvn = Join-Path $root 'apache-maven-3.9.16\bin\mvn.cmd'
-          $repo = Join-Path $root 'm2-repository'
-          if (-not (Test-Path -LiteralPath (Join-Path $root 'logs\expert-launcher.log'))) { throw 'Log Windows non locale' }
-          & $mvn '--batch-mode' "--no-transfer-progress" "-Dmaven.repo.local=$repo" 'verify'
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-
   packaging-macos:
-    name: Crea entrambi gli ZIP da macOS
+    name: Crea e controlla ZIP macOS/Windows
     runs-on: macos-latest
     steps:
       - name: Scarica il progetto
         uses: actions/checkout@v4
 
-      - name: Verifica bootstrap portabile macOS senza avviare JavaFX
-        run: |
-          SWIFTBAT_PREPARE_ONLY=1 bash AVVIA_ESPERTI_MAC.command
-          test -x .swiftbat-runtime/jdk-17/bin/java
-          test -x .swiftbat-runtime/apache-maven-3.9.16/bin/mvn
-          test -s .swiftbat-runtime/logs/expert-launcher.log
-
-      - name: Genera i pacchetti
+      - name: Genera entrambi gli ZIP
         run: bash CREA_PACCHETTI_DISTRIBUZIONE_MAC.command
 
-      - name: Verifica contenuto e checksum
+      - name: Verifica struttura minima dei pacchetti e checksum
+        shell: bash
         run: |
-          set -e
-          test -s dist/SwiftBAT-Explorer-Esperti-macOS.zip
-          test -s dist/SwiftBAT-Explorer-Relatori-Windows.zip
+          set -euo pipefail
           (cd dist && shasum -a 256 -c SwiftBAT-Explorer-Esperti-macOS.sha256.txt)
           (cd dist && shasum -a 256 -c SwiftBAT-Explorer-Relatori-Windows.sha256.txt)
-          unzip -Z -1 dist/SwiftBAT-Explorer-Esperti-macOS.zip | grep -F 'SwiftBAT Explorer/AVVIA_SWIFTBAT.command'
-          unzip -Z -1 dist/SwiftBAT-Explorer-Relatori-Windows.zip | grep -F 'SwiftBAT Explorer/AVVIA_SWIFTBAT.bat'
-          unzip -Z -1 dist/SwiftBAT-Explorer-Relatori-Windows.zip | grep -F 'SwiftBAT Explorer/AVVIA_ESPERTI_WINDOWS.ps1'
-          if unzip -Z -1 dist/SwiftBAT-Explorer-Esperti-macOS.zip | grep -F '.swiftbat-runtime/'; then exit 1; fi
-          if unzip -Z -1 dist/SwiftBAT-Explorer-Relatori-Windows.zip | grep -F '.swiftbat-runtime/'; then exit 1; fi
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          for filename, launch, internal in [
+              ("SwiftBAT-Explorer-Esperti-macOS.zip", "AVVIA_SWIFTBAT.command", "AVVIA_ESPERTI_MAC.command"),
+              ("SwiftBAT-Explorer-Relatori-Windows.zip", "AVVIA_SWIFTBAT.bat", "AVVIA_ESPERTI_WINDOWS.ps1")
+          ]:
+              with ZipFile(Path("dist") / filename) as archive:
+                  names = set(archive.namelist())
+                  prefix = "SwiftBAT Explorer/"
+                  top = {n[len(prefix):].split("/")[0] for n in names if n.startswith(prefix) and n != prefix}
+                  assert top == {launch, "Applicazione"}, f"{filename}: file esterni inattesi: {top}"
+                  assert prefix + launch in names
+                  assert prefix + "Applicazione/pom.xml" in names
+                  assert prefix + "Applicazione/" + internal in names
+                  assert not any("/.swiftbat-runtime/" in n for n in names), "Runtime di sviluppo nello ZIP"
+                  print("OK:", filename, "solo launcher + Applicazione/")
+          PY
+
+      - name: Testa il launcher dello ZIP Mac estratto
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/swiftbat-check"
+          ditto -x -k dist/SwiftBAT-Explorer-Esperti-macOS.zip "$RUNNER_TEMP/swiftbat-check"
+          root="$RUNNER_TEMP/swiftbat-check/SwiftBAT Explorer"
+          SWIFTBAT_PREPARE_ONLY=1 /bin/bash "$root/AVVIA_SWIFTBAT.command"
+          test -x "$root/Applicazione/.swiftbat-runtime/jdk-17/bin/java"
+          test -x "$root/Applicazione/.swiftbat-runtime/apache-maven-3.9.16/bin/mvn"
+          test -s "$root/Applicazione/.swiftbat-runtime/logs/expert-launcher.log"
 
       - name: Pubblica il pacchetto Windows per i relatori
         uses: actions/upload-artifact@v7
@@ -124,3 +101,54 @@ jobs:
           archive: false
           if-no-files-found: error
           retention-days: 30
+
+  windows-bootstrap:
+    name: Testa lo ZIP Windows estratto x64
+    needs: packaging-macos
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Scarica lo ZIP generato per Windows
+        uses: actions/download-artifact@v4
+        with:
+          name: SwiftBAT-Explorer-Relatori-Windows
+          path: packaged
+
+      - name: Estrai e valida lo script PowerShell nel pacchetto
+        shell: powershell
+        run: |
+          Expand-Archive -LiteralPath 'packaged/SwiftBAT-Explorer-Relatori-Windows.zip' -DestinationPath 'packaged/unpacked'
+          $app = Join-Path (Get-Location).Path 'packaged/unpacked/SwiftBAT Explorer/Applicazione'
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $app 'AVVIA_ESPERTI_WINDOWS.ps1'),
+            [ref]$tokens, [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+
+      - name: Esegui il BAT dello ZIP e prepara Java/Maven isolati
+        shell: powershell
+        run: |
+          $root = Join-Path (Get-Location).Path 'packaged/unpacked/SwiftBAT Explorer'
+          Push-Location $root
+          try {
+            & cmd.exe /d /c 'AVVIA_SWIFTBAT.bat -PrepareOnly'
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          } finally { Pop-Location }
+
+      - name: Verifica build Maven usando solo ambiente interno
+        shell: powershell
+        run: |
+          $app = Join-Path (Get-Location).Path 'packaged/unpacked/SwiftBAT Explorer/Applicazione'
+          $root = Join-Path $app '.swiftbat-runtime'
+          $env:JAVA_HOME = Join-Path $root 'jdk-17'
+          $env:PATH = (Join-Path $env:JAVA_HOME 'bin') + ';' + $env:PATH
+          $mvn = Join-Path $root 'apache-maven-3.9.16/bin/mvn.cmd'
+          $repo = Join-Path $root 'm2-repository'
+          if (-not (Test-Path -LiteralPath (Join-Path $root 'logs/expert-launcher.log'))) { throw 'Log non locale' }
+          Push-Location $app
+          try {
+            & $mvn '--batch-mode' '--no-transfer-progress' "-Dmaven.repo.local=$repo" 'verify'
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+          } finally { Pop-Location }
