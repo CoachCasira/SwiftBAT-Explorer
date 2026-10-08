@@ -3,15 +3,16 @@ set -euo pipefail
 
 APP_NAME="SwiftBAT Explorer 1.3.0"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CACHE_ROOT="${HOME}/Library/Caches/SwiftBAT-Explorer/expert-runtime"
+CACHE_ROOT="${SCRIPT_DIR}/.swiftbat-runtime"
 JDK_ROOT="${CACHE_ROOT}/jdk-17"
 MAVEN_VERSION="3.9.16"
 MAVEN_HOME="${CACHE_ROOT}/apache-maven-${MAVEN_VERSION}"
 M2_REPO="${CACHE_ROOT}/m2-repository"
-LOG_DIR="${HOME}/Library/Logs/SwiftBAT Explorer"
+LOG_DIR="${CACHE_ROOT}/logs"
+export TMPDIR="${CACHE_ROOT}/tmp/"
 LOG_FILE="${LOG_DIR}/expert-launcher.log"
 
-mkdir -p "$CACHE_ROOT" "$M2_REPO" "$LOG_DIR"
+mkdir -p "$CACHE_ROOT" "$M2_REPO" "$LOG_DIR" "$TMPDIR"
 touch "$LOG_FILE"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
@@ -36,7 +37,7 @@ echo "  $APP_NAME - avvio per esperti macOS"
 echo "============================================================"
 echo
 echo "Questa procedura NON installa Java o Maven nel sistema."
-echo "L'ambiente necessario viene salvato solo nella cache dell'utente."
+echo "L'ambiente necessario viene salvato nella cartella .swiftbat-runtime accanto all'app."
 echo
 
 if [ "$(uname -s)" != "Darwin" ]; then
@@ -174,8 +175,13 @@ fi
 echo
 echo "[3/3] Avvio SwiftBAT Explorer..."
 echo "Al primo avvio Maven scarichera' le librerie necessarie."
-echo "Gli avvii successivi useranno la cache locale e saranno piu' rapidi."
+echo "Gli avvii successivi useranno la cartella locale e saranno piu' rapidi."
 echo
+
+if [ "${SWIFTBAT_PREPARE_ONLY:-0}" = "1" ]; then
+  echo "Ambiente macOS locale pronto; avvio grafico non richiesto."
+  exit 0
+fi
 
 cd "$SCRIPT_DIR"
 "$MAVEN_HOME/bin/mvn"   --batch-mode   -Dmaven.repo.local="$M2_REPO"   -DskipTests   compile javafx:run
