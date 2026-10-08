@@ -96,3 +96,21 @@ jobs:
           unzip -Z -1 dist/SwiftBAT-Explorer-Esperti-macOS.zip | grep -F 'SwiftBAT Explorer/AVVIA_SWIFTBAT.command'
           unzip -Z -1 dist/SwiftBAT-Explorer-Relatori-Windows.zip | grep -F 'SwiftBAT Explorer/AVVIA_SWIFTBAT.bat'
           unzip -Z -1 dist/SwiftBAT-Explorer-Relatori-Windows.zip | grep -F 'SwiftBAT Explorer/AVVIA_ESPERTI_WINDOWS.ps1'
+
+      - name: Pubblica il pacchetto Windows per i relatori
+        uses: actions/upload-artifact@v7
+        with:
+          name: SwiftBAT-Explorer-Relatori-Windows
+          path: dist/SwiftBAT-Explorer-Relatori-Windows.zip
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Pubblica il pacchetto macOS per gli esperti
+        uses: actions/upload-artifact@v7
+        with:
+          name: SwiftBAT-Explorer-Esperti-macOS
+          path: dist/SwiftBAT-Explorer-Esperti-macOS.zip
+          archive: false
+          if-no-files-found: error
+          retention-days: 30
