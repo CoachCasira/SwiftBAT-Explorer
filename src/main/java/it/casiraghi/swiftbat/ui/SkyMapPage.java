@@ -100,6 +100,9 @@ public final class SkyMapPage extends BorderPane {
         });
         configureFilters();
         configureOpenButton();
+        // Quando cambia lingua aggiorniamo anche i dettagli scientifici selezionati.
+        I18n.languageProperty().addListener((obs, oldLanguage, newLanguage) ->
+                javafx.application.Platform.runLater(this::updateSelectedPanel));
     }
 
     public void setBaseCatalog(List<CatalogEntry> entries) {
@@ -396,7 +399,16 @@ public final class SkyMapPage extends BorderPane {
             sphereView = showSphere;
             mapHost.getChildren().setAll(showSphere ? sphere : mollweide);
             javafx.application.Platform.runLater(() -> {
-                if (showSphere) sphere.resetView(); else mollweide.resetView();
+                if (showSphere) {
+                    sphere.resetView();
+                    // Un punto selezionato nella Mollweide puo' trovarsi dietro
+                    // la sfera: orientiamola verso quel GRB quando si apre il 3D.
+                    if (selectedBurst != null) {
+                        sphere.focusOn(selectedBurst);
+                    }
+                } else {
+                    mollweide.resetView();
+                }
             });
         });
         return new HBox(6, mollweideButton, sphereButton);
@@ -489,7 +501,7 @@ public final class SkyMapPage extends BorderPane {
         Consumer<SkyBurst> updater = burst -> {
             current[0] = burst;
             if (burst == null) {
-                name.setText("Nessun GRB selezionato");
+                I18n.setText(name, "Nessun GRB selezionato", "No GRB selected");
                 trigger.setText("—");
                 ra.setText("—");
                 dec.setText("—");
@@ -500,7 +512,7 @@ public final class SkyMapPage extends BorderPane {
                 open.setDisable(true);
                 return;
             }
-            name.setText(burst.grbName());
+            I18n.setText(name, burst.grbName(), burst.grbName());
             trigger.setText(burst.triggerId().isBlank() ? "n.d." : burst.triggerId());
             ra.setText(String.format(Locale.ITALY, "%.5f°", burst.raDeg())
                     + "  ·  " + SkyCoordinates.raToHms(burst.raDeg()));
@@ -754,7 +766,7 @@ public final class SkyMapPage extends BorderPane {
 
     private void updateSelectedPanel() {
         if (selectedBurst == null) {
-            selectedName.setText("Nessun GRB selezionato");
+            I18n.setText(selectedName, "Nessun GRB selezionato", "No GRB selected");
             selectedTrigger.setText("—");
             selectedRa.setText("—");
             selectedDec.setText("—");
@@ -764,7 +776,9 @@ public final class SkyMapPage extends BorderPane {
             openButton.setDisable(true);
             return;
         }
-        selectedName.setText(selectedBurst.grbName());
+        // Usa lo stesso valore dinamico per IT/EN, evitando che UiTranslations
+        // ripristini l'etichetta di inizializzazione quando la pagina viene aggiornata.
+        I18n.setText(selectedName, selectedBurst.grbName(), selectedBurst.grbName());
         selectedTrigger.setText(selectedBurst.triggerId().isBlank() ? "n.d." : selectedBurst.triggerId());
         selectedRa.setText(String.format(Locale.ITALY, "%.5f°", selectedBurst.raDeg())
                 + "  ·  " + SkyCoordinates.raToHms(selectedBurst.raDeg()));
