@@ -43,6 +43,8 @@ rm -f   "$app_dir/.DS_Store"   "$app_dir/AVVIA_APP_MAC.command"   "$app_dir/CREA
   "$app_dir/AVVIA_ESPERTI_WINDOWS.ps1" \
   "$app_dir/CREA_PACCHETTO_RELATORI_WINDOWS_MAC.command" \
   "$app_dir/CREA_PACCHETTI_DISTRIBUZIONE_MAC.command" \
+  "$app_dir/CREA_PACCHETTI_DISTRIBUZIONE_WINDOWS.bat" \
+  "$app_dir/CREA_PACCHETTI_DISTRIBUZIONE_WINDOWS.ps1" \
   "$app_dir/ISTRUZIONI_RELATORI_WINDOWS.md"
 
 chmod 755 "$app_dir/AVVIA_ESPERTI_MAC.command"
