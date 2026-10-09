@@ -44,6 +44,9 @@ public final class CelestialSpherePane extends Pane {
     private final Group gridGroup = new Group();
     private final Rotate rotateX = new Rotate(-14, Rotate.X_AXIS);
     private final Rotate rotateY = new Rotate(-24, Rotate.Y_AXIS);
+    // Orientamento aggiuntivo utilizzato solo per portare un GRB selezionato
+    // sulla faccia visibile quando si passa dalla proiezione 2D alla sfera.
+    private final Rotate focusRotation = new Rotate(0, Rotate.Y_AXIS);
     private final PerspectiveCamera camera = new PerspectiveCamera(true);
     private final SubScene subScene;
     private final Label zoomLabel = new Label("Zoom 100%");
@@ -77,7 +80,7 @@ public final class CelestialSpherePane extends Pane {
         globe.setCullFace(CullFace.NONE);
         globe.setMouseTransparent(true);
 
-        world.getTransforms().addAll(rotateX, rotateY);
+        world.getTransforms().addAll(rotateX, rotateY, focusRotation);
         world.getChildren().addAll(globe, gridGroup, galacticGroup, markerGroup);
 
         Group root3d = new Group(world);
@@ -158,9 +161,33 @@ public final class CelestialSpherePane extends Pane {
         }
     }
 
+    /**
+     * Porta la direzione di un GRB selezionato sul lato della sfera rivolto
+     * alla camera (-Z), senza cambiare le sue coordinate RA/DEC o il catalogo.
+     * Le normali interazioni 3D (drag e zoom) continuano a essere disponibili.
+     */
+    public void focusOn(SkyBurst burst) {
+        if (burst == null) return;
+        select(burst);
+        SkyPoint3D point = SkyCoordinates.onSphere(burst.raDeg(), burst.decDeg(), 1.0);
+        Point3D direction = new Point3D(point.x(), point.y(), point.z());
+        Point3D cameraFront = new Point3D(0.0, 0.0, -1.0);
+        Point3D axis = direction.crossProduct(cameraFront);
+        // Nel caso antipodale il prodotto vettoriale e' nullo: scegliamo
+        // un asse perpendicolare valido, cosi' anche RA=90 funziona.
+        if (axis.magnitude() < 1.0e-9) {
+            axis = Rotate.Y_AXIS;
+        }
+        rotateX.setAngle(0.0);
+        rotateY.setAngle(0.0);
+        focusRotation.setAxis(axis);
+        focusRotation.setAngle(direction.angle(cameraFront));
+    }
+
     public void resetView() {
         rotateX.setAngle(-14.0);
         rotateY.setAngle(-24.0);
+        focusRotation.setAngle(0.0);
         camera.setTranslateZ(DEFAULT_CAMERA_Z);
         updateZoomLabel();
     }
