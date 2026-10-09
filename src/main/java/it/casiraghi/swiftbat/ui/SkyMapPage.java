@@ -112,24 +112,35 @@ public final class SkyMapPage extends BorderPane {
     }
 
     public void showLoading(String text) {
-        status.setText(text == null || text.isBlank() ? "Caricamento coordinate…" : text);
+        String italian = text == null || text.isBlank() ? "Caricamento coordinate…" : text;
+        // I messaggi dinamici devono essere ritraducibili, non ripristinati al testo iniziale.
+        I18n.setText(status, italian, "Loading sky coordinates…");
         setStatusStyle("status-neutral");
     }
 
     public void showError(String message) {
-        status.setText(message == null || message.isBlank() ? "Coordinate non disponibili" : message);
+        String detail = message == null || message.isBlank() ? "Coordinate non disponibili" : message;
+        // Un errore remoto puo' contenere dettagli arbitrari: lo preserviamo integralmente.
+        I18n.setText(status, detail, detail);
         setStatusStyle("status-warning");
     }
 
     public void showWarning(String message) {
-        status.setText(message == null || message.isBlank() ? "Dati scientifici caricati parzialmente" : message);
+        String italian = message == null || message.isBlank()
+                ? "Dati scientifici caricati parzialmente" : message;
+        String english = message == null || message.isBlank()
+                ? "Scientific data partially loaded"
+                : "Sky coordinates and T90 loaded; redshift temporarily unavailable";
+        I18n.setText(status, italian, english);
         setStatusStyle("status-warning");
     }
 
     public void setSkyBursts(List<SkyBurst> bursts) {
         allBursts = bursts == null ? List.of() : List.copyOf(bursts);
         searchAssist.refresh();
-        status.setText(allBursts.size() + " GRB con coordinate BAT caricati");
+        I18n.setText(status,
+                allBursts.size() + " GRB con coordinate BAT caricati",
+                allBursts.size() + " GRBs with BAT sky coordinates loaded");
         setStatusStyle("status-online");
         applyFilters();
     }
@@ -584,7 +595,7 @@ public final class SkyMapPage extends BorderPane {
         try {
             range = readRange();
         } catch (IllegalArgumentException exception) {
-            status.setText(exception.getMessage());
+            I18n.setText(status, exception.getMessage(), exception.getMessage());
             setStatusStyle("status-warning");
             return;
         }
@@ -603,7 +614,7 @@ public final class SkyMapPage extends BorderPane {
                 throw new IllegalArgumentException("Controlla il range del redshift.");
             }
         } catch (IllegalArgumentException exception) {
-            status.setText(exception.getMessage());
+            I18n.setText(status, exception.getMessage(), exception.getMessage());
             setStatusStyle("status-warning");
             return;
         }
@@ -644,7 +655,9 @@ public final class SkyMapPage extends BorderPane {
         sphere.setBursts(visibleBursts);
         updateMetrics();
         if (!allBursts.isEmpty()) {
-            status.setText(visibleBursts.size() + " / " + allBursts.size() + " GRB visualizzati");
+            I18n.setText(status,
+                    visibleBursts.size() + " / " + allBursts.size() + " GRB visualizzati",
+                    visibleBursts.size() + " / " + allBursts.size() + " GRBs displayed");
             setStatusStyle("status-online");
         }
     }
@@ -724,10 +737,16 @@ public final class SkyMapPage extends BorderPane {
         long shortCount = visibleBursts.stream().filter(SkyBurst::isShort).count();
         long longCount = visibleBursts.stream().filter(SkyBurst::isLong).count();
         long unknownCount = visibleBursts.size() - shortCount - longCount;
-        shownMetric.setText(Integer.toString(visibleBursts.size()));
-        shortMetric.setText(Long.toString(shortCount));
-        longMetric.setText(Long.toString(longCount));
-        noT90Metric.setText(Long.toString(unknownCount));
+        // I18n.setText aggiorna anche la coppia IT/EN: il cambio pagina/lingua
+        // non potra' piu' sovrascrivere le metriche con lo "0" iniziale.
+        String visible = Integer.toString(visibleBursts.size());
+        String shortValue = Long.toString(shortCount);
+        String longValue = Long.toString(longCount);
+        String unknown = Long.toString(unknownCount);
+        I18n.setText(shownMetric, visible, visible);
+        I18n.setText(shortMetric, shortValue, shortValue);
+        I18n.setText(longMetric, longValue, longValue);
+        I18n.setText(noT90Metric, unknown, unknown);
     }
 
     private void setStatusStyle(String style) {
