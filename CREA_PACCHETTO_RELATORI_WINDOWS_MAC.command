@@ -41,6 +41,8 @@ rm -f "$app_dir/.DS_Store" "$app_dir/AVVIA_APP.bat" \
   "$app_dir/CREA_APP_MAC.command" "$app_dir/CREA_PACCHETTO_ESPERTI_MAC.command" \
   "$app_dir/CREA_PACCHETTO_RELATORI_WINDOWS_MAC.command" \
   "$app_dir/CREA_PACCHETTI_DISTRIBUZIONE_MAC.command" \
+  "$app_dir/CREA_PACCHETTI_DISTRIBUZIONE_WINDOWS.bat" \
+  "$app_dir/CREA_PACCHETTI_DISTRIBUZIONE_WINDOWS.ps1" \
   "$app_dir/ISTRUZIONI_ESPERTI_MAC.md" \
   "$app_dir/BUILD_ESEGUIBILI.md"
 
