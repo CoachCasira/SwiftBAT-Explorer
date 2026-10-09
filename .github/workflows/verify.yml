@@ -237,11 +237,15 @@ jobs:
             } finally { $file.Dispose() }
           }
 
+      - name: Distingui l'artefatto prodotto dal runner Windows
+        shell: powershell
+        run: Copy-Item -LiteralPath 'dist/SwiftBAT-Explorer-Esperti-macOS.zip' -Destination 'dist/SwiftBAT-macOS-created-on-Windows.zip'
+
       - name: Pubblica Mac ZIP creato su Windows per il test macOS
         uses: actions/upload-artifact@v7
         with:
           name: SwiftBAT-macOS-created-on-Windows
-          path: dist/SwiftBAT-Explorer-Esperti-macOS.zip
+          path: dist/SwiftBAT-macOS-created-on-Windows.zip
           archive: false
           if-no-files-found: error
           retention-days: 7
@@ -263,7 +267,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/swiftbat-generated-on-windows"
-          ditto -x -k packaged/SwiftBAT-Explorer-Esperti-macOS.zip "$RUNNER_TEMP/swiftbat-generated-on-windows"
+          ditto -x -k packaged/SwiftBAT-macOS-created-on-Windows.zip "$RUNNER_TEMP/swiftbat-generated-on-windows"
           app="$RUNNER_TEMP/swiftbat-generated-on-windows/SwiftBAT Explorer"
           test -x "$app/AVVIA_SWIFTBAT.command"
           test -x "$app/Applicazione/AVVIA_ESPERTI_MAC.command"
