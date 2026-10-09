@@ -22,6 +22,7 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
@@ -226,9 +227,6 @@ public final class SkyMapPage extends BorderPane {
         card.getStyleClass().add("card");
         card.setPadding(new Insets(12, 14, 12, 14));
 
-        HBox row = new HBox(7);
-        row.setAlignment(Pos.CENTER_LEFT);
-
         search.getStyleClass().add("modern-text-field");
         search.setMinWidth(145);
         search.setPrefWidth(190);
@@ -260,9 +258,59 @@ public final class SkyMapPage extends BorderPane {
         HBox raRange = compactSkyRange("RA", raMin, raMax);
         HBox decRange = compactSkyRange("DEC", decMin, decMax);
         HBox zRange = compactSkyRange("z", zMin, zMax);
-        row.getChildren().addAll(searchNode, durationFilter, redshiftControl,
-                raRange, decRange, zRange, galacticPlane, reset);
-        card.getChildren().add(row);
+
+        // Le stesse istanze dei controlli vengono riutilizzate in entrambi i
+        // layout: filtri, ascoltatori ed eventi non cambiano comportamento.
+        HBox searchGroup = new HBox(9, searchNode, durationFilter);
+        HBox coordinatesGroup = new HBox(13, raRange, decRange, zRange);
+        HBox actionsGroup = new HBox(13, galacticPlane, reset);
+        for (HBox group : List.of(searchGroup, coordinatesGroup, actionsGroup)) {
+            group.setAlignment(Pos.CENTER_LEFT);
+        }
+        List<Node> groups = List.of(searchGroup, redshiftControl, coordinatesGroup, actionsGroup);
+
+        // Desktop: quattro gruppi distribuiti su tutta la larghezza disponibile.
+        HBox wideRow = new HBox(10);
+        wideRow.setAlignment(Pos.CENTER_LEFT);
+        List<Node> wideChildren = new ArrayList<>();
+        for (int index = 0; index < groups.size(); index++) {
+            if (index > 0) {
+                Region flexibleSpace = new Region();
+                flexibleSpace.setMinWidth(0);
+                HBox.setHgrow(flexibleSpace, Priority.ALWAYS);
+                wideChildren.add(flexibleSpace);
+            }
+            wideChildren.add(groups.get(index));
+        }
+        wideRow.getChildren().setAll(wideChildren);
+
+        // Finestre piu' strette: i gruppi vanno a capo anziche' essere tagliati.
+        FlowPane compactRow = new FlowPane(18, 12);
+        compactRow.setAlignment(Pos.CENTER_LEFT);
+        compactRow.setMaxWidth(Double.MAX_VALUE);
+
+        card.getChildren().add(wideRow);
+        final double wideLayoutMinWidth = 1280.0;
+        final boolean[] compact = {false};
+        Runnable updateLayout = () -> {
+            boolean useCompact = card.getWidth() < wideLayoutMinWidth;
+            if (useCompact == compact[0]) {
+                return;
+            }
+            if (useCompact) {
+                wideRow.getChildren().clear();
+                compactRow.getChildren().setAll(groups);
+                card.getChildren().setAll(compactRow);
+            } else {
+                compactRow.getChildren().clear();
+                wideRow.getChildren().setAll(wideChildren);
+                card.getChildren().setAll(wideRow);
+            }
+            compact[0] = useCompact;
+        };
+        card.widthProperty().addListener((obs, oldWidth, newWidth) ->
+                javafx.application.Platform.runLater(updateLayout));
+        updateLayout.run();
         return card;
     }
 
