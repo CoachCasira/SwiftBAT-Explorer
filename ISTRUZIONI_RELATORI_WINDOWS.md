@@ -22,6 +22,21 @@ Gli avvii successivi riutilizzano gli strumenti e le librerie scaricati nella ca
 
 **Spazio consigliato:** almeno 1 GB libero per JDK, Maven e librerie.
 
+## Creare i due pacchetti dal PC Windows
+
+Nel repository aggiornato sul branch `feature/cross-platform-expert-bootstrap`, in Windows 10/11, fare doppio clic su:
+
+```text
+CREA_PACCHETTI_DISTRIBUZIONE_WINDOWS.bat
+```
+
+Il file avvia lo script PowerShell gia incluso nel progetto e **non richiede Java, Maven, Git Bash o Python** per costruire gli ZIP. Nella cartella `dist/` verranno creati entrambi i pacchetti:
+
+- `SwiftBAT-Explorer-Esperti-macOS.zip` (da inviare agli esperti Mac);
+- `SwiftBAT-Explorer-Relatori-Windows.zip` (da inviare ai relatori Windows).
+
+Insieme ai due ZIP vengono generati i rispettivi file SHA-256. Il pacchetto Mac creato da Windows mantiene il launcher eseguibile e gli script con terminatori Unix. Dopo l'estrazione, **entrambi i pacchetti mostrano solo il file AVVIA_SWIFTBAT appropriato e la cartella Applicazione**. Il runtime Java/Maven si prepara alla prima apertura della distribuzione, non durante la creazione degli ZIP.
+
 ## Creare lo ZIP direttamente dal Mac
 
 Dal branch GitHub `feature/cross-platform-expert-bootstrap`, eseguire su macOS:
