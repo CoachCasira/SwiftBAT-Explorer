@@ -725,3 +725,19 @@
     -fx-opacity: 0;
     -fx-padding: 0;
 }
+
+
+/* Header/body grid geometry (Explore ASCII/FITS and other aligned tables).
+   Only the outer native JavaFX cells draw column separators; the removable
+   HBox in the header is content and must not own a second border. */
+.reference-redesign .data-table.final-aligned-table .column-header,
+.reference-redesign .data-table.final-aligned-table .table-cell {
+    -fx-border-color: transparent rgba(116, 141, 190, 0.18) transparent transparent;
+    -fx-border-width: 0 1px 0 0;
+    -fx-border-insets: 0;
+}
+.reference-redesign .data-table.final-aligned-table .removable-column-header {
+    -fx-padding: 0;
+    -fx-border-color: transparent;
+    -fx-background-insets: 0;
+}
