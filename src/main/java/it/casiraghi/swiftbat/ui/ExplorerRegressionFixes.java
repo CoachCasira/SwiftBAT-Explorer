@@ -225,19 +225,13 @@ public final class ExplorerRegressionFixes {
         header.setMaxWidth(Double.MAX_VALUE);
         HBox.setHgrow(title, Priority.ALWAYS);
 
+        // Let JavaFX's TableColumnHeader size this graphic using the *actual*
+        // column width. The former width-18px calculation gave the header
+        // graphic its own geometry, which could visually drift away from the
+        // cell separators after resizing or horizontal scrolling.
+        header.setPrefWidth(Region.USE_COMPUTED_SIZE);
         column.setText("");
         column.setGraphic(header);
-        syncHeaderWidth(column, header);
-        if (!Boolean.TRUE.equals(column.getProperties().get(COLUMN_DONE + ".width"))) {
-            column.getProperties().put(COLUMN_DONE + ".width", Boolean.TRUE);
-            column.widthProperty().addListener((obs, oldWidth, newWidth) -> {
-                Node graphic = column.getGraphic();
-                if (graphic instanceof Region region
-                        && graphic.getStyleClass().contains("removable-column-header")) {
-                    syncHeaderWidth(column, region);
-                }
-            });
-        }
     }
 
     private static void refreshHeader(TableColumn<?, ?> column) {
@@ -248,13 +242,9 @@ public final class ExplorerRegressionFixes {
             hide.getTooltip().setText(I18n.dynamic("Nascondi colonna", "Hide column"));
         }
         column.setText("");
-        syncHeaderWidth(column, header);
-    }
-
-    private static void syncHeaderWidth(TableColumn<?, ?> column, Region header) {
-        double available = Math.max(34.0, column.getWidth() - 18.0);
-        header.setPrefWidth(available);
-        header.setMaxWidth(available);
+        // The skin owns the header width, including after a language switch.
+        header.setPrefWidth(Region.USE_COMPUTED_SIZE);
+        header.setMaxWidth(Double.MAX_VALUE);
     }
 
     private static String sourceColumnName(TableColumn<?, ?> column) {
