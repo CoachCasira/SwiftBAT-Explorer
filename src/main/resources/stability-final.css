@@ -741,3 +741,21 @@
     -fx-border-color: transparent;
     -fx-background-insets: 0;
 }
+
+
+/* Fix accumulated header/body column drift in Explore tables.
+   OpenJFX TableRowSkinBase subtracts the row's left and right snapped
+   insets from *every* cell width. The theme previously assigned a border on
+   all four sides (including transparent left/right borders), shrinking each
+   body column by 2 CSS pixels while the header retained its full width.
+   Keep the horizontal insets at zero; retain the horizontal row divider. */
+.reference-redesign .data-table.final-aligned-table .table-row-cell {
+    -fx-padding: 0;
+    -fx-border-width: 0 0 1px 0;
+    -fx-border-insets: 0;
+}
+.reference-redesign .data-table.final-aligned-table .table-row-cell:selected {
+    -fx-padding: 0;
+    -fx-border-width: 0 0 1px 0;
+    -fx-border-insets: 0;
+}
