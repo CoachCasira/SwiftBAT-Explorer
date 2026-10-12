@@ -783,3 +783,24 @@
     -fx-line-spacing: 3px;
     -fx-opacity: 1;
 }
+
+
+/* Data Dictionary focus cards: legible icon, heading and description. */
+.reference-redesign .dictionary-focus-live-card .info-focus-live-icon {
+    -fx-text-fill: #36d6f8;
+    -fx-font-size: 21px;
+    -fx-font-weight: bold;
+    -fx-opacity: 1;
+}
+.reference-redesign .dictionary-focus-live-card .info-focus-live-title {
+    -fx-text-fill: #f8fbff;
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-opacity: 1;
+}
+.reference-redesign .dictionary-focus-live-card .info-focus-live-text {
+    -fx-text-fill: #dcecff;
+    -fx-font-size: 17px;
+    -fx-line-spacing: 3px;
+    -fx-opacity: 1;
+}
