@@ -380,11 +380,17 @@ public final class InteractionPolishEnhancer {
         // Keep the legacy snapshot for other card types with arbitrary graphics.
         boolean liveInfo = card instanceof VBox
                 && card.getStyleClass().contains("info-static-card");
+        // Data Dictionary cards contain a nested HBox title row and a text Label.
+        // Rebuild the content as live controls instead of scaling a raster snapshot.
+        boolean liveExplanation = card instanceof VBox
+                && card.getStyleClass().contains("explanation-card");
         double hostWidth = host.getWidth() > 300 ? host.getWidth() : card.getScene().getWidth();
         double hostHeight = host.getHeight() > 300 ? host.getHeight() : card.getScene().getHeight();
         Node focused;
         if (liveInfo) {
             focused = liveInfoFocus((VBox) card, hostWidth);
+        } else if (liveExplanation) {
+            focused = liveExplanationFocus((VBox) card, hostWidth);
         } else {
             SnapshotParameters parameters = new SnapshotParameters();
             parameters.setFill(Color.TRANSPARENT);
@@ -485,6 +491,47 @@ public final class InteractionPolishEnhancer {
             text.setMinWidth(0);
             text.setMaxWidth(Double.MAX_VALUE);
             result.getChildren().add(text);
+        }
+        return result;
+    }
+
+    /**
+     * The Data Dictionary explanation card has a title row (icon + heading)
+     * followed by a wrapped description. Rendering these as fresh JavaFX
+     * labels avoids pixelation when the focused card is displayed larger.
+     * Read the displayed label text so the current IT/EN translation and
+     * scientific field description are preserved without recomputing them.
+     */
+    private static VBox liveExplanationFocus(VBox source, double hostWidth) {
+        VBox result = new VBox(16);
+        result.getStyleClass().addAll("info-focus-live-card", "dictionary-focus-live-card");
+        result.setPadding(new Insets(28, 34, 30, 34));
+        result.setAlignment(Pos.CENTER_LEFT);
+        result.setMinWidth(0);
+        result.setPrefWidth(Math.min(750, Math.max(340, hostWidth * 0.72)));
+        result.setMaxWidth(750);
+
+        for (Node child : source.getChildren()) {
+            if (child instanceof HBox originalHeading) {
+                HBox heading = new HBox(12);
+                heading.setAlignment(Pos.CENTER_LEFT);
+                for (Node part : originalHeading.getChildren()) {
+                    if (!(part instanceof Label original)) continue;
+                    Label label = new Label(original.getText());
+                    label.getStyleClass().add(original.getStyleClass().contains("explanation-icon")
+                            ? "info-focus-live-icon" : "info-focus-live-title");
+                    label.setWrapText(true);
+                    heading.getChildren().add(label);
+                }
+                if (!heading.getChildren().isEmpty()) result.getChildren().add(heading);
+            } else if (child instanceof Label original) {
+                Label description = new Label(original.getText());
+                description.getStyleClass().add("info-focus-live-text");
+                description.setWrapText(true);
+                description.setMinWidth(0);
+                description.setMaxWidth(Double.MAX_VALUE);
+                result.getChildren().add(description);
+            }
         }
         return result;
     }
