@@ -759,3 +759,27 @@
     -fx-border-width: 0 0 1px 0;
     -fx-border-insets: 0;
 }
+
+
+/* Info card focus: enlarged text must be rendered as real JavaFX labels,
+   with high contrast rather than a scaled screenshot. */
+.reference-redesign .info-focus-live-card {
+    -fx-background-color: linear-gradient(to bottom right, #061a32, #071125);
+    -fx-border-color: rgba(35, 209, 246, 0.78);
+    -fx-border-width: 1.5px;
+    -fx-border-radius: 18px;
+    -fx-background-radius: 18px;
+    -fx-effect: null;
+}
+.reference-redesign .info-focus-live-card .info-focus-live-title {
+    -fx-text-fill: #f8fbff;
+    -fx-font-weight: bold;
+    -fx-font-size: 24px;
+    -fx-opacity: 1;
+}
+.reference-redesign .info-focus-live-card .info-focus-live-text {
+    -fx-text-fill: #d9e9fb;
+    -fx-font-size: 16px;
+    -fx-line-spacing: 3px;
+    -fx-opacity: 1;
+}
