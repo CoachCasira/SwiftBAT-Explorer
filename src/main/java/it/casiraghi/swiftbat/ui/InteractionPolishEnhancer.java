@@ -375,10 +375,29 @@ public final class InteractionPolishEnhancer {
         card.applyCss();
         Parent parent = card.getParent();
         if (parent != null) parent.layout();
-        SnapshotParameters parameters = new SnapshotParameters();
-        parameters.setFill(Color.TRANSPARENT);
-        WritableImage image = card.snapshot(parameters, null);
-        if (image == null || image.getWidth() <= 1 || image.getHeight() <= 1) return;
+        // An enlarged raster snapshot makes the text in Info cards blurry.
+        // Info has text-only cards, so use fresh live JavaFX labels instead.
+        // Keep the legacy snapshot for other card types with arbitrary graphics.
+        boolean liveInfo = card instanceof VBox
+                && card.getStyleClass().contains("info-static-card");
+        double hostWidth = host.getWidth() > 300 ? host.getWidth() : card.getScene().getWidth();
+        double hostHeight = host.getHeight() > 300 ? host.getHeight() : card.getScene().getHeight();
+        Node focused;
+        if (liveInfo) {
+            focused = liveInfoFocus((VBox) card, hostWidth);
+        } else {
+            SnapshotParameters parameters = new SnapshotParameters();
+            parameters.setFill(Color.TRANSPARENT);
+            WritableImage image = card.snapshot(parameters, null);
+            if (image == null || image.getWidth() <= 1 || image.getHeight() <= 1) return;
+            ImageView snapshot = new ImageView(image);
+            snapshot.setPreserveRatio(true);
+            snapshot.setSmooth(true);
+            snapshot.setFitWidth(Math.min(image.getWidth() * 1.045, Math.max(460, hostWidth * 0.84)));
+            snapshot.setFitHeight(Math.min(image.getHeight() * 1.22, Math.max(280, hostHeight * 0.72)));
+            snapshot.setEffect(new DropShadow(42, Color.color(0.05, 0.79, 1.0, 0.42)));
+            focused = snapshot;
+        }
 
         Node page = directChildUnder(host, card);
         Effect oldPageEffect = page == null ? null : page.getEffect();
@@ -390,15 +409,6 @@ public final class InteractionPolishEnhancer {
 
         card.getProperties().put(CARD_ACTIVE, Boolean.TRUE);
         animateCard(card, 0, 1.0, 90);
-
-        ImageView focused = new ImageView(image);
-        focused.setPreserveRatio(true);
-        focused.setSmooth(true);
-        double hostWidth = host.getWidth() > 300 ? host.getWidth() : card.getScene().getWidth();
-        double hostHeight = host.getHeight() > 300 ? host.getHeight() : card.getScene().getHeight();
-        focused.setFitWidth(Math.min(image.getWidth() * 1.045, Math.max(460, hostWidth * 0.84)));
-        focused.setFitHeight(Math.min(image.getHeight() * 1.22, Math.max(280, hostHeight * 0.72)));
-        focused.setEffect(new DropShadow(42, Color.color(0.05, 0.79, 1.0, 0.42)));
 
         StackPane focusedCard = new StackPane(focused);
         focusedCard.setPickOnBounds(false);
@@ -450,6 +460,33 @@ public final class InteractionPolishEnhancer {
         fade.play();
         scale.play();
         Platform.runLater(overlay::requestFocus);
+    }
+
+    /**
+     * Create a live, accessible text card instead of enlarging the 124px-tall
+     * original as a bitmap. In particular the Info page remains sharp on
+     * high-DPI/large Windows displays.
+     */
+    private static VBox liveInfoFocus(VBox source, double hostWidth) {
+        VBox result = new VBox(13);
+        result.getStyleClass().add("info-focus-live-card");
+        result.setPadding(new Insets(28, 34, 30, 34));
+        result.setAlignment(Pos.CENTER_LEFT);
+        result.setMinWidth(0);
+        result.setPrefWidth(Math.min(750, Math.max(340, hostWidth * 0.72)));
+        result.setMaxWidth(750);
+
+        for (Node child : source.getChildren()) {
+            if (!(child instanceof Label original)) continue;
+            Label text = new Label(original.getText());
+            text.getStyleClass().add(original.getStyleClass().contains("home-action-title")
+                    ? "info-focus-live-title" : "info-focus-live-text");
+            text.setWrapText(true);
+            text.setMinWidth(0);
+            text.setMaxWidth(Double.MAX_VALUE);
+            result.getChildren().add(text);
+        }
+        return result;
     }
 
     private static StackPane findPageHost(Node node) {
