@@ -42,6 +42,7 @@ public final class CurveInteractionLinkEnhancer {
     private static final String LOCK_SYNC = CurveInteractionLinkEnhancer.class.getName() + ".lockSync";
     private static final String LOCK_ADDED = CurveInteractionLinkEnhancer.class.getName() + ".lockAdded";
     private static final String SPOTLIGHT_STYLE = CurveInteractionLinkEnhancer.class.getName() + ".spotlightStyle";
+    private static final String SPOTLIGHT_APPLIED = CurveInteractionLinkEnhancer.class.getName() + ".spotlightApplied";
     private static final String CHART_FOCUS = ChartInteractionEnhancer.class.getName() + ".focus";
     private static final String CHART_LINE_DONE = ChartInteractionEnhancer.class.getName() + ".lineDone";
     private static final String CHART_EXPORT_DONE = ChartInteractionEnhancer.class.getName() + ".exportDone";
@@ -283,8 +284,12 @@ public final class CurveInteractionLinkEnhancer {
             SeriesHit hit = nearest(chart, event.getX(), event.getY(), locked, spotlight);
             Set<XYChart.Series> focus = focusedSeries(chart);
             XYChart.Series hovered = hit == null || focus.isEmpty() ? null : hit.series();
-            chart.getProperties().put(HOVER, hovered);
-            applyVisualState(chart);
+            // Redrawing and restyling every curve on every mouse pixel is expensive.
+            // Refresh the visual state only when the hovered curve actually changes.
+            if (chart.getProperties().get(HOVER) != hovered) {
+                chart.getProperties().put(HOVER, hovered);
+                applyVisualState(chart);
+            }
 
             if (hit == null) {
                 tooltip.hide();
@@ -495,16 +500,50 @@ public final class CurveInteractionLinkEnhancer {
         double best = HIT_RADIUS * HIT_RADIUS;
         SeriesHit result = null;
 
+        // All population curves (including the percentile series) are sorted by time.
+        // Only inspect segments whose X range can approach the pointer, rather than
+        // transforming every data point from every curve on every mouse movement.
+        double visibleMin = Double.NaN;
+        double visibleMax = Double.NaN;
+        try {
+            Point2D scenePoint = chart.localToScene(mouseX, mouseY);
+            Point2D axisPoint = xAxis.sceneToLocal(scenePoint);
+            Object first = xAxis.getValueForDisplay(axisPoint.getX() - HIT_RADIUS);
+            Object last = xAxis.getValueForDisplay(axisPoint.getX() + HIT_RADIUS);
+            if (first instanceof Number a && last instanceof Number b
+                    && Double.isFinite(a.doubleValue()) && Double.isFinite(b.doubleValue())) {
+                visibleMin = Math.min(a.doubleValue(), b.doubleValue());
+                visibleMax = Math.max(a.doubleValue(), b.doubleValue());
+            }
+        } catch (RuntimeException ignored) {
+            // Fallback to the full scan until the axes have been laid out.
+        }
+
         for (Object rawSeries : chart.getData()) {
             XYChart.Series series = (XYChart.Series) rawSeries;
             if (focusedOnly && !focus.contains(series)) continue;
             if (spotlightOnly != null && !spotlightOnly.equals(canonicalPopulationName(series.getName()))) continue;
             if (series.getData() == null || series.getData().isEmpty()) continue;
+            List<XYChart.Data> points = series.getData();
+
+            int from = 0;
+            int to = points.size();
+            if (Double.isFinite(visibleMin) && Double.isFinite(visibleMax)
+                    && points.get(0).getXValue() instanceof Number first
+                    && points.get(points.size() - 1).getXValue() instanceof Number last
+                    && first.doubleValue() <= last.doubleValue()) {
+                int lower = timeBound(points, visibleMin, false);
+                int upper = timeBound(points, visibleMax, true);
+                if (lower >= 0 && upper >= 0) {
+                    from = Math.max(0, lower - 1);
+                    to = Math.min(points.size(), upper + 1);
+                }
+            }
 
             XYChart.Data previousData = null;
             Point2D previousPoint = null;
-            for (Object rawData : series.getData()) {
-                XYChart.Data data = (XYChart.Data) rawData;
+            for (int index = from; index < to; index++) {
+                XYChart.Data data = points.get(index);
                 Point2D point = chartPoint(chart, xAxis, yAxis, data);
                 if (point == null) {
                     previousData = null;
@@ -532,6 +571,21 @@ public final class CurveInteractionLinkEnhancer {
             }
         }
         return result;
+    }
+
+    /** Binary-search bounds on time-ordered JavaFX data. A negative result requests a safe full scan. */
+    private static int timeBound(List<?> points, double time, boolean upper) {
+        int low = 0;
+        int high = points.size();
+        while (low < high) {
+            int mid = (low + high) >>> 1;
+            Object value = ((XYChart.Data<?, ?>) points.get(mid)).getXValue();
+            if (!(value instanceof Number number) || !Double.isFinite(number.doubleValue())) return -1;
+            double x = number.doubleValue();
+            if (x < time || (upper && x == time)) low = mid + 1;
+            else high = mid;
+        }
+        return low;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -609,12 +663,15 @@ public final class CurveInteractionLinkEnhancer {
             String name = series.getName();
             boolean inFocus = focus.isEmpty() || focus.contains(series);
             boolean active = inFocus || (!locked && series == hovered);
-            node.setOpacity(active ? 1.0 : isTrigger(name) ? 0.50 : 0.07);
+            double opacity = active ? 1.0 : isTrigger(name) ? 0.50 : 0.07;
+            if (Double.compare(node.getOpacity(), opacity) != 0) node.setOpacity(opacity);
             applySpotlightStyle(node, name, spotlight != null && spotlight.equals(canonicalPopulationName(name)));
         }
     }
 
     private static void applySpotlightStyle(Node seriesNode, String name, boolean spotlight) {
+        boolean alreadyApplied = Boolean.TRUE.equals(seriesNode.getProperties().get(SPOTLIGHT_APPLIED));
+        if (spotlight == alreadyApplied) return; // No CSS lookup or layout invalidation for unchanged styles.
         Node line = seriesNode.lookup(".chart-series-line");
         if (line == null) line = seriesNode;
         if (spotlight) {
@@ -624,11 +681,13 @@ public final class CurveInteractionLinkEnhancer {
             String base = String.valueOf(line.getProperties().get(SPOTLIGHT_STYLE));
             line.setStyle(base + "; -fx-stroke: " + spotlightColor(name) + "; -fx-stroke-width: 3.4px;");
             line.setEffect(new Glow(0.88));
+            seriesNode.getProperties().put(SPOTLIGHT_APPLIED, Boolean.TRUE);
             seriesNode.toFront();
-        } else if (line.getProperties().containsKey(SPOTLIGHT_STYLE)) {
+        } else {
             Object original = line.getProperties().remove(SPOTLIGHT_STYLE);
             line.setStyle(original == null ? "" : original.toString());
             line.setEffect(null);
+            seriesNode.getProperties().remove(SPOTLIGHT_APPLIED);
         }
     }
 
