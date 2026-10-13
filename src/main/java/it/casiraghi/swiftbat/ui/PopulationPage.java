@@ -1026,12 +1026,14 @@ public final class PopulationPage extends BorderPane {
                 }
             }
         });
-        Platform.runLater(() -> {
-            Node node = series.getNode();
-            if (node != null && node.lookup(".chart-series-line") != null) {
-                node.lookup(".chart-series-line").setStyle(style);
-            }
-        });
+        // Most series have no node until the chart skin creates them. Avoid
+        // queuing one runLater task per GRB; the listener above styles each line
+        // as it is created. Handle pre-existing nodes synchronously.
+        Node existing = series.getNode();
+        if (existing != null) {
+            Node line = existing.lookup(".chart-series-line");
+            if (line != null) line.setStyle(style);
+        }
     }
 
     private void populateHistograms(AnalysisResult result) {
