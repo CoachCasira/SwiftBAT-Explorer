@@ -194,15 +194,27 @@ public final class DefinitiveLayoutAndManualSelectionFix {
     private static void alignPopulationFilters(VBox card) {
         HBox row = findTopPopulationRow(card);
         if (row == null || row.getChildren().size() < 5) return;
-        row.setSpacing(8);
+        row.setSpacing(6);
         row.setAlignment(Pos.TOP_LEFT);
+        if (!row.getStyleClass().contains("population-filter-top-row")) {
+            row.getStyleClass().add("population-filter-top-row");
+        }
 
         List<Node> children = row.getChildren();
-        configureTopGroup(children.get(0), 132, 164, 174, false); // T90
-        configureTopGroup(children.get(1), 205, 238, 252, true);  // redshift
-        configureTopGroup(children.get(2), 220, 252, 268, true);  // time window
-        configureFracexp(children.get(3), 338, 374, 392);
-        configureTopGroup(children.get(4), 104, 126, 136, false); // maximum sample
+        // This is the final layout pass, run after the startup polishes. Update
+        // ResponsiveRow's actual sizing basis too: prefWidth changes alone do
+        // not affect wrapping. The five controls require 994 logical px incl. gaps.
+        double[] widths = {125, 190, 205, 338, 112};
+        configureTopGroup(children.get(0), 120, widths[0], 175, false); // T90
+        configureTopGroup(children.get(1), 180, widths[1], 255, true);  // redshift
+        configureTopGroup(children.get(2), 195, widths[2], 270, true);  // time window
+        configureFracexp(children.get(3), 328, widths[3], 460);
+        configureTopGroup(children.get(4), 108, widths[4], 124, false); // compact sample
+        if (row instanceof ResponsiveRow) {
+            for (int i = 0; i < widths.length; i++) {
+                ResponsiveRow.basis(children.get(i), widths[i]);
+            }
+        }
 
         for (Node child : children) {
             if (child instanceof Region region) {

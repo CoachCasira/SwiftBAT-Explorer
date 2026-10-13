@@ -66,6 +66,22 @@ final class ResponsiveRow extends HBox {
     private double[] widths(List<Node> row, double available) {
         double sum = row.stream().mapToDouble(this::basis).sum();
         double usable = Math.max(0, available - getSpacing() * (row.size() - 1));
+
+        if (getStyleClass().contains("population-filter-top-row")) {
+            // Unlike generic rows, the population filters must not stretch the
+            // final "Maximum sample" choice to full width when it wraps alone.
+            double[] result = row.stream().mapToDouble(this::basis).toArray();
+            if (row.size() == getManagedChildren().size() && result.length == 5 && usable > sum) {
+                // Share spare space among the four scientific controls only.
+                // Keep the sample-size selector compact even on a wide screen.
+                double spare = usable - sum;
+                result[0] += spare * 0.10;
+                result[1] += spare * 0.22;
+                result[2] += spare * 0.22;
+                result[3] += spare * 0.46;
+            }
+            return result;
+        }
         return row.stream().mapToDouble(node -> usable * basis(node) / sum).toArray();
     }
 

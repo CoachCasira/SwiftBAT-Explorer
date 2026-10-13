@@ -175,7 +175,7 @@ public final class FinalMacAndPopulationPolish {
         }
         if (top == null) return;
 
-        top.setSpacing(10);
+        top.setSpacing(6);
         top.setAlignment(Pos.TOP_LEFT);
         List<Node> children = top.getChildren();
         if (children.size() < 5) return;
@@ -183,10 +183,10 @@ public final class FinalMacAndPopulationPolish {
         // Keep all five filters on one line on desktop windows. The previous
         // widths totaled over 1,400 logical px, which wrapped Maximum sample
         // into a full-width row even when the page still looked wide.
-        double[] compactWidths = {155, 205, 220, 365, 130};
+        double[] compactWidths = {125, 190, 205, 338, 112};
         polishFilterGroup(children.get(0), compactWidths[0], -1); // T90
-        polishFilterGroup(children.get(1), compactWidths[1], 62); // redshift
-        polishFilterGroup(children.get(2), compactWidths[2], 68); // time window
+        polishFilterGroup(children.get(1), compactWidths[1], 60); // redshift
+        polishFilterGroup(children.get(2), compactWidths[2], 64); // time window
         polishFracexp(children.get(3), compactWidths[3]);
         polishFilterGroup(children.get(4), compactWidths[4], -1); // maximum sample
         if (top instanceof ResponsiveRow) {
