@@ -928,19 +928,22 @@ public final class PopulationPage extends BorderPane {
     }
 
     private void populateCurveChart(AnalysisResult result) {
-        curveChart.getData().clear();
+        // Replace all series in one observable-list change. Adding hundreds of series
+        // separately schedules hundreds of chart focus/skin refreshes on the FX thread.
+        List<XYChart.Series<Number, Number>> rendered = new ArrayList<>(result.curves().size() + 3);
         for (CumulativeAnalysisService.NormalizedCurve curve : result.curves()) {
             XYChart.Series<Number, Number> series = series(curve.grbName(), curve.points());
-            curveChart.getData().add(series);
+            rendered.add(series);
             styleSeries(series, "-fx-stroke: rgba(84, 215, 255, 0.20); -fx-stroke-width: 1px;");
         }
         XYChart.Series<Number, Number> lower = series("25° percentile", result.profile().lowerQuartile());
         XYChart.Series<Number, Number> upper = series("75° percentile", result.profile().upperQuartile());
         XYChart.Series<Number, Number> median = series("Mediana", result.profile().median());
-        curveChart.getData().addAll(List.of(lower, upper, median));
+        rendered.addAll(List.of(lower, upper, median));
         styleSeries(lower, "-fx-stroke: #aa78db; -fx-stroke-width: 2px; -fx-stroke-dash-array: 7 5;");
         styleSeries(upper, "-fx-stroke: #aa78db; -fx-stroke-width: 2px; -fx-stroke-dash-array: 7 5;");
         styleSeries(median, "-fx-stroke: #ffae4a; -fx-stroke-width: 4px;");
+        curveChart.getData().setAll(rendered);
         curveXAxis.setAutoRanging(false);
         curveXAxis.setLowerBound(-result.halfWindow());
         curveXAxis.setUpperBound(result.halfWindow());
@@ -1023,12 +1026,14 @@ public final class PopulationPage extends BorderPane {
                 }
             }
         });
-        Platform.runLater(() -> {
-            Node node = series.getNode();
-            if (node != null && node.lookup(".chart-series-line") != null) {
-                node.lookup(".chart-series-line").setStyle(style);
-            }
-        });
+        // Most series have no node until the chart skin creates them. Avoid
+        // queuing one runLater task per GRB; the listener above styles each line
+        // as it is created. Handle pre-existing nodes synchronously.
+        Node existing = series.getNode();
+        if (existing != null) {
+            Node line = existing.lookup(".chart-series-line");
+            if (line != null) line.setStyle(style);
+        }
     }
 
     private void populateHistograms(AnalysisResult result) {
