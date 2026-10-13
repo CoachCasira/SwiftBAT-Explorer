@@ -175,18 +175,25 @@ public final class FinalMacAndPopulationPolish {
         }
         if (top == null) return;
 
-        top.setSpacing(12);
+        top.setSpacing(10);
         top.setAlignment(Pos.TOP_LEFT);
         List<Node> children = top.getChildren();
         if (children.size() < 5) return;
 
-        // Stable geometry: enough room for every label, but still fits comfortably
-        // in the 1580px reference window without overlaps or ellipses.
-        polishFilterGroup(children.get(0), 190, -1); // T90
-        polishFilterGroup(children.get(1), 260, 80); // redshift
-        polishFilterGroup(children.get(2), 280, 86); // time window
-        polishFracexp(children.get(3), 480);
-        polishFilterGroup(children.get(4), 145, -1); // maximum sample
+        // Keep all five filters on one line on desktop windows. The previous
+        // widths totaled over 1,400 logical px, which wrapped Maximum sample
+        // into a full-width row even when the page still looked wide.
+        double[] compactWidths = {155, 205, 220, 365, 130};
+        polishFilterGroup(children.get(0), compactWidths[0], -1); // T90
+        polishFilterGroup(children.get(1), compactWidths[1], 62); // redshift
+        polishFilterGroup(children.get(2), compactWidths[2], 68); // time window
+        polishFracexp(children.get(3), compactWidths[3]);
+        polishFilterGroup(children.get(4), compactWidths[4], -1); // maximum sample
+        if (top instanceof ResponsiveRow) {
+            for (int i = 0; i < compactWidths.length; i++) {
+                ResponsiveRow.basis(children.get(i), compactWidths[i]);
+            }
+        }
 
         for (Node child : children) {
             if (child instanceof Region region) {
@@ -247,16 +254,16 @@ public final class FinalMacAndPopulationPolish {
                 heading.setSpacing(5);
                 for (Node item : heading.getChildren()) {
                     if (item instanceof Label label && label.getStyleClass().contains("filter-label")) {
-                        label.setMinWidth(72);
-                        label.setPrefWidth(78);
-                        label.setMaxWidth(84);
+                        label.setMinWidth(68);
+                        label.setPrefWidth(74);
+                        label.setMaxWidth(78);
                         label.setWrapText(false);
                         label.setTextOverrun(OverrunStyle.CLIP);
                     } else if (item instanceof HBox valueBox) {
                         valueBox.setSpacing(4);
-                        valueBox.setMinWidth(108);
-                        valueBox.setPrefWidth(116);
-                        valueBox.setMaxWidth(124);
+                        valueBox.setMinWidth(90);
+                        valueBox.setPrefWidth(96);
+                        valueBox.setMaxWidth(100);
                     }
                 }
             }

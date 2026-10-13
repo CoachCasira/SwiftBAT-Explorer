@@ -75,39 +75,26 @@ public final class CumulativeAnalysisService {
                 || time > points.get(points.size() - 1).time()) {
             return Double.NaN;
         }
-        // Normalized curves are sorted by time. Binary search avoids scanning every
-        // point for every second of every curve during a large population analysis.
-        int low = 0;
-        int high = points.size() - 1;
-        while (low <= high) {
-            int middle = (low + high) >>> 1;
-            Point point = points.get(middle);
-            int comparison = Double.compare(point.time(), time);
-            if (comparison == 0) {
-                // Match the original linear scan's first occurrence when a timestamp
-                // is duplicated, so the optimization does not change the data values.
-                while (middle > 0 && Double.compare(points.get(middle - 1).time(), time) == 0) {
-                    middle--;
+        Point previous = points.get(0);
+        if (Double.compare(previous.time(), time) == 0) {
+            return previous.value();
+        }
+        for (int index = 1; index < points.size(); index++) {
+            Point next = points.get(index);
+            if (Double.compare(next.time(), time) == 0) {
+                return next.value();
+            }
+            if (next.time() > time) {
+                double span = next.time() - previous.time();
+                if (span <= 0.0 || span > 2.5) {
+                    return Double.NaN;
                 }
-                return points.get(middle).value();
+                double weight = (time - previous.time()) / span;
+                return previous.value() * (1.0 - weight) + next.value() * weight;
             }
-            if (comparison < 0) {
-                low = middle + 1;
-            } else {
-                high = middle - 1;
-            }
+            previous = next;
         }
-        if (high < 0 || low >= points.size()) {
-            return Double.NaN;
-        }
-        Point previous = points.get(high);
-        Point next = points.get(low);
-        double span = next.time() - previous.time();
-        if (span <= 0.0 || span > 2.5) {
-            return Double.NaN;
-        }
-        double weight = (time - previous.time()) / span;
-        return previous.value() * (1.0 - weight) + next.value() * weight;
+        return Double.NaN;
     }
 
     private double parse(List<String> row, int index) {
