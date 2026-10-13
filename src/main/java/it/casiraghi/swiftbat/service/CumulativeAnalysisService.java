@@ -84,7 +84,12 @@ public final class CumulativeAnalysisService {
             Point point = points.get(middle);
             int comparison = Double.compare(point.time(), time);
             if (comparison == 0) {
-                return point.value();
+                // Match the original linear scan's first occurrence when a timestamp
+                // is duplicated, so the optimization does not change the data values.
+                while (middle > 0 && Double.compare(points.get(middle - 1).time(), time) == 0) {
+                    middle--;
+                }
+                return points.get(middle).value();
             }
             if (comparison < 0) {
                 low = middle + 1;
