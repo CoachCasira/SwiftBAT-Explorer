@@ -52,6 +52,16 @@ class CumulativeAnalysisServiceTest {
         assertTrue(Double.isNaN(service.sampleAt(curve, 0)));
     }
 
+    @Test
+    void preservesFirstValueAtDuplicateTimestamps() {
+        var curve = new CumulativeAnalysisService.NormalizedCurve("GRBDUP", List.of(
+                new CumulativeAnalysisService.Point(-1, 0.1),
+                new CumulativeAnalysisService.Point(0, 0.3),
+                new CumulativeAnalysisService.Point(0, 0.9),
+                new CumulativeAnalysisService.Point(1, 0.8)));
+        assertEquals(0.3, service.sampleAt(curve, 0), 1e-12);
+    }
+
     private GrbData data(String name, double first, double peak, double last) {
         TabularData ascii = new TabularData(
                 List.of("TIME_FROM_TRIGGER_CENTER_S", "RATE_15_350_KEV"),
