@@ -21,6 +21,8 @@ import java.awt.event.MouseWheelEvent;
 import java.awt.geom.Line2D;
 import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
+import java.awt.image.BufferedImage;
+import javax.swing.Timer;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
@@ -73,6 +75,14 @@ public final class Java2DWaterfallPanel extends JPanel {
     private DoubleConsumer zoomListener = value -> { };
     private Consumer<Set<String>> focusListener = ignored -> { };
     private Consumer<String> spotlightListener = ignored -> { };
+    // Full-quality static frame. Hovering a curve must not redraw a hundred
+    // glow paths. The rendered image is invalidated on any visual state change.
+    private BufferedImage staticFrame;
+    private boolean staticFrameDirty = true;
+    private Bounds cachedBounds;
+    private boolean draggingPreview;
+    private final Timer dragFrameTimer = new Timer(33, event -> repaint());
+    private long lastHoverSearchNanos;
 
     public Java2DWaterfallPanel() {
         setOpaque(true);
@@ -81,6 +91,7 @@ public final class Java2DWaterfallPanel extends JPanel {
         setMinimumSize(new Dimension(500, 330));
         setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         setFocusable(true);
+        dragFrameTimer.setRepeats(true);
 
         MouseAdapter mouse = new MouseAdapter() {
             @Override public void mousePressed(MouseEvent event) {
@@ -94,17 +105,28 @@ public final class Java2DWaterfallPanel extends JPanel {
             }
 
             @Override public void mouseReleased(MouseEvent event) {
+                dragFrameTimer.stop();
+                if (draggingPreview) {
+                    draggingPreview = false;
+                    invalidateStaticFrame();
+                    repaint(); // Restore the exact full-quality view after the drag.
+                }
                 setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             }
 
             @Override public void mouseDragged(MouseEvent event) {
-                if (Math.abs(event.getX() - dragStartX) > 3 || Math.abs(event.getY() - dragStartY) > 3) {
-                    draggedSincePress = true;
-                }
+                if (Math.abs(event.getX() - dragStartX) <= 3 && Math.abs(event.getY() - dragStartY) <= 3
+                        && !draggedSincePress) return;
+                draggedSincePress = true;
+                draggingPreview = true;
                 yaw = clamp(dragStartYaw + (event.getX() - dragStartX) * 0.0028, -0.72, 0.72);
                 pitch = clamp(dragStartPitch - (event.getY() - dragStartY) * 0.0032, 0.30, 1.12);
                 hover = null;
-                repaint();
+                // One animation repaint per ~33 ms, not one per raw mouse event.
+                if (!dragFrameTimer.isRunning()) {
+                    repaint();
+                    dragFrameTimer.start();
+                }
             }
 
             @Override public void mouseMoved(MouseEvent event) {
@@ -112,12 +134,16 @@ public final class Java2DWaterfallPanel extends JPanel {
             }
 
             @Override public void mouseExited(MouseEvent event) {
-                hover = null;
-                repaint();
+                if (hover != null) {
+                    hover = null;
+                    invalidateStaticFrame();
+                    repaint();
+                }
             }
 
             @Override public void mouseClicked(MouseEvent event) {
                 if (draggedSincePress) return;
+                invalidateStaticFrame();
 
                 if (interactionLocked) {
                     if (SwingUtilities.isRightMouseButton(event)) {
@@ -165,6 +191,7 @@ public final class Java2DWaterfallPanel extends JPanel {
             @Override public void mouseWheelMoved(MouseWheelEvent event) {
                 zoomAt(event.getX(), event.getY(), event.getPreciseWheelRotation());
                 hover = null;
+                invalidateStaticFrame();
                 zoomListener.accept(zoom);
                 repaint();
                 event.consume();
@@ -181,6 +208,8 @@ public final class Java2DWaterfallPanel extends JPanel {
             return;
         }
         dataset = newDataset == null ? Dataset.empty() : newDataset.copy();
+        cachedBounds = null;
+        invalidateStaticFrame();
         focusedBands.clear();
         spotlightLabel = null;
         hover = null;
@@ -203,6 +232,7 @@ public final class Java2DWaterfallPanel extends JPanel {
         }
         if (spotlightLabel != null && !focusedLabels().contains(spotlightLabel)) spotlightLabel = null;
         hover = null;
+        invalidateStaticFrame();
         repaint();
     }
 
@@ -230,6 +260,7 @@ public final class Java2DWaterfallPanel extends JPanel {
         interactionLocked = locked && !focusedBands.isEmpty();
         if (!interactionLocked) spotlightLabel = null;
         hover = null;
+        invalidateStaticFrame();
         repaint();
     }
 
@@ -241,6 +272,7 @@ public final class Java2DWaterfallPanel extends JPanel {
         if (!interactionLocked || label == null || !focusedLabels().contains(label)) spotlightLabel = null;
         else spotlightLabel = label;
         hover = null;
+        invalidateStaticFrame();
         repaint();
     }
 
@@ -251,6 +283,7 @@ public final class Java2DWaterfallPanel extends JPanel {
         }
         presentation = newPresentation == null ? Presentation.explorerDefaults() : newPresentation;
         hover = null;
+        invalidateStaticFrame();
         repaint();
     }
 
@@ -267,6 +300,7 @@ public final class Java2DWaterfallPanel extends JPanel {
         panY = 0;
         hover = null;
         zoomListener.accept(zoom);
+        invalidateStaticFrame();
         repaint();
     }
 
@@ -292,17 +326,49 @@ public final class Java2DWaterfallPanel extends JPanel {
         zoom = newZoom;
     }
 
+    private void invalidateStaticFrame() {
+        staticFrameDirty = true;
+    }
+
     @Override protected void paintComponent(Graphics graphics) {
         super.paintComponent(graphics);
         Graphics2D g = (Graphics2D) graphics.create();
         try {
-            configure(g);
-            paintBackground(g);
             if (dataset.isEmpty()) {
+                configure(g);
+                paintBackground(g);
                 paintEmpty(g);
                 return;
             }
-            paintChart(g);
+            if (draggingPreview) {
+                // Temporary lightweight preview only while rotating the view.
+                // No change to data or to the image rendered after mouse release.
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+                g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_SPEED);
+                paintBackground(g);
+                paintChart(g);
+                return;
+            }
+            int width = getWidth();
+            int height = getHeight();
+            if (width <= 0 || height <= 0) return;
+            if (staticFrame == null || staticFrameDirty
+                    || staticFrame.getWidth() != width || staticFrame.getHeight() != height) {
+                BufferedImage frame = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+                Graphics2D offscreen = frame.createGraphics();
+                try {
+                    configure(offscreen);
+                    paintBackground(offscreen);
+                    paintChart(offscreen);
+                } finally {
+                    offscreen.dispose();
+                }
+                staticFrame = frame;
+                staticFrameDirty = false;
+            }
+            g.drawImage(staticFrame, 0, 0, null);
+            if (hover != null) paintHover(g, hover);
         } finally {
             g.dispose();
         }
@@ -344,10 +410,10 @@ public final class Java2DWaterfallPanel extends JPanel {
 
         paintAxesAndLabels(g, bounds, geometry);
         paintOrientationHint(g);
-        if (hover != null) paintHover(g, hover);
     }
 
     private Bounds calculateBounds() {
+        if (cachedBounds != null) return cachedBounds;
         double minTime = dataset.times()[0];
         double maxTime = dataset.times()[dataset.times().length - 1];
         double minRate = 0;
@@ -362,7 +428,8 @@ public final class Java2DWaterfallPanel extends JPanel {
         }
         if (maxTime <= minTime) maxTime = minTime + 1;
         if (maxRate <= 0) maxRate = 1;
-        return new Bounds(minTime, maxTime, minRate < 0 ? minRate * 1.30 : -maxRate * 0.08, maxRate * 1.12);
+        cachedBounds = new Bounds(minTime, maxTime, minRate < 0 ? minRate * 1.30 : -maxRate * 0.08, maxRate * 1.12);
+        return cachedBounds;
     }
 
     private void paintGrid(Graphics2D g, Bounds bounds, Geometry geometry) {
@@ -421,7 +488,8 @@ public final class Java2DWaterfallPanel extends JPanel {
         Color color = dataset.colors()[band];
         double zeroNorm = normalize(0, bounds.minRate(), bounds.maxRate());
         Path2D line = new Path2D.Double();
-        Point2D[] points = new Point2D[times.length];
+        Point2D[] points = presentation.showAreaFill() || presentation.showPeakMarkers()
+                ? new Point2D[times.length] : null;
         boolean drawingSegment = false;
         boolean allFinite = true;
         Point2D previousPoint = null;
@@ -437,16 +505,18 @@ public final class Java2DWaterfallPanel extends JPanel {
             }
             Point2D point = geometry.project(normalize(times[index], bounds.minTime(), bounds.maxTime()),
                     normalize(values[index], bounds.minRate(), bounds.maxRate()), band);
-            points[index] = point;
+            if (points != null) points[index] = point;
             if (!drawingSegment) {
                 line.moveTo(point.getX(), point.getY());
                 drawingSegment = true;
             } else {
                 line.lineTo(point.getX(), point.getY());
             }
-            projectedPoints.add(new ProjectedPoint(point, band, index));
-            if (previousPoint != null && previousIndex >= 0) {
-                projectedSegments.add(new ProjectedSegment(previousPoint, point, band, previousIndex, index));
+            if (!draggingPreview) {
+                projectedPoints.add(new ProjectedPoint(point, band, index));
+                if (previousPoint != null && previousIndex >= 0) {
+                    projectedSegments.add(new ProjectedSegment(previousPoint, point, band, previousIndex, index));
+                }
             }
             previousPoint = point;
             previousIndex = index;
@@ -469,9 +539,11 @@ public final class Java2DWaterfallPanel extends JPanel {
         boolean spotlight = isSpotlightBand(band);
         int glowAlpha = spotlight ? 150 : medianBand ? 70 : quartileBand ? 40 : presentation.denseSeries() ? 18 : 55;
         float glowWidth = spotlight ? 12.0f : medianBand ? 8.0f : quartileBand ? 5.0f : presentation.denseSeries() ? 3.0f : 7.5f;
-        g.setColor(withAlpha(color, focusAlpha(band, glowAlpha)));
-        g.setStroke(new BasicStroke(glowWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        g.draw(line);
+        if (!draggingPreview) {
+            g.setColor(withAlpha(color, focusAlpha(band, glowAlpha)));
+            g.setStroke(new BasicStroke(glowWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            g.draw(line);
+        }
 
         int lineAlpha = spotlight ? 255 : medianBand ? 255 : quartileBand ? 235 : presentation.denseSeries() ? 105 : band == 0 ? 245 : 220;
         float lineWidth = spotlight ? 3.6f : medianBand ? 4.2f : quartileBand ? 2.4f : presentation.denseSeries() ? 1.05f : band == 0 ? 2.8f : 2.35f;
@@ -654,18 +726,21 @@ public final class Java2DWaterfallPanel extends JPanel {
     }
 
     private void updateHover(Point mouse) {
+        // The scene may receive hundreds of mouse events per second on modern
+        // trackpads. A 60 Hz hit-test cap preserves responsive tooltips.
+        long now = System.nanoTime();
+        if (now - lastHoverSearchNanos < 16_000_000L) return;
+        lastHoverSearchNanos = now;
         boolean respectFocus = interactionLocked && !focusedBands.isEmpty();
         int onlyBand = interactionLocked && spotlightLabel != null ? spotlightBandIndex() : -1;
         HoverPoint nearest = nearestHit(mouse, respectFocus, onlyBand);
-        if (nearest == null) {
-            if (hover != null) {
-                hover = null;
-                repaint();
-            }
-            return;
+        int oldBand = hover == null ? -1 : hover.band();
+        int newBand = nearest == null ? -1 : nearest.band();
+        if (oldBand != newBand) invalidateStaticFrame();
+        if (hover != null || nearest != null) {
+            hover = nearest;
+            repaint();
         }
-        hover = nearest;
-        repaint();
     }
 
     private void paintHover(Graphics2D g, HoverPoint hovered) {

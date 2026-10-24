@@ -41,6 +41,8 @@ public final class Population3DChartPane extends BorderPane {
     private List<CumulativeAnalysisService.NormalizedCurve> sourceCurves = List.of();
     private CumulativeAnalysisService.PopulationProfile sourceProfile;
     private double sourceHalfWindowSeconds = 60.0;
+    private Java2DWaterfallPanel.Dataset cachedDataset = Java2DWaterfallPanel.Dataset.empty();
+    private boolean newDatasetPending = true;
 
     public Population3DChartPane() {
         getStyleClass().add("three-d-panel");
@@ -79,11 +81,15 @@ public final class Population3DChartPane extends BorderPane {
         sourceCurves = curves == null ? List.of() : List.copyOf(curves);
         sourceProfile = profile;
         sourceHalfWindowSeconds = halfWindowSeconds;
+        cachedDataset = toDataset(sourceCurves, sourceProfile, sourceHalfWindowSeconds);
+        newDatasetPending = true;
         refreshDataset();
     }
 
     private void refreshDataset() {
-        Java2DWaterfallPanel.Dataset dataset = toDataset(sourceCurves, sourceProfile, sourceHalfWindowSeconds);
+        Java2DWaterfallPanel.Dataset dataset = cachedDataset;
+        boolean pushDataset = newDatasetPending;
+        newDatasetPending = false;
         Set<String> focused = CurveInteractionLinkEnhancer.populationFocusedNames();
         boolean locked = CurveInteractionLinkEnhancer.populationFocusLocked() && !focused.isEmpty();
         String spotlight = locked ? CurveInteractionLinkEnhancer.populationSpotlightName() : null;
@@ -108,7 +114,7 @@ public final class Population3DChartPane extends BorderPane {
             // state, not a data filter: the non-selected curves remain dimmed at
             // their original depth, so a one-curve lock cannot collapse the view
             // into a flat 2D plot.
-            renderer.setDataset(finalDataset);
+            if (pushDataset) renderer.setDataset(finalDataset);
             renderer.setFocusedLabels(focused);
             renderer.setInteractionLocked(locked);
             renderer.setSpotlightLabel(spotlight);
