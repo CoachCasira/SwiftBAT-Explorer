@@ -212,6 +212,8 @@ public final class I18n {
         put("Binning temporale", "Time binning");
         put("Banda complessiva", "Overall energy band");
         put("Intervallo temporale", "Time range");
+        put("Intervallo senza campioni validi", "Interval without valid samples");
+        put("Tratteggio indicativo: nessuna interpolazione", "Dashed guide: no interpolation");
         put("Righe ASCII", "ASCII rows");
         put("Righe FITS", "FITS rows");
         put("Campo da spiegare", "Field to explain");
