@@ -185,7 +185,8 @@ public final class Population3DChartPane extends BorderPane {
         titleRow.setAlignment(Pos.CENTER_LEFT);
         Label explanation = UiFactory.wrappedLabel(
                 "La vista 3D riproduce gli stessi elementi del grafico 2D: singoli GRB in azzurro, mediana in arancio e limiti 25°/75° in viola. "
-                        + "La profondità serve solo a separare visivamente le curve e non rappresenta T90, distanza o posizione nello spazio.",
+                        + "La profondità serve solo a separare visivamente le curve e non rappresenta T90, distanza o posizione nello spazio. "
+                        + "I tratti tratteggiati delle curve evidenziate segnalano intervalli privi di campioni.",
                 "overlay-caption");
         FlowPane legend = new FlowPane(14, 6,
                 legendItem("— Singoli GRB", SINGLE_COLOR),

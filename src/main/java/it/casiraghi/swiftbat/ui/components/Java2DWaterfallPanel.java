@@ -525,6 +525,13 @@ public final class Java2DWaterfallPanel extends JPanel {
         boolean allFinite = true;
         Point2D previousPoint = null;
         int previousIndex = -1;
+        // Rendering aid only: a dashed connector identifies a true gap
+        // between two observed samples on the hovered population curve.
+        // The rate series and the hit-test index remain untouched.
+        List<Line2D.Double> missingDataBridges =
+                paintingHoverOverlay && presentation.denseSeries() ? new ArrayList<>() : null;
+        Point2D lastObserved = null;
+        boolean inMissingInterval = false;
 
         for (int index = 0; index < times.length; index++) {
             if (!Double.isFinite(times[index]) || !Double.isFinite(values[index])) {
@@ -532,11 +539,17 @@ public final class Java2DWaterfallPanel extends JPanel {
                 allFinite = false;
                 previousPoint = null;
                 previousIndex = -1;
+                if (lastObserved != null) inMissingInterval = true;
                 continue;
             }
             Point2D point = geometry.project(normalize(times[index], bounds.minTime(), bounds.maxTime()),
                     normalize(values[index], bounds.minRate(), bounds.maxRate()), band);
             if (points != null) points[index] = point;
+            if (missingDataBridges != null && inMissingInterval && lastObserved != null) {
+                missingDataBridges.add(new Line2D.Double(lastObserved, point));
+            }
+            lastObserved = point;
+            inMissingInterval = false;
             if (!drawingSegment) {
                 line.moveTo(point.getX(), point.getY());
                 drawingSegment = true;
@@ -586,6 +599,13 @@ public final class Java2DWaterfallPanel extends JPanel {
             g.setStroke(new BasicStroke(lineWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
         }
         g.draw(line);
+        if (missingDataBridges != null && !missingDataBridges.isEmpty()) {
+            // Dashed gaps are visual annotations, NOT interpolated data.
+            g.setColor(withAlpha(color, 230));
+            g.setStroke(new BasicStroke(1.65f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND,
+                    10f, new float[]{3f, 6f}, 0f));
+            for (Line2D.Double bridge : missingDataBridges) g.draw(bridge);
+        }
 
         int peakIndex = presentation.showPeakMarkers() && isBandActive(band) ? peakIndex(values) : -1;
         if (peakIndex >= 0 && points[peakIndex] != null) {
