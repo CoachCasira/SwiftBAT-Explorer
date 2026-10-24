@@ -55,7 +55,8 @@ public final class PopulationCanvasRenderer {
         XYChart.Data<Number, Number> minimum = null;
         XYChart.Data<Number, Number> maximum = null;
         for (XYChart.Data<Number, Number> sample : samples) {
-            if (!(sample.getYValue() instanceof Number y) || !Double.isFinite(y.doubleValue())) continue;
+            Number y = sample.getYValue();
+            if (y == null || !Double.isFinite(y.doubleValue())) continue;
             if (minimum == null || y.doubleValue() < minimum.getYValue().doubleValue()) minimum = sample;
             if (maximum == null || y.doubleValue() > maximum.getYValue().doubleValue()) maximum = sample;
         }
@@ -107,6 +108,11 @@ public final class PopulationCanvasRenderer {
             return layer.samples.get(series);
         }
         return List.copyOf(series.getData());
+    }
+
+    public static boolean manages(LineChart<?, ?> chart, XYChart.Series<?, ?> series) {
+        Layer layer = layer(chart);
+        return layer != null && layer.enabled && layer.samples.containsKey(series);
     }
 
     @SuppressWarnings("rawtypes")
