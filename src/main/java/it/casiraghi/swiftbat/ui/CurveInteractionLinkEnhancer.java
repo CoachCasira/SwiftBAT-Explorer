@@ -8,6 +8,7 @@ import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.chart.Axis;
 import javafx.scene.chart.LineChart;
+import javafx.scene.chart.ValueAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBase;
@@ -38,6 +39,7 @@ public final class CurveInteractionLinkEnhancer {
     private static final String WATCHED = CurveInteractionLinkEnhancer.class.getName() + ".watched";
     private static final String LINE_DONE = CurveInteractionLinkEnhancer.class.getName() + ".lineDone";
     private static final String HOVER = CurveInteractionLinkEnhancer.class.getName() + ".hover";
+    private static final String HIT_GEOMETRY = CurveInteractionLinkEnhancer.class.getName() + ".hitGeometry";
     private static final String LOCK_DONE = CurveInteractionLinkEnhancer.class.getName() + ".lockDone";
     private static final String LOCK_SYNC = CurveInteractionLinkEnhancer.class.getName() + ".lockSync";
     private static final String LOCK_ADDED = CurveInteractionLinkEnhancer.class.getName() + ".lockAdded";
@@ -373,6 +375,7 @@ public final class CurveInteractionLinkEnhancer {
         });
 
         chart.getData().addListener((ListChangeListener<XYChart.Series>) change -> Platform.runLater(() -> {
+            chart.getProperties().remove(HIT_GEOMETRY);
             restorePopulationFocus(chart);
             applyVisualState(chart);
             installPopulationLockControl(chart);
@@ -501,6 +504,79 @@ public final class CurveInteractionLinkEnhancer {
         return null;
     }
 
+    private record CachedCurve(XYChart.Series series, List<XYChart.Data> source,
+                               double[] x, double[] y, boolean ordered) { }
+
+    private static final class HitGeometry {
+        private final CoordinateMapper mapper;
+        private final double xLow, xHigh, yLow, yHigh;
+        private final double xWidth, yHeight;
+        private final List<CachedCurve> curves;
+
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        private HitGeometry(LineChart chart, CoordinateMapper transform) {
+            this.mapper = transform;
+            Axis xAxis = chart.getXAxis();
+            Axis yAxis = chart.getYAxis();
+            xLow = lowerBound(xAxis);
+            xHigh = upperBound(xAxis);
+            yLow = lowerBound(yAxis);
+            yHigh = upperBound(yAxis);
+            xWidth = xAxis.getWidth();
+            yHeight = yAxis.getHeight();
+            curves = new java.util.ArrayList<>(chart.getData().size());
+            for (Object raw : chart.getData()) {
+                XYChart.Series series = (XYChart.Series) raw;
+                List<XYChart.Data> data = series.getData();
+                if (data == null || data.isEmpty()) continue;
+                double[] xp = new double[data.size()];
+                double[] yp = new double[data.size()];
+                boolean ordered = true;
+                double prevTime = Double.NEGATIVE_INFINITY;
+                for (int i = 0; i < data.size(); i++) {
+                    XYChart.Data point = data.get(i);
+                    Object rawTime = point.getXValue();
+                    if (!(rawTime instanceof Number time) || !Double.isFinite(time.doubleValue())
+                            || time.doubleValue() < prevTime) ordered = false;
+                    else prevTime = time.doubleValue();
+                    Point2D projected = chartPoint(chart, xAxis, yAxis, point, transform);
+                    xp[i] = projected == null ? Double.NaN : projected.getX();
+                    yp[i] = projected == null ? Double.NaN : projected.getY();
+                }
+                curves.add(new CachedCurve(series, data, xp, yp, ordered));
+            }
+        }
+
+        @SuppressWarnings("rawtypes")
+        private boolean matches(LineChart chart, CoordinateMapper transform) {
+            return java.util.Objects.equals(mapper, transform)
+                    && Double.compare(xLow, lowerBound(chart.getXAxis())) == 0
+                    && Double.compare(xHigh, upperBound(chart.getXAxis())) == 0
+                    && Double.compare(yLow, lowerBound(chart.getYAxis())) == 0
+                    && Double.compare(yHigh, upperBound(chart.getYAxis())) == 0
+                    && Double.compare(xWidth, chart.getXAxis().getWidth()) == 0
+                    && Double.compare(yHeight, chart.getYAxis().getHeight()) == 0
+                    && curves.size() == chart.getData().size();
+        }
+    }
+
+    private static double lowerBound(Axis<?> axis) {
+        return axis instanceof ValueAxis<?> value ? value.getLowerBound() : Double.NaN;
+    }
+
+    private static double upperBound(Axis<?> axis) {
+        return axis instanceof ValueAxis<?> value ? value.getUpperBound() : Double.NaN;
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static HitGeometry hitGeometry(LineChart chart, CoordinateMapper mapper) {
+        Object raw = chart.getProperties().get(HIT_GEOMETRY);
+        if (raw instanceof HitGeometry old && old.matches(chart, mapper)) return old;
+        HitGeometry rebuilt = new HitGeometry(chart, mapper);
+        chart.getProperties().put(HIT_GEOMETRY, rebuilt);
+        return rebuilt;
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static SeriesHit nearest(LineChart chart, double mouseX, double mouseY,
                                      boolean focusedOnly, String spotlightOnly) {
@@ -509,13 +585,10 @@ public final class CurveInteractionLinkEnhancer {
         Axis yAxis = chart.getYAxis();
         Set<XYChart.Series> focus = focusedOnly ? focusedSeries(chart) : Set.of();
         CoordinateMapper mapper = coordinateMapper(chart, xAxis, yAxis);
+        HitGeometry geometry = hitGeometry(chart, mapper);
         double best = HIT_RADIUS * HIT_RADIUS;
         SeriesHit result = null;
 
-        // The population series are ordered by time. Convert the cursor's
-        // hit-radius into axis coordinates once, then examine only the nearby
-        // samples and their immediate neighbors. If layout is incomplete or
-        // data are not sorted, the original exhaustive search remains in use.
         double leftX = Double.NaN;
         double rightX = Double.NaN;
         try {
@@ -529,61 +602,57 @@ public final class CurveInteractionLinkEnhancer {
                 rightX = Math.max(low.doubleValue(), high.doubleValue());
             }
         } catch (RuntimeException ignored) {
-            // Axis transforms may be unavailable during the first layout pulse.
+            // A chart in its initial layout may not expose stable axis transforms.
         }
 
-        for (Object rawSeries : chart.getData()) {
-            XYChart.Series series = (XYChart.Series) rawSeries;
+        // Pixel coordinates are computed only when a chart is created, resized,
+        // reranged or repopulated; ordinary hover does not reproject every GRB.
+        for (CachedCurve curve : geometry.curves) {
+            XYChart.Series series = curve.series();
             if (focusedOnly && !focus.contains(series)) continue;
             if (spotlightOnly != null && !spotlightOnly.equals(canonicalPopulationName(series.getName()))) continue;
-            if (series.getData() == null || series.getData().isEmpty()) continue;
 
-            List<XYChart.Data> points = series.getData();
-            int from = 0;
-            int until = points.size();
-            if (Double.isFinite(leftX) && Double.isFinite(rightX)
-                    && points.get(0).getXValue() instanceof Number first
-                    && points.get(points.size() - 1).getXValue() instanceof Number last
-                    && Double.isFinite(first.doubleValue()) && Double.isFinite(last.doubleValue())
-                    && first.doubleValue() <= last.doubleValue()) {
+            List<XYChart.Data> points = curve.source();
+            int from = 0, until = points.size();
+            if (curve.ordered() && Double.isFinite(leftX) && Double.isFinite(rightX)) {
                 int lower = timeBound(points, leftX, false);
                 int upper = timeBound(points, rightX, true);
                 if (lower >= 0 && upper >= 0) {
-                    // Add a neighbor on either side to retain segment hit testing
-                    // for long gaps and for hits close to a sampling boundary.
                     from = Math.max(0, lower - 1);
                     until = Math.min(points.size(), upper + 1);
                 }
             }
-
-            XYChart.Data previousData = null;
-            Point2D previousPoint = null;
-            for (int i = from; i < until; i++) {
-                XYChart.Data data = points.get(i);
-                Point2D point = chartPoint(chart, xAxis, yAxis, data, mapper);
-                if (point == null) {
-                    previousData = null;
-                    previousPoint = null;
+            int prevIndex = -1;
+            for (int index = from; index < until; index++) {
+                double px = curve.x()[index], py = curve.y()[index];
+                if (!Double.isFinite(px) || !Double.isFinite(py)) {
+                    prevIndex = -1;
                     continue;
                 }
-
-                double pointDistance = squaredDistance(point.getX(), point.getY(), mouseX, mouseY);
+                double dx = px - mouseX, dy = py - mouseY;
+                double pointDistance = dx * dx + dy * dy;
                 if (pointDistance < best) {
                     best = pointDistance;
-                    result = new SeriesHit(series, data.getXValue(), data.getYValue());
+                    XYChart.Data point = points.get(index);
+                    result = new SeriesHit(series, point.getXValue(), point.getYValue());
                 }
-
-                if (previousPoint != null && previousData != null) {
-                    SegmentProjection projection = project(mouseX, mouseY, previousPoint, point);
-                    if (projection.distanceSquared() < best) {
-                        best = projection.distanceSquared();
-                        Object xValue = interpolateValue(previousData.getXValue(), data.getXValue(), projection.fraction());
-                        Object yValue = interpolateValue(previousData.getYValue(), data.getYValue(), projection.fraction());
-                        result = new SeriesHit(series, xValue, yValue);
+                if (prevIndex >= 0) {
+                    double ax = curve.x()[prevIndex], ay = curve.y()[prevIndex];
+                    double vx = px - ax, vy = py - ay;
+                    double lengthSquared = vx * vx + vy * vy;
+                    double fraction = lengthSquared < 1e-12 ? 0
+                            : Math.max(0, Math.min(1, ((mouseX - ax) * vx + (mouseY - ay) * vy) / lengthSquared));
+                    double ex = ax + fraction * vx - mouseX, ey = ay + fraction * vy - mouseY;
+                    double segmentDistance = ex * ex + ey * ey;
+                    if (segmentDistance < best) {
+                        best = segmentDistance;
+                        XYChart.Data left = points.get(prevIndex), right = points.get(index);
+                        result = new SeriesHit(series,
+                                interpolateValue(left.getXValue(), right.getXValue(), fraction),
+                                interpolateValue(left.getYValue(), right.getYValue(), fraction));
                     }
                 }
-                previousData = data;
-                previousPoint = point;
+                prevIndex = index;
             }
         }
         return result;
