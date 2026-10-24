@@ -81,6 +81,7 @@ public final class Java2DWaterfallPanel extends JPanel {
     private boolean staticFrameDirty = true;
     private Bounds cachedBounds;
     private boolean draggingPreview;
+    private boolean paintingHoverOverlay;
     private final Timer dragFrameTimer = new Timer(33, event -> repaint());
     private long lastHoverSearchNanos;
 
@@ -136,7 +137,6 @@ public final class Java2DWaterfallPanel extends JPanel {
             @Override public void mouseExited(MouseEvent event) {
                 if (hover != null) {
                     hover = null;
-                    invalidateStaticFrame();
                     repaint();
                 }
             }
@@ -357,18 +357,39 @@ public final class Java2DWaterfallPanel extends JPanel {
                     || staticFrame.getWidth() != width || staticFrame.getHeight() != height) {
                 BufferedImage frame = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
                 Graphics2D offscreen = frame.createGraphics();
+                HoverPoint retainedHover = hover;
                 try {
+                    // Cache the frame without mouse highlighting. Hovering then
+                    // paints only one curve, never all 100+ curves again.
+                    hover = null;
                     configure(offscreen);
                     paintBackground(offscreen);
                     paintChart(offscreen);
                 } finally {
+                    hover = retainedHover;
                     offscreen.dispose();
                 }
                 staticFrame = frame;
                 staticFrameDirty = false;
             }
             g.drawImage(staticFrame, 0, 0, null);
-            if (hover != null) paintHover(g, hover);
+            if (hover != null) {
+                configure(g);
+                int band = hover.band();
+                if (band >= 0 && band < dataset.bandCount()) {
+                    // The selected line is painted on top of the cached image,
+                    // improving visibility without connecting invalid/missing data.
+                    paintingHoverOverlay = true;
+                    try {
+                        Geometry geometry = new Geometry(getWidth(), getHeight(),
+                                dataset.bandCount(), yaw, pitch, zoom, panX, panY);
+                        paintBand(g, band, calculateBounds(), geometry);
+                    } finally {
+                        paintingHoverOverlay = false;
+                    }
+                }
+                paintHover(g, hover);
+            }
         } finally {
             g.dispose();
         }
@@ -512,7 +533,7 @@ public final class Java2DWaterfallPanel extends JPanel {
             } else {
                 line.lineTo(point.getX(), point.getY());
             }
-            if (!draggingPreview) {
+            if (!draggingPreview && !paintingHoverOverlay) {
                 projectedPoints.add(new ProjectedPoint(point, band, index));
                 if (previousPoint != null && previousIndex >= 0) {
                     projectedSegments.add(new ProjectedSegment(previousPoint, point, band, previousIndex, index));
@@ -734,9 +755,8 @@ public final class Java2DWaterfallPanel extends JPanel {
         boolean respectFocus = interactionLocked && !focusedBands.isEmpty();
         int onlyBand = interactionLocked && spotlightLabel != null ? spotlightBandIndex() : -1;
         HoverPoint nearest = nearestHit(mouse, respectFocus, onlyBand);
-        int oldBand = hover == null ? -1 : hover.band();
-        int newBand = nearest == null ? -1 : nearest.band();
-        if (oldBand != newBand) invalidateStaticFrame();
+        // The full-quality image remains cached; only the hovered line and
+        // tooltip are redrawn on top of it.
         if (hover != null || nearest != null) {
             hover = nearest;
             repaint();
