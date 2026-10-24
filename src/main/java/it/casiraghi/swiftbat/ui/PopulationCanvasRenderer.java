@@ -261,6 +261,10 @@ public final class PopulationCanvasRenderer {
                 boolean inFocus = selected.isEmpty() || selected.contains(series);
                 boolean isSpotlight = locked && spotlight != null && spotlight.equals(series.getName());
                 if (isSpotlight) {
+                    // Reproduce the 25-GRB JavaFX lock spotlight: a restrained
+                    // cyan halo around the 3.4-pixel selected curve.
+                    // This is part of the cached image, never a hover repaint.
+                    draw(g, entry.getValue(), EMPHASIS, 0.12, 6.5);
                     draw(g, entry.getValue(), EMPHASIS, 1.0, 3.4);
                 } else {
                     // Same 20% cyan used by the original population series.
@@ -273,20 +277,16 @@ public final class PopulationCanvasRenderer {
             GraphicsContext g = highlight.getGraphicsContext2D();
             g.clearRect(0, 0, highlight.getWidth(), highlight.getHeight());
             if (hovered == null) return;
-            List<XYChart.Data<Number, Number>> points = samples.get(hovered);
-            if (points == null) return;
-            // The lock restricts candidate curves in the hit tester. A
-            // spotlight must not suppress hover on another selected GRB.
-            // Unlocked hover can also preview a dimmed, unselected curve.
-            if (locked && !selected.isEmpty() && !selected.contains(hovered)) return;
 
-            // A soft halo followed by a precise bright stroke restores the
-            // click affordance from the original chart. Only this lightweight
-            // foreground Canvas is cleared per hover; the cached 100-curve
-            // background never needs repainting.
-            draw(g, points, EMPHASIS, 0.13, 8.0);
-            draw(g, points, EMPHASIS, 0.34, 4.5);
-            draw(g, points, EMPHASIS, 0.96, 2.2);
+            // The original LineChart (up to 25 GRBs) does not thicken a line
+            // on hover. It only restores normal opacity to an unselected curve
+            // when another curve is selected; otherwise it shows the tooltip.
+            // Mirror that behavior instead of painting an oversized neon halo.
+            if (selected.isEmpty() || selected.contains(hovered) || locked) return;
+            List<XYChart.Data<Number, Number>> points = samples.get(hovered);
+            if (points != null) {
+                draw(g, points, CYAN, 0.20, 1.0);
+            }
         }
 
         private void draw(GraphicsContext g, List<XYChart.Data<Number, Number>> points,

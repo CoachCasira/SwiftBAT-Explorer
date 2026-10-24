@@ -593,16 +593,20 @@ public final class Java2DWaterfallPanel extends JPanel {
         boolean medianBand = isMedianBand(band);
         boolean quartileBand = isQuartileBand(band);
         boolean spotlight = isSpotlightBand(band);
-        int glowAlpha = spotlight ? 150 : medianBand ? 70 : quartileBand ? 40 : presentation.denseSeries() ? 18 : 55;
-        float glowWidth = spotlight ? 12.0f : medianBand ? 8.0f : quartileBand ? 5.0f : presentation.denseSeries() ? 3.0f : 7.5f;
+        // Dense datasets remain lightweight in the cached background.
+        // Only the hovered curve receives the very same visual treatment
+        // it would have received with 25 GRBs.
+        boolean denseBackground = presentation.denseSeries() && !paintingHoverOverlay;
+        int glowAlpha = spotlight ? 150 : medianBand ? 70 : quartileBand ? 40 : denseBackground ? 18 : 55;
+        float glowWidth = spotlight ? 12.0f : medianBand ? 8.0f : quartileBand ? 5.0f : denseBackground ? 3.0f : 7.5f;
         if (!draggingPreview) {
             g.setColor(withAlpha(color, focusAlpha(band, glowAlpha)));
             g.setStroke(new BasicStroke(glowWidth, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             g.draw(line);
         }
 
-        int lineAlpha = spotlight ? 255 : medianBand ? 255 : quartileBand ? 235 : presentation.denseSeries() ? 105 : band == 0 ? 245 : 220;
-        float lineWidth = spotlight ? 3.6f : medianBand ? 4.2f : quartileBand ? 2.4f : presentation.denseSeries() ? 1.05f : band == 0 ? 2.8f : 2.35f;
+        int lineAlpha = spotlight ? 255 : medianBand ? 255 : quartileBand ? 235 : denseBackground ? 105 : band == 0 ? 245 : 220;
+        float lineWidth = spotlight ? 3.6f : medianBand ? 4.2f : quartileBand ? 2.4f : denseBackground ? 1.05f : band == 0 ? 2.8f : 2.35f;
         if (!isBandActive(band)) lineWidth = Math.min(1.0f, lineWidth);
         g.setColor(withAlpha(color, focusAlpha(band, lineAlpha)));
         if (quartileBand) {
@@ -795,7 +799,10 @@ public final class Java2DWaterfallPanel extends JPanel {
         if (now - lastHoverSearchNanos < 16_000_000L) return;
         lastHoverSearchNanos = now;
         boolean respectFocus = interactionLocked && !focusedBands.isEmpty();
-        int onlyBand = interactionLocked && spotlightLabel != null ? spotlightBandIndex() : -1;
+        // When locked, the spotlight is the last clicked curve, not an exclusive
+        // hover target. The other locked curves must remain hoverable as in the
+        // 25-GRB view.
+        int onlyBand = -1;
         // A dashed gap is not a measured value; give it its own explanation.
         GapHover gap = nearestGap(mouse, onlyBand);
         if (gap != null) {
