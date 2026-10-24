@@ -279,10 +279,10 @@ public final class CurveInteractionLinkEnhancer {
 
         final long[] previousHoverFrameNanos = {0L};
         chart.addEventHandler(MouseEvent.MOUSE_MOVED, event -> {
-            // Cap expensive hit testing to about 60 Hz on high-polling Mac trackpads.
+            // Cap tooltip hit testing to about 30 Hz for 100+ displayed curves.
             // Clicks still use exact unthrottled hit testing.
             long now = System.nanoTime();
-            if (now - previousHoverFrameNanos[0] < 16_000_000L) return;
+            if (now - previousHoverFrameNanos[0] < 33_000_000L) return;
             previousHoverFrameNanos[0] = now;
             boolean locked = populationFocusLocked();
             String spotlight = locked ? populationSpotlightName() : null;
@@ -301,14 +301,17 @@ public final class CurveInteractionLinkEnhancer {
             String seriesName = hit.series().getName() == null ? I18n.dynamic("Curva", "Curve") : hit.series().getName();
             String xLabel = chart.getXAxis().getLabel();
             String yLabel = chart.getYAxis().getLabel();
-            tooltip.setText(seriesName + "\n"
+            String description = seriesName + "\n"
                     + (xLabel == null || xLabel.isBlank() ? "X" : xLabel) + ": " + format(hit.xValue()) + "\n"
-                    + (yLabel == null || yLabel.isBlank() ? "Y" : yLabel) + ": " + format(hit.yValue()));
+                    + (yLabel == null || yLabel.isBlank() ? "Y" : yLabel) + ": " + format(hit.yValue());
+            if (!description.equals(tooltip.getText())) tooltip.setText(description);
+            double tipX = event.getScreenX() + 14;
+            double tipY = event.getScreenY() + 14;
             if (!tooltip.isShowing()) {
-                tooltip.show(chart, event.getScreenX() + 14, event.getScreenY() + 14);
+                tooltip.show(chart, tipX, tipY);
             } else {
-                tooltip.setAnchorX(event.getScreenX() + 14);
-                tooltip.setAnchorY(event.getScreenY() + 14);
+                if (Math.abs(tooltip.getAnchorX() - tipX) > 3) tooltip.setAnchorX(tipX);
+                if (Math.abs(tooltip.getAnchorY() - tipY) > 3) tooltip.setAnchorY(tipY);
             }
         });
 
@@ -499,6 +502,7 @@ public final class CurveInteractionLinkEnhancer {
         Axis xAxis = chart.getXAxis();
         Axis yAxis = chart.getYAxis();
         Set<XYChart.Series> focus = focusedOnly ? focusedSeries(chart) : Set.of();
+        CoordinateMapper mapper = coordinateMapper(chart, xAxis, yAxis);
         double best = HIT_RADIUS * HIT_RADIUS;
         SeriesHit result = null;
 
@@ -550,7 +554,7 @@ public final class CurveInteractionLinkEnhancer {
             Point2D previousPoint = null;
             for (int i = from; i < until; i++) {
                 XYChart.Data data = points.get(i);
-                Point2D point = chartPoint(chart, xAxis, yAxis, data);
+                Point2D point = chartPoint(chart, xAxis, yAxis, data, mapper);
                 if (point == null) {
                     previousData = null;
                     previousPoint = null;
@@ -594,8 +598,42 @@ public final class CurveInteractionLinkEnhancer {
         return low;
     }
 
+    /**
+     * A single affine coordinate map per mouse event replaces thousands of
+     * localToScene/sceneToLocal calls when many GRBs share the same time window.
+     * This reproduces the original chartPoint transformation, including HiDPI
+     * scale, because both axes and the chart use affine scene transforms.
+     */
+    private record CoordinateMapper(double x0, double y0,
+                                    double xx, double xy, double yx, double yy) {
+        Point2D point(double x, double y) {
+            return new Point2D(x0 + xx * x + yx * y, y0 + xy * x + yy * y);
+        }
+    }
+
+    @SuppressWarnings("rawtypes")
+    private static CoordinateMapper coordinateMapper(LineChart chart, Axis xAxis, Axis yAxis) {
+        try {
+            Point2D x0 = xAxis.localToScene(0, 0);
+            Point2D x1 = xAxis.localToScene(1, 0);
+            Point2D y0 = yAxis.localToScene(0, 0);
+            Point2D y1 = yAxis.localToScene(0, 1);
+            if (x0 == null || x1 == null || y0 == null || y1 == null) return null;
+            Point2D base = chart.sceneToLocal(x0.getX(), y0.getY());
+            Point2D xUnit = chart.sceneToLocal(x1.getX(), y0.getY());
+            Point2D yUnit = chart.sceneToLocal(x0.getX(), y1.getY());
+            if (base == null || xUnit == null || yUnit == null) return null;
+            return new CoordinateMapper(base.getX(), base.getY(),
+                    xUnit.getX() - base.getX(), xUnit.getY() - base.getY(),
+                    yUnit.getX() - base.getX(), yUnit.getY() - base.getY());
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private static Point2D chartPoint(LineChart chart, Axis xAxis, Axis yAxis, XYChart.Data data) {
+    private static Point2D chartPoint(LineChart chart, Axis xAxis, Axis yAxis,
+                                      XYChart.Data data, CoordinateMapper mapper) {
         Object xValue = data.getXValue();
         Object yValue = data.getYValue();
         if (xValue == null || yValue == null) return null;
@@ -603,6 +641,8 @@ public final class CurveInteractionLinkEnhancer {
             double xDisplay = xAxis.getDisplayPosition(xValue);
             double yDisplay = yAxis.getDisplayPosition(yValue);
             if (!Double.isFinite(xDisplay) || !Double.isFinite(yDisplay)) return null;
+            if (mapper != null) return mapper.point(xDisplay, yDisplay);
+            // Fallback for a chart undergoing initial layout.
             Point2D xScene = xAxis.localToScene(xDisplay, 0);
             Point2D yScene = yAxis.localToScene(0, yDisplay);
             if (xScene == null || yScene == null) return null;
