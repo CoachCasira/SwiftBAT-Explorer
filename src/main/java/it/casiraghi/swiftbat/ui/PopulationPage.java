@@ -496,6 +496,9 @@ public final class PopulationPage extends BorderPane {
         copyAxis(curveXAxis, xAxis);
         copyAxis(curveYAxis, yAxis);
 
+        boolean dense = PopulationCanvasRenderer.enabled(curveChart);
+        Map<XYChart.Series<Number, Number>, List<XYChart.Data<Number, Number>>> canvasSources
+                = new LinkedHashMap<>();
         for (XYChart.Series<Number, Number> source : curveChart.getData()) {
             XYChart.Series<Number, Number> target = new XYChart.Series<>();
             target.setName(source.getName());
@@ -503,9 +506,22 @@ public final class PopulationPage extends BorderPane {
                 target.getData().add(new XYChart.Data<>(point.getXValue(), point.getYValue()));
             }
             copy.getData().add(target);
-            styleSeries(target, profileSeriesStyle(target.getName()));
+            boolean individual = isPopulationIndividual(source.getName());
+            if (dense && individual) {
+                canvasSources.put(target, PopulationCanvasRenderer.samplesForCopy(curveChart, source));
+                styleSeries(target, "-fx-stroke: transparent; -fx-stroke-width: 0px;");
+            } else {
+                styleSeries(target, profileSeriesStyle(target.getName()));
+            }
         }
+        if (dense) PopulationCanvasRenderer.install(copy, canvasSources);
         return copy;
+    }
+
+    private static boolean isPopulationIndividual(String name) {
+        if (name == null) return false;
+        String lower = name.toLowerCase(Locale.ROOT);
+        return !lower.contains("percentile") && !lower.equals("mediana") && !lower.equals("median");
     }
 
     private void copyAxis(NumberAxis source, NumberAxis target) {
@@ -928,11 +944,27 @@ public final class PopulationPage extends BorderPane {
     }
 
     private void populateCurveChart(AnalysisResult result) {
+        // Small samples retain the original JavaFX LineChart implementation.
+        // Dense samples use Canvas for individual curves, keeping the same axes,
+        // median, percentiles, chart identity and interaction controls.
+        PopulationCanvasRenderer.clear(curveChart);
         curveChart.getData().clear();
+        boolean dense = result.curves().size() >= PopulationCanvasRenderer.MIN_CANVAS_CURVES;
+        Map<XYChart.Series<Number, Number>, List<XYChart.Data<Number, Number>>> canvasSources
+                = new LinkedHashMap<>();
         for (CumulativeAnalysisService.NormalizedCurve curve : result.curves()) {
-            XYChart.Series<Number, Number> series = series(curve.grbName(), curve.points());
-            curveChart.getData().add(series);
-            styleSeries(series, "-fx-stroke: rgba(84, 215, 255, 0.20); -fx-stroke-width: 1px;");
+            XYChart.Series<Number, Number> scientific = series(curve.grbName(), curve.points());
+            XYChart.Series<Number, Number> displayed = dense
+                    ? PopulationCanvasRenderer.proxy(curve.grbName(), scientific.getData())
+                    : scientific;
+            curveChart.getData().add(displayed);
+            if (dense) {
+                canvasSources.put(displayed, List.copyOf(scientific.getData()));
+                // Proxy nodes affect axis auto-ranging, but are never rendered.
+                styleSeries(displayed, "-fx-stroke: transparent; -fx-stroke-width: 0px;");
+            } else {
+                styleSeries(displayed, "-fx-stroke: rgba(84, 215, 255, 0.20); -fx-stroke-width: 1px;");
+            }
         }
         XYChart.Series<Number, Number> lower = series("25° percentile", result.profile().lowerQuartile());
         XYChart.Series<Number, Number> upper = series("75° percentile", result.profile().upperQuartile());
@@ -945,6 +977,7 @@ public final class PopulationPage extends BorderPane {
         curveXAxis.setLowerBound(-result.halfWindow());
         curveXAxis.setUpperBound(result.halfWindow());
         curveXAxis.setTickUnit(result.halfWindow() <= 20 ? 5 : result.halfWindow() <= 60 ? 15 : 30);
+        if (dense) PopulationCanvasRenderer.install(curveChart, canvasSources);
         curveChart.setTitle(I18n.t(result.curves().size() + " curve normalizzate e allineate a t = 0"));
     }
 
