@@ -57,6 +57,7 @@ public final class Java2DWaterfallPanel extends JPanel {
     private Presentation presentation = Presentation.explorerDefaults();
     private final List<ProjectedPoint> projectedPoints = new ArrayList<>();
     private final List<ProjectedSegment> projectedSegments = new ArrayList<>();
+    private final List<ProjectedGap> projectedGaps = new ArrayList<>();
     private final Set<Integer> focusedBands = new LinkedHashSet<>();
 
     private double yaw = 0.32;
@@ -72,6 +73,7 @@ public final class Java2DWaterfallPanel extends JPanel {
     private boolean interactionLocked;
     private String spotlightLabel;
     private HoverPoint hover;
+    private GapHover hoverGap;
     private DoubleConsumer zoomListener = value -> { };
     private Consumer<Set<String>> focusListener = ignored -> { };
     private Consumer<String> spotlightListener = ignored -> { };
@@ -123,6 +125,7 @@ public final class Java2DWaterfallPanel extends JPanel {
                 yaw = clamp(dragStartYaw + (event.getX() - dragStartX) * 0.0028, -0.72, 0.72);
                 pitch = clamp(dragStartPitch - (event.getY() - dragStartY) * 0.0032, 0.30, 1.12);
                 hover = null;
+                hoverGap = null;
                 // One animation repaint per ~33 ms, not one per raw mouse event.
                 if (!dragFrameTimer.isRunning()) {
                     repaint();
@@ -135,8 +138,9 @@ public final class Java2DWaterfallPanel extends JPanel {
             }
 
             @Override public void mouseExited(MouseEvent event) {
-                if (hover != null) {
+                if (hover != null || hoverGap != null) {
                     hover = null;
+                    hoverGap = null;
                     repaint();
                 }
             }
@@ -208,6 +212,7 @@ public final class Java2DWaterfallPanel extends JPanel {
             return;
         }
         dataset = newDataset == null ? Dataset.empty() : newDataset.copy();
+        hoverGap = null;
         cachedBounds = null;
         invalidateStaticFrame();
         focusedBands.clear();
@@ -232,6 +237,7 @@ public final class Java2DWaterfallPanel extends JPanel {
         }
         if (spotlightLabel != null && !focusedLabels().contains(spotlightLabel)) spotlightLabel = null;
         hover = null;
+        hoverGap = null;
         invalidateStaticFrame();
         repaint();
     }
@@ -383,7 +389,10 @@ public final class Java2DWaterfallPanel extends JPanel {
                 staticFrameDirty = false;
             }
             g.drawImage(staticFrame, 0, 0, null);
-            if (hover != null) {
+            if (hoverGap != null) {
+                configure(g);
+                paintGapHover(g, hoverGap);
+            } else if (hover != null) {
                 configure(g);
                 int band = hover.band();
                 if (band >= 0 && band < dataset.bandCount()) {
@@ -428,6 +437,7 @@ public final class Java2DWaterfallPanel extends JPanel {
     private void paintChart(Graphics2D g) {
         projectedPoints.clear();
         projectedSegments.clear();
+        projectedGaps.clear();
         Bounds bounds = calculateBounds();
         Geometry geometry = new Geometry(getWidth(), getHeight(), dataset.bandCount(), yaw, pitch, zoom, panX, panY);
         paintGrid(g, bounds, geometry);
@@ -528,8 +538,9 @@ public final class Java2DWaterfallPanel extends JPanel {
         // Rendering aid only: a dashed connector identifies a true gap
         // between two observed samples on the hovered population curve.
         // The rate series and the hit-test index remain untouched.
-        List<Line2D.Double> missingDataBridges =
-                paintingHoverOverlay && presentation.denseSeries() ? new ArrayList<>() : null;
+        boolean annotateGaps = presentation.denseSeries() && !draggingPreview
+                && (paintingHoverOverlay || focusedBands.contains(band));
+        List<Line2D.Double> missingDataBridges = annotateGaps ? new ArrayList<>() : null;
         Point2D lastObserved = null;
         boolean inMissingInterval = false;
 
@@ -547,6 +558,7 @@ public final class Java2DWaterfallPanel extends JPanel {
             if (points != null) points[index] = point;
             if (missingDataBridges != null && inMissingInterval && lastObserved != null) {
                 missingDataBridges.add(new Line2D.Double(lastObserved, point));
+                if (!paintingHoverOverlay) projectedGaps.add(new ProjectedGap(lastObserved, point, band));
             }
             lastObserved = point;
             inMissingInterval = false;
@@ -784,13 +796,75 @@ public final class Java2DWaterfallPanel extends JPanel {
         lastHoverSearchNanos = now;
         boolean respectFocus = interactionLocked && !focusedBands.isEmpty();
         int onlyBand = interactionLocked && spotlightLabel != null ? spotlightBandIndex() : -1;
+        // A dashed gap is not a measured value; give it its own explanation.
+        GapHover gap = nearestGap(mouse, onlyBand);
+        if (gap != null) {
+            hover = null;
+            hoverGap = gap;
+            repaint();
+            return;
+        }
         HoverPoint nearest = nearestHit(mouse, respectFocus, onlyBand);
-        // The full-quality image remains cached; only the hovered line and
-        // tooltip are redrawn on top of it.
-        if (hover != null || nearest != null) {
+        boolean wasVisible = hover != null || hoverGap != null;
+        hoverGap = null;
+        if (wasVisible || nearest != null) {
             hover = nearest;
             repaint();
         }
+    }
+
+    private GapHover nearestGap(Point mouse, int onlyBand) {
+        GapHover nearest = null;
+        double closest = 10.0 * 10.0;
+        for (ProjectedGap gap : projectedGaps) {
+            if (onlyBand >= 0 && gap.band() != onlyBand) continue;
+            if (!focusedBands.contains(gap.band())) continue;
+            SegmentProjection result = project(mouse, gap.start(), gap.end());
+            if (result.distanceSquared() >= closest) continue;
+            closest = result.distanceSquared();
+            Point2D center = new Point2D.Double(
+                    lerp(gap.start().getX(), gap.end().getX(), result.fraction()),
+                    lerp(gap.start().getY(), gap.end().getY(), result.fraction()));
+            nearest = new GapHover(center, gap.band());
+        }
+        return nearest;
+    }
+
+    private void paintGapHover(Graphics2D g, GapHover gap) {
+        Point2D point = gap.point();
+        Color color = dataset.colors()[gap.band()];
+        g.setColor(Color.WHITE);
+        g.fillOval((int) point.getX() - 4, (int) point.getY() - 4, 8, 8);
+        g.setColor(color);
+        g.setStroke(new BasicStroke(1.8f));
+        g.drawOval((int) point.getX() - 7, (int) point.getY() - 7, 14, 14);
+        String[] lines = {
+                I18n.t(labelForBand(gap.band())),
+                I18n.dynamic("Intervallo senza campioni validi", "Interval without valid samples"),
+                I18n.dynamic("Tratteggio indicativo: nessuna interpolazione", "Dashed guide: no interpolation")
+        };
+        g.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        FontMetrics metrics = g.getFontMetrics();
+        int width = 0;
+        for (String line : lines) width = Math.max(width, metrics.stringWidth(line));
+        width += 24;
+        int height = 70;
+        int x = (int) point.getX() + 16;
+        int y = (int) point.getY() - height - 12;
+        if (x + width > getWidth() - 10) x = (int) point.getX() - width - 16;
+        if (y < 10) y = (int) point.getY() + 16;
+        g.setColor(TOOLTIP_BG);
+        g.fillRoundRect(x, y, width, height, 14, 14);
+        g.setColor(withAlpha(color, 180));
+        g.setStroke(new BasicStroke(1.2f));
+        g.drawRoundRect(x, y, width, height, 14, 14);
+        g.setColor(color);
+        g.setFont(new Font("SansSerif", Font.BOLD, 12));
+        g.drawString(lines[0], x + 12, y + 19);
+        g.setColor(TEXT);
+        g.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        g.drawString(lines[1], x + 12, y + 39);
+        g.drawString(lines[2], x + 12, y + 57);
     }
 
     private void paintHover(Graphics2D g, HoverPoint hovered) {
@@ -933,7 +1007,9 @@ public final class Java2DWaterfallPanel extends JPanel {
     private record Bounds(double minTime, double maxTime, double minRate, double maxRate) { }
     private record ProjectedPoint(Point2D point, int band, int index) { }
     private record ProjectedSegment(Point2D start, Point2D end, int band, int startIndex, int endIndex) { }
+    private record ProjectedGap(Point2D start, Point2D end, int band) { }
     private record HoverPoint(Point2D point, int band, double time, double value) { }
+    private record GapHover(Point2D point, int band) { }
     private record SegmentProjection(double fraction, double distanceSquared) { }
 
     private static final class Geometry {
