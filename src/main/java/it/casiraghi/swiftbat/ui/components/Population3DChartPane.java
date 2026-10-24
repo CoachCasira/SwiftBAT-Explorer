@@ -71,7 +71,7 @@ public final class Population3DChartPane extends BorderPane {
         setTop(buildHeader());
         setCenter(viewer);
         setBottom(buildFooter());
-        I18n.languageProperty().addListener((obs, oldValue, newValue) -> SwingUtilities.invokeLater(renderer::repaint));
+        I18n.languageProperty().addListener((obs, oldValue, newValue) -> SwingUtilities.invokeLater(renderer::refreshLocalizedText));
         Platform.runLater(() -> syncRendererSize(viewer));
     }
 

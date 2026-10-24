@@ -326,6 +326,16 @@ public final class Java2DWaterfallPanel extends JPanel {
         zoom = newZoom;
     }
 
+    /** Refreshes translated labels without rebuilding scientific data. */
+    public void refreshLocalizedText() {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(this::refreshLocalizedText);
+            return;
+        }
+        invalidateStaticFrame();
+        repaint();
+    }
+
     private void invalidateStaticFrame() {
         staticFrameDirty = true;
     }
