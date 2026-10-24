@@ -42,6 +42,7 @@ public final class CurveInteractionLinkEnhancer {
     private static final String LOCK_SYNC = CurveInteractionLinkEnhancer.class.getName() + ".lockSync";
     private static final String LOCK_ADDED = CurveInteractionLinkEnhancer.class.getName() + ".lockAdded";
     private static final String SPOTLIGHT_STYLE = CurveInteractionLinkEnhancer.class.getName() + ".spotlightStyle";
+    private static final String SPOTLIGHT_ACTIVE = CurveInteractionLinkEnhancer.class.getName() + ".spotlightActive";
     private static final String CHART_FOCUS = ChartInteractionEnhancer.class.getName() + ".focus";
     private static final String CHART_LINE_DONE = ChartInteractionEnhancer.class.getName() + ".lineDone";
     private static final String CHART_EXPORT_DONE = ChartInteractionEnhancer.class.getName() + ".exportDone";
@@ -50,6 +51,9 @@ public final class CurveInteractionLinkEnhancer {
     private static final Set<Scene> WATCHED_SCENES = Collections.newSetFromMap(new WeakHashMap<>());
     private static final LinkedHashSet<String> POPULATION_FOCUS = new LinkedHashSet<>();
     private static final Set<ToggleButton> POPULATION_LOCK_TOGGLES = Collections.newSetFromMap(new WeakHashMap<>());
+    // Weak registry: selection refreshes only actual Population charts, not the
+    // full application scene graph (including thousands of chart descendants).
+    private static final Set<LineChart<?, ?>> POPULATION_CHARTS = Collections.newSetFromMap(new WeakHashMap<>());
 
     private static Parent installedRoot;
     private static Scene installedScene;
@@ -262,6 +266,7 @@ public final class CurveInteractionLinkEnhancer {
         // the generic enhancer as already installed so two independent hit-testers
         // and tooltips cannot compete on the same chart.
         rawChart.getProperties().put(CHART_LINE_DONE, Boolean.TRUE);
+        POPULATION_CHARTS.add(rawChart);
         if (Boolean.TRUE.equals(rawChart.getProperties().get(LINE_DONE))) {
             Platform.runLater(() -> {
                 installPopulationLockControl(rawChart);
@@ -271,6 +276,7 @@ public final class CurveInteractionLinkEnhancer {
         }
         rawChart.getProperties().put(LINE_DONE, Boolean.TRUE);
         LineChart chart = rawChart;
+        POPULATION_CHARTS.add(rawChart);
 
         Tooltip tooltip = new Tooltip();
         tooltip.setAutoHide(false);
@@ -706,6 +712,10 @@ public final class CurveInteractionLinkEnhancer {
             XYChart.Series series = (XYChart.Series) raw;
             Node node = series.getNode();
             if (node == null) continue;
+            // Hit testing a JavaFX Path with hundreds of segments for every
+            // mouse motion is expensive on macOS. Population uses its own
+            // analytical nearest-curve tester, so JavaFX must not pick paths.
+            if (!node.isMouseTransparent()) node.setMouseTransparent(true);
             String name = series.getName();
             boolean inFocus = focus.isEmpty() || focus.contains(series);
             boolean active = inFocus || (!locked && series == hovered);
@@ -716,20 +726,22 @@ public final class CurveInteractionLinkEnhancer {
     }
 
     private static void applySpotlightStyle(Node seriesNode, String name, boolean spotlight) {
+        boolean wasActive = Boolean.TRUE.equals(seriesNode.getProperties().get(SPOTLIGHT_ACTIVE));
+        if (wasActive == spotlight) return; // No CSS lookup for unchanged styles.
         Node line = seriesNode.lookup(".chart-series-line");
         if (line == null) line = seriesNode;
         if (spotlight) {
-            if (!line.getProperties().containsKey(SPOTLIGHT_STYLE)) {
-                line.getProperties().put(SPOTLIGHT_STYLE, line.getStyle() == null ? "" : line.getStyle());
-                String base = String.valueOf(line.getProperties().get(SPOTLIGHT_STYLE));
-                line.setStyle(base + "; -fx-stroke: " + spotlightColor(name) + "; -fx-stroke-width: 3.4px;");
-                line.setEffect(new Glow(0.88));
-                seriesNode.toFront();
-            }
-        } else if (line.getProperties().containsKey(SPOTLIGHT_STYLE)) {
+            line.getProperties().put(SPOTLIGHT_STYLE, line.getStyle() == null ? "" : line.getStyle());
+            String base = String.valueOf(line.getProperties().get(SPOTLIGHT_STYLE));
+            line.setStyle(base + "; -fx-stroke: " + spotlightColor(name) + "; -fx-stroke-width: 3.4px;");
+            line.setEffect(new Glow(0.88));
+            seriesNode.getProperties().put(SPOTLIGHT_ACTIVE, Boolean.TRUE);
+            seriesNode.toFront();
+        } else {
             Object original = line.getProperties().remove(SPOTLIGHT_STYLE);
-            line.setStyle(original == null ? "" : original.toString());
+            if (original != null) line.setStyle(original.toString());
             line.setEffect(null);
+            seriesNode.getProperties().remove(SPOTLIGHT_ACTIVE);
         }
     }
 
@@ -765,9 +777,17 @@ public final class CurveInteractionLinkEnhancer {
     }
 
     private static void refreshPopulationCharts() {
-        if (installedRoot != null) refreshPopulationNode(installedRoot);
-        if (installedScene != null && installedScene.getRoot() != null && installedScene.getRoot() != installedRoot) {
-            refreshPopulationNode(installedScene.getRoot());
+        // Global subtree traversal was O(all scene nodes) for every selection,
+        // often repeated on the fullscreen root. Only mounted charts need a
+        // visual update; the charts register when their interaction is installed.
+        for (LineChart<?, ?> registered : List.copyOf(POPULATION_CHARTS)) {
+            if (registered == null || registered.getScene() == null) continue;
+            @SuppressWarnings("rawtypes") LineChart chart = registered;
+            restorePopulationFocus(chart);
+            chart.getProperties().remove(HOVER);
+            applyVisualState(chart);
+            installPopulationLockControl(chart);
+            installPopulationExport(chart);
         }
     }
 
