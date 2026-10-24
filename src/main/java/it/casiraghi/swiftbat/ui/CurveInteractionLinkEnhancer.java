@@ -293,10 +293,12 @@ public final class CurveInteractionLinkEnhancer {
             if (now - previousHoverFrameNanos[0] < 33_000_000L) return;
             previousHoverFrameNanos[0] = now;
             boolean locked = populationFocusLocked();
-            String spotlight = locked ? populationSpotlightName() : null;
-            SeriesHit hit = nearest(chart, event.getX(), event.getY(), locked, spotlight);
-            Set<XYChart.Series> focus = focusedSeries(chart);
-            XYChart.Series hovered = hit == null || focus.isEmpty() ? null : hit.series();
+            // Hover is independent from selection: before the first click the
+            // canvas must still reveal the nearest curve. With the lock on,
+            // the existing hit tester continues to restrict candidates to the
+            // selected subset, but not just to the current spotlight.
+            SeriesHit hit = nearest(chart, event.getX(), event.getY(), locked, null);
+            XYChart.Series hovered = hit == null ? null : hit.series();
             if (chart.getProperties().get(HOVER) != hovered) {
                 chart.getProperties().put(HOVER, hovered);
                 applyVisualState(chart);
