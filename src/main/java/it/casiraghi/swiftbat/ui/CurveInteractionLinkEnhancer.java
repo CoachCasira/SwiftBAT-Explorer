@@ -527,7 +527,7 @@ public final class CurveInteractionLinkEnhancer {
             curves = new java.util.ArrayList<>(chart.getData().size());
             for (Object raw : chart.getData()) {
                 XYChart.Series series = (XYChart.Series) raw;
-                List<XYChart.Data> data = series.getData();
+                List<XYChart.Data> data = PopulationCanvasRenderer.samples(chart, series);
                 if (data == null || data.isEmpty()) continue;
                 double[] xp = new double[data.size()];
                 double[] yp = new double[data.size()];
@@ -776,8 +776,13 @@ public final class CurveInteractionLinkEnhancer {
         XYChart.Series hovered = hoverRaw instanceof XYChart.Series series ? series : null;
         boolean locked = populationFocusLocked();
         String spotlight = locked ? populationSpotlightName() : null;
+        // For dense populations the JavaFX series are invisible axis proxies.
+        // Repainting the cached Canvas base is necessary only after focus/lock
+        // changes; ordinary mouse hover updates just the foreground Canvas.
+        PopulationCanvasRenderer.visualState(chart, focus, hovered, spotlight, locked);
 
         for (Object raw : chart.getData()) {
+            if (PopulationCanvasRenderer.manages(chart, (XYChart.Series) raw)) continue;
             XYChart.Series series = (XYChart.Series) raw;
             Node node = series.getNode();
             if (node == null) continue;
