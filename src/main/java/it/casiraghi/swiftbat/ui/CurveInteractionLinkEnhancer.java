@@ -277,14 +277,22 @@ public final class CurveInteractionLinkEnhancer {
         tooltip.setShowDelay(Duration.ZERO);
         tooltip.setHideDelay(Duration.ZERO);
 
+        final long[] previousHoverFrameNanos = {0L};
         chart.addEventHandler(MouseEvent.MOUSE_MOVED, event -> {
+            // Cap expensive hit testing to about 60 Hz on high-polling Mac trackpads.
+            // Clicks still use exact unthrottled hit testing.
+            long now = System.nanoTime();
+            if (now - previousHoverFrameNanos[0] < 16_000_000L) return;
+            previousHoverFrameNanos[0] = now;
             boolean locked = populationFocusLocked();
             String spotlight = locked ? populationSpotlightName() : null;
             SeriesHit hit = nearest(chart, event.getX(), event.getY(), locked, spotlight);
             Set<XYChart.Series> focus = focusedSeries(chart);
             XYChart.Series hovered = hit == null || focus.isEmpty() ? null : hit.series();
-            chart.getProperties().put(HOVER, hovered);
-            applyVisualState(chart);
+            if (chart.getProperties().get(HOVER) != hovered) {
+                chart.getProperties().put(HOVER, hovered);
+                applyVisualState(chart);
+            }
 
             if (hit == null) {
                 tooltip.hide();
@@ -305,8 +313,7 @@ public final class CurveInteractionLinkEnhancer {
         });
 
         chart.addEventHandler(MouseEvent.MOUSE_EXITED, event -> {
-            chart.getProperties().remove(HOVER);
-            applyVisualState(chart);
+            if (chart.getProperties().remove(HOVER) != null) applyVisualState(chart);
             tooltip.hide();
         });
 
@@ -495,16 +502,54 @@ public final class CurveInteractionLinkEnhancer {
         double best = HIT_RADIUS * HIT_RADIUS;
         SeriesHit result = null;
 
+        // The population series are ordered by time. Convert the cursor's
+        // hit-radius into axis coordinates once, then examine only the nearby
+        // samples and their immediate neighbors. If layout is incomplete or
+        // data are not sorted, the original exhaustive search remains in use.
+        double leftX = Double.NaN;
+        double rightX = Double.NaN;
+        try {
+            Point2D scene = chart.localToScene(mouseX, mouseY);
+            Point2D axisLocal = xAxis.sceneToLocal(scene);
+            Object left = xAxis.getValueForDisplay(axisLocal.getX() - HIT_RADIUS);
+            Object right = xAxis.getValueForDisplay(axisLocal.getX() + HIT_RADIUS);
+            if (left instanceof Number low && right instanceof Number high
+                    && Double.isFinite(low.doubleValue()) && Double.isFinite(high.doubleValue())) {
+                leftX = Math.min(low.doubleValue(), high.doubleValue());
+                rightX = Math.max(low.doubleValue(), high.doubleValue());
+            }
+        } catch (RuntimeException ignored) {
+            // Axis transforms may be unavailable during the first layout pulse.
+        }
+
         for (Object rawSeries : chart.getData()) {
             XYChart.Series series = (XYChart.Series) rawSeries;
             if (focusedOnly && !focus.contains(series)) continue;
             if (spotlightOnly != null && !spotlightOnly.equals(canonicalPopulationName(series.getName()))) continue;
             if (series.getData() == null || series.getData().isEmpty()) continue;
 
+            List<XYChart.Data> points = series.getData();
+            int from = 0;
+            int until = points.size();
+            if (Double.isFinite(leftX) && Double.isFinite(rightX)
+                    && points.get(0).getXValue() instanceof Number first
+                    && points.get(points.size() - 1).getXValue() instanceof Number last
+                    && Double.isFinite(first.doubleValue()) && Double.isFinite(last.doubleValue())
+                    && first.doubleValue() <= last.doubleValue()) {
+                int lower = timeBound(points, leftX, false);
+                int upper = timeBound(points, rightX, true);
+                if (lower >= 0 && upper >= 0) {
+                    // Add a neighbor on either side to retain segment hit testing
+                    // for long gaps and for hits close to a sampling boundary.
+                    from = Math.max(0, lower - 1);
+                    until = Math.min(points.size(), upper + 1);
+                }
+            }
+
             XYChart.Data previousData = null;
             Point2D previousPoint = null;
-            for (Object rawData : series.getData()) {
-                XYChart.Data data = (XYChart.Data) rawData;
+            for (int i = from; i < until; i++) {
+                XYChart.Data data = points.get(i);
                 Point2D point = chartPoint(chart, xAxis, yAxis, data);
                 if (point == null) {
                     previousData = null;
@@ -532,6 +577,21 @@ public final class CurveInteractionLinkEnhancer {
             }
         }
         return result;
+    }
+
+    /** Returns -1 for a nonnumeric time axis, preserving the safe full-scan fallback. */
+    private static int timeBound(List<XYChart.Data> points, double time, boolean upperInclusive) {
+        int low = 0;
+        int high = points.size();
+        while (low < high) {
+            int middle = (low + high) >>> 1;
+            Object value = points.get(middle).getXValue();
+            if (!(value instanceof Number n) || !Double.isFinite(n.doubleValue())) return -1;
+            double current = n.doubleValue();
+            if (current < time || (upperInclusive && current == time)) low = middle + 1;
+            else high = middle;
+        }
+        return low;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -609,7 +669,8 @@ public final class CurveInteractionLinkEnhancer {
             String name = series.getName();
             boolean inFocus = focus.isEmpty() || focus.contains(series);
             boolean active = inFocus || (!locked && series == hovered);
-            node.setOpacity(active ? 1.0 : isTrigger(name) ? 0.50 : 0.07);
+            double desiredOpacity = active ? 1.0 : isTrigger(name) ? 0.50 : 0.07;
+            if (Double.compare(node.getOpacity(), desiredOpacity) != 0) node.setOpacity(desiredOpacity);
             applySpotlightStyle(node, name, spotlight != null && spotlight.equals(canonicalPopulationName(name)));
         }
     }
@@ -620,11 +681,11 @@ public final class CurveInteractionLinkEnhancer {
         if (spotlight) {
             if (!line.getProperties().containsKey(SPOTLIGHT_STYLE)) {
                 line.getProperties().put(SPOTLIGHT_STYLE, line.getStyle() == null ? "" : line.getStyle());
+                String base = String.valueOf(line.getProperties().get(SPOTLIGHT_STYLE));
+                line.setStyle(base + "; -fx-stroke: " + spotlightColor(name) + "; -fx-stroke-width: 3.4px;");
+                line.setEffect(new Glow(0.88));
+                seriesNode.toFront();
             }
-            String base = String.valueOf(line.getProperties().get(SPOTLIGHT_STYLE));
-            line.setStyle(base + "; -fx-stroke: " + spotlightColor(name) + "; -fx-stroke-width: 3.4px;");
-            line.setEffect(new Glow(0.88));
-            seriesNode.toFront();
         } else if (line.getProperties().containsKey(SPOTLIGHT_STYLE)) {
             Object original = line.getProperties().remove(SPOTLIGHT_STYLE);
             line.setStyle(original == null ? "" : original.toString());
