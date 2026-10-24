@@ -169,7 +169,6 @@ public final class PopulationCanvasRenderer {
                 y.upperBoundProperty().addListener(changed);
             }
             chart.sceneProperty().addListener((obs, before, after) -> request());
-            chart.skinProperty().addListener((obs, before, after) -> request());
             chart.layoutBoundsProperty().addListener((obs, before, after) -> request());
         }
 
