@@ -64,6 +64,37 @@ public final class UiRefinements {
     private static void watch(Node node) {
         if (node == null) return;
         polishNode(node);
+        // Keep high-level UI refinements but never observe thousands of
+        // chart/axis ticks or virtualized TableView/ComboBox skin children.
+        if (node instanceof javafx.scene.chart.Chart
+                || node instanceof javafx.scene.control.Control) return;
+        if (node instanceof javafx.scene.control.TabPane tabs) {
+            for (javafx.scene.control.Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) watch(tab.getContent());
+            }
+            String key = WATCHED + ".tabs";
+            if (!Boolean.TRUE.equals(tabs.getProperties().get(key))) {
+                tabs.getProperties().put(key, Boolean.TRUE);
+                tabs.getTabs().addListener((javafx.collections.ListChangeListener<javafx.scene.control.Tab>) change -> {
+                    while (change.next()) {
+                        if (!change.wasAdded()) continue;
+                        for (javafx.scene.control.Tab tab : change.getAddedSubList()) {
+                            if (tab.getContent() != null) watch(tab.getContent());
+                        }
+                    }
+                });
+            }
+            return;
+        }
+        if (node instanceof javafx.scene.control.ScrollPane scroll) {
+            if (Boolean.TRUE.equals(scroll.getProperties().get(WATCHED))) return;
+            scroll.getProperties().put(WATCHED, Boolean.TRUE);
+            if (scroll.getContent() != null) watch(scroll.getContent());
+            scroll.contentProperty().addListener((obs, before, after) -> {
+                if (after != null) watch(after);
+            });
+            return;
+        }
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
@@ -73,7 +104,7 @@ public final class UiRefinements {
                     for (Node added : change.getAddedSubList()) watch(added);
                 }
             }
-            Platform.runLater(() -> polish(parent));
+            // Newly added nodes were already processed; no full subtree scan.
         });
         for (Node child : parent.getChildrenUnmodifiable()) watch(child);
     }
@@ -81,6 +112,18 @@ public final class UiRefinements {
     private static void polish(Node node) {
         if (node == null) return;
         polishNode(node);
+        if (node instanceof javafx.scene.chart.Chart
+                || node instanceof javafx.scene.control.Control) return;
+        if (node instanceof javafx.scene.control.TabPane tabs) {
+            for (javafx.scene.control.Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) polish(tab.getContent());
+            }
+            return;
+        }
+        if (node instanceof javafx.scene.control.ScrollPane scroll) {
+            if (scroll.getContent() != null) polish(scroll.getContent());
+            return;
+        }
         if (node instanceof Parent parent) {
             for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) polish(child);
         }
