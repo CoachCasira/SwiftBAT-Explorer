@@ -27,16 +27,16 @@ $allJava | Select-Object ProcessId, Name, CommandLine |
     Format-List | Out-File (Join-Path $destination "java-processes.txt") -Encoding utf8
 
 if ($JavaProcessId -le 0) {
-    $matches = @($allJava |
+    $candidates = @($allJava |
         Where-Object { $_.CommandLine -match "(?i)swiftbat|casiraghi\.swiftbat" } |
         Sort-Object CreationDate -Descending)
-    if ($matches.Count -eq 0) {
+    if ($candidates.Count -eq 0) {
         Write-Host "Nessun processo SwiftBAT individuato. Avvia l'app e rilancia lo script." -ForegroundColor Yellow
         Write-Host "Processi Java elencati in: $destination\java-processes.txt"
         & $command -l
         exit 1
     }
-    $JavaProcessId = [int]$matches[0].ProcessId
+    $JavaProcessId = [int]$candidates[0].ProcessId
 }
 
 Write-Host "Diagnostica del processo Java PID $JavaProcessId..."
