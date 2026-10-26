@@ -348,7 +348,7 @@ public final class MainView {
         }
         List<CatalogEntry> exact = currentCatalog.stream()
                 .filter(entry -> entry.grbName().equalsIgnoreCase(query)
-                        || entry.triggerId().equalsIgnoreCase(query))
+                        || query.equalsIgnoreCase(entry.triggerId()))
                 .toList();
         List<CatalogEntry> partial = currentCatalog.stream()
                 .filter(entry -> entry.grbName().toUpperCase(Locale.ROOT).contains(query))
