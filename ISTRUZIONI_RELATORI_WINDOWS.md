@@ -52,6 +52,12 @@ Per generare solo lo ZIP Windows da Mac, eseguire `CREA_PACCHETTO_RELATORI_WINDO
 
 Non inviare i singoli launcher da soli: lo ZIP contiene il codice e i file necessari all'avvio.
 
+## Dati scientifici disponibili senza collegamento NASA
+
+Il pacchetto può includere la cartella interna `Applicazione/offline-data/v1/`, creata automaticamente dal generatore ZIP quando sul computer di origine sono presenti prodotti Swift/BAT già scaricati. In questo caso l'applicazione mostra in modalità offline **tutti i GRB dotati di prodotti ASCII/FITS validi nella cache**, non soltanto i 10 eventi di emergenza. Gli eventi rimangono selezionabili e le curve memorizzate sono consultabili senza contattare il sito NASA.
+
+**Importante:** la prima esecuzione del launcher richiede comunque Internet per scaricare Java 17, Maven e le dipendenze del progetto; è il collegamento al catalogo scientifico NASA che può essere assente. Funzionalità basate su altre tabelle non ancora memorizzate (come coordinate/redshift e alcuni risultati spettroscopici) possono risultare parzialmente indisponibili. La cartella offline-data è facoltativa: se assente, l'app usa la cache personale già presente sul PC.
+
 ## Sicurezza e accessi
 
 L'ambiente Java/Maven, le dipendenze, i temporanei e i log sono mantenuti nella cartella `.swiftbat-runtime` accanto all'applicazione. Non viene eseguito `sudo`, non viene richiesto l'accesso a GitHub e non vengono modificati Java o variabili d'ambiente globali.
