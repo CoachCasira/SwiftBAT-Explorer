@@ -17,6 +17,19 @@ class PersistentGrbCacheTest {
     Path temporary;
 
     @Test
+    void manifestWithoutScienceProductIsNotCountedAsCachedCurve() throws Exception {
+        PersistentGrbCache cache = new PersistentGrbCache(temporary);
+        CatalogEntry empty = new CatalogEntry("GRB250605A", "1321323", "https://example.test/");
+        cache.write(empty, new PersistentGrbCache.CachedProducts(
+                null, null, empty.dataProductUrl(), "", "", "", "", Instant.EPOCH));
+        assertEquals(0, cache.count());
+        assertTrue(cache.catalogEntries().isEmpty());
+        PersistentGrbCache reopened = new PersistentGrbCache(temporary);
+        assertEquals(0, reopened.count());
+        assertTrue(reopened.catalogEntries().isEmpty());
+    }
+
+    @Test
     void persistsOfficialBytesAndManifest() throws Exception {
         PersistentGrbCache cache = new PersistentGrbCache(temporary);
         CatalogEntry entry = new CatalogEntry("GRBTESTA", "123", "https://example.test/data/");
