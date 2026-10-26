@@ -483,6 +483,27 @@ class ExplorerUiLifecycleTest {
     }
 
     @Test
+    void failedCompareLoadCanBeRetriedWithoutRestartingApplication() throws Exception {
+        java.util.concurrent.atomic.AtomicInteger requested = new java.util.concurrent.atomic.AtomicInteger();
+        fx(() -> {
+            ComparePage page = new ComparePage(
+                    FXCollections.<String, GrbData>observableHashMap(),
+                    entry -> requested.incrementAndGet());
+            page.setCatalog(List.of(new CatalogEntry(
+                    "GRB250605A", "1321323", "https://example.test/")));
+            @SuppressWarnings("unchecked")
+            ComboBox<String> first = (ComboBox<String>) field(page, "first");
+            first.getEditor().setText("GRB250605A");
+            assertEquals(1, requested.get(), "First request must be issued");
+            page.loadFailed("GRB250605A");
+            first.getEditor().setText("GRB250605"); // Erase the final A.
+            first.getEditor().setText("GRB250605A"); // Retry explicitly.
+            assertEquals(2, requested.get(), "A failed request must be retryable");
+            return null;
+        });
+    }
+
+    @Test
     void populationFilterRowsUseAvailableWidthAndWrapOnSmallWindows() throws Exception {
         PopulationPage page = fx(() -> new PopulationPage((entry, progress) -> null, Runnable::run, null,
                 FXCollections.observableHashMap()));
