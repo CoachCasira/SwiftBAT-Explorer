@@ -16,6 +16,14 @@ final class CompareSearchInput {
         return text != null && text.matches("[A-Z0-9]*");
     }
 
+    /**
+     * A previously committed GRB must never be re-inserted while the editor
+     * contains a different (usually shortened) search string.
+     */
+    static boolean matchesSelection(String selectedGrb, String editorText) {
+        return selectedGrb != null && selectedGrb.equals(normalize(editorText));
+    }
+
     static String normalize(String raw) {
         String text = raw == null ? "" : raw.trim().toUpperCase(Locale.ROOT);
         if ("GRB".startsWith(text)) return "GRB";
