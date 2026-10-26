@@ -118,6 +118,10 @@ public final class PopulationPage extends BorderPane {
     private final BarChart<String, Number> t90Histogram = histogram("T90");
     private final BarChart<String, Number> redshiftHistogram = histogram("Redshift");
     private final TableView<PopulationEvent> resultTable = new TableView<>();
+    // A single post-layout refresh synchronizes TableView row cells with the
+    // newly visible header after JavaFX calculates its native vertical bar.
+    // Never observe table height or skin children: that caused FX pulse loops.
+    private final PauseTransition includedTableFirstLayout = new PauseTransition(Duration.millis(80));
     private FlowPane resultColumnBar;
     private final TabPane resultTabs = new TabPane();
     private final Button profile3D = UiFactory.button("Vista 3D interattiva", "secondary-button");
@@ -191,10 +195,15 @@ public final class PopulationPage extends BorderPane {
 
         resultTabs.getStyleClass().add("main-tabs");
         resultTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        Tab includedTab = new Tab("GRB inclusi", includedTable);
         resultTabs.getTabs().addAll(
                 new Tab("Profilo temporale", chartCard()),
                 new Tab("Distribuzioni del campione", distributionPane()),
-                new Tab("GRB inclusi", includedTable));
+                includedTab);
+        includedTab.selectedProperty().addListener((obs, wasSelected, selected) -> {
+            if (selected) scheduleIncludedTableFirstLayout();
+            else includedTableFirstLayout.stop();
+        });
         resultTabs.setMinHeight(450);
         resultTabs.setPrefHeight(500);
         resultTabs.setMaxHeight(560);
@@ -694,6 +703,14 @@ public final class PopulationPage extends BorderPane {
         chart.getStyleClass().addAll("lightcurve-chart", "population-chart");
     }
 
+    private void scheduleIncludedTableFirstLayout() {
+        // Debounce rapid tab switches and analysis completion. The one-shot
+        // JavaFX pause happens after the initial scene layout establishes the
+        // scrollbar width; no listener repeatedly rebuilds TableView cells.
+        includedTableFirstLayout.stop();
+        includedTableFirstLayout.playFromStart();
+    }
+
     private void configureTable() {
         resultTable.getStyleClass().add("data-table");
         // Unlike Explorer, Population constructs a hidden results TableView
@@ -702,6 +719,16 @@ public final class PopulationPage extends BorderPane {
         // repeated JavaFX pulse work and eventually heap exhaustion.
         // Keep this one table on the standard virtualized JavaFX scrollbar.
         resultTable.getProperties().put("swiftbat.population.nativeTableScroll", Boolean.TRUE);
+        // A hidden TableView initially sizes its header without knowing if
+        // vertical scrolling will be needed. On first reveal, its cells can
+        // retain the pre-scrollbar column widths until the user scrolls.
+        // Refresh only once after the first visible pulse, not continuously.
+        includedTableFirstLayout.setOnFinished(event -> {
+            if (resultTable.getScene() == null || !resultTable.isVisible()
+                    || resultTabs.getSelectionModel().getSelectedIndex() != 2) return;
+            resultTable.refresh();
+            resultTable.requestLayout();
+        });
         resultColumnBar = TablePreferences.install(resultTable, "population.results");
         resultTable.setPlaceholder(UiFactory.wrappedLabel(
                 "Nessun GRB incluso. Controlla i filtri oppure esegui una nuova analisi.",
@@ -895,6 +922,9 @@ public final class PopulationPage extends BorderPane {
         lastResult = result;
         populateCurveChart(result);
         resultTable.setItems(FXCollections.observableArrayList(result.accepted()));
+        if (resultTabs.getSelectionModel().getSelectedIndex() == 2) {
+            scheduleIncludedTableFirstLayout();
+        }
         populateHistograms(result);
         populateInsight(result);
         profile3D.setDisable(result.curves().isEmpty());
