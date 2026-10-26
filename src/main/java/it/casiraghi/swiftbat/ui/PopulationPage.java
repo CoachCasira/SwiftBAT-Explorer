@@ -706,7 +706,8 @@ public final class PopulationPage extends BorderPane {
                 column("T90", event -> event.burst().formattedT90()),
                 column("Classe", event -> event.burst().durationClass()),
                 column("Redshift", event -> event.burst().redshift().displayValue()),
-                column("Copertura", event -> String.format(Locale.ITALY, "%.2f%%", event.exposurePercent())),
+                column("Copertura", event -> Double.isFinite(event.exposurePercent())
+                        ? String.format(Locale.ITALY, "%.2f%%", event.exposurePercent()) : "n.d."),
                 column("Flag qualità", PopulationEvent::qualityFlag)));
     }
 
@@ -824,21 +825,27 @@ public final class PopulationPage extends BorderPane {
                     GrbData data = outcome.data();
                     loaded.put(data.grbName(), data);
                     double quality = QualityMetrics.fullExposurePercent(data);
-                    if (!Double.isFinite(quality)) {
+                    // A missing FITS/FRACEXP measurement is not 0% or 100%.
+                    // Allow temporal analysis only if the user left quality
+                    // filtering unrestricted (0%–100%).
+                    if (!Double.isFinite(quality)
+                            && !(filter.exposureMin() == 0.0 && filter.exposureMax() == 100.0)) {
                         failures++;
                         continue;
                     }
                     PopulationEvent event = new PopulationEvent(
                             data.grbName(), outcome.candidate().burst(), quality, "");
                     measured.add(event);
-                    if (quality >= filter.exposureMin() && quality <= filter.exposureMax()) {
+                    if (!Double.isFinite(quality)
+                            || (quality >= filter.exposureMin() && quality <= filter.exposureMax())) {
                         accepted.add(event);
                     }
                 }
                 double lowTail = QualityMetrics.percentile(
                         measured.stream().map(PopulationEvent::exposurePercent).toList(), 0.10);
                 List<PopulationEvent> flagged = accepted.stream()
-                        .map(event -> event.withQualityFlag(event.exposurePercent() <= lowTail
+                        .map(event -> event.withQualityFlag(!Double.isFinite(event.exposurePercent())
+                                ? "FRACEXP n.d." : event.exposurePercent() <= lowTail
                                 ? "Coda bassa (≤ 10° percentile)" : "Regolare"))
                         .toList();
                 List<CumulativeAnalysisService.NormalizedCurve> curves = new ArrayList<>();
@@ -893,13 +900,23 @@ public final class PopulationPage extends BorderPane {
                 .append(result.examined()).append(" examined");
         if (!result.measured().isEmpty()) {
             double observedMinimum = result.measured().stream()
-                    .mapToDouble(PopulationEvent::exposurePercent).min().orElse(Double.NaN);
+                    .mapToDouble(PopulationEvent::exposurePercent).filter(Double::isFinite)
+                    .min().orElse(Double.NaN);
             double observedMaximum = result.measured().stream()
-                    .mapToDouble(PopulationEvent::exposurePercent).max().orElse(Double.NaN);
-            messageIt.append(String.format(Locale.ITALY, " · copertura rilevata %.1f%%–%.1f%%",
-                    observedMinimum, observedMaximum));
-            messageEn.append(String.format(Locale.US, " · observed coverage %.1f%%–%.1f%%",
-                    observedMinimum, observedMaximum));
+                    .mapToDouble(PopulationEvent::exposurePercent).filter(Double::isFinite)
+                    .max().orElse(Double.NaN);
+            if (Double.isFinite(observedMinimum) && Double.isFinite(observedMaximum)) {
+                messageIt.append(String.format(Locale.ITALY, " · copertura rilevata %.1f%%–%.1f%%",
+                        observedMinimum, observedMaximum));
+                messageEn.append(String.format(Locale.US, " · observed coverage %.1f%%–%.1f%%",
+                        observedMinimum, observedMaximum));
+            }
+            long unknown = result.measured().stream()
+                    .filter(event -> !Double.isFinite(event.exposurePercent())).count();
+            if (unknown > 0) {
+                messageIt.append(" · FRACEXP n.d.: ").append(unknown);
+                messageEn.append(" · FRACEXP unavailable: ").append(unknown);
+            }
             if (result.accepted().isEmpty()) {
                 messageIt.append(String.format(Locale.ITALY, " fuori dal filtro %.0f%%–%.0f%%",
                         result.exposureMinimum(), result.exposureMaximum()));
@@ -1130,6 +1147,7 @@ public final class PopulationPage extends BorderPane {
     }
 
     private String coverageBin(double value) {
+        if (!Double.isFinite(value)) return "n.d.";
         int lower = Math.min(90, Math.max(0, (int) Math.floor(value / 10.0) * 10));
         return lower + "–" + (lower + 10) + "%";
     }
@@ -1165,8 +1183,12 @@ public final class PopulationPage extends BorderPane {
             String label = (int) edges[index] + "–" + (int) edges[index + 1] + suffix;
             result.put(label, 0);
         }
+        result.put("n.d.", 0);
         for (Double value : values) {
-            if (value == null || !Double.isFinite(value)) continue;
+            if (value == null || !Double.isFinite(value)) {
+                increment(result, "n.d.");
+                continue;
+            }
             int bin = Math.min(edges.length - 2, Math.max(0, (int) Math.floor(value / 10.0)));
             String label = (int) edges[bin] + "–" + (int) edges[bin + 1] + suffix;
             increment(result, label);
