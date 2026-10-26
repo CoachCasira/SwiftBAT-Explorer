@@ -103,6 +103,12 @@ public final class UiTableAndStartupFixes {
             }
         }
 
+        // TableView/Chart/Control skins are dynamic JavaFX internals. Mark
+        // their logical owner once, never recurse into thousands of cells.
+        if (node instanceof javafx.scene.chart.Chart
+                || (node instanceof javafx.scene.control.Control
+                    && !(node instanceof TabPane))) return;
+        if (node instanceof TabPane) return; // Tab contents handled above.
         if (!(node instanceof Parent parent)) return;
         if (!Boolean.TRUE.equals(parent.getProperties().get(PREPARED))) {
             parent.getProperties().put(PREPARED, Boolean.TRUE);
@@ -149,6 +155,10 @@ public final class UiTableAndStartupFixes {
             }
         }
 
+        if (node instanceof javafx.scene.chart.Chart
+                || (node instanceof javafx.scene.control.Control
+                    && !(node instanceof TabPane))) return;
+        if (node instanceof TabPane) return; // Tab contents handled above.
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
