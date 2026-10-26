@@ -150,36 +150,36 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         combo.getEditor().setText("GRB");
         combo.getEditor().setPromptText("");
         combo.getEditor().setTextFormatter(new TextFormatter<String>(change -> {
-            String next = change.getControlNewText() == null ? "" : change.getControlNewText().toUpperCase(Locale.ROOT);
-            if (!next.startsWith("GRB")) return null;
-            String suffix = next.substring(3);
-            if (!suffix.matches("[0-9A-Z]*")) return null;
+            // Permit complete deletion, Ctrl+A / Backspace, editing from the
+            // first character and typing a bare numerical GRB ID. The old
+            // startsWith("GRB") check rejected all these legitimate edits.
+            String nextText = change.getControlNewText() == null ? ""
+                    : change.getControlNewText().toUpperCase(Locale.ROOT);
+            if (!CompareSearchInput.isEditable(nextText)) return null;
             change.setText(change.getText().toUpperCase(Locale.ROOT));
             return change;
         }));
-        combo.getEditor().textProperty().addListener((obs, oldValue, raw) -> updateSuggestions(combo, counter, ghost, other, raw));
+        combo.getEditor().textProperty().addListener((obs, oldValue, raw) -> {
+            updateSuggestions(combo, counter, ghost, other, raw);
+            // Do not keep comparing the previously selected GRB after the
+            // user deletes/edits the text. In-progress queries are not
+            // considered a committed scientific event.
+            if (!Boolean.TRUE.equals(combo.getProperties().get(COMMITTING_KEY))
+                    && !java.util.Objects.equals(CompareSearchInput.normalize(oldValue),
+                            CompareSearchInput.normalize(raw))) {
+                refreshComparison();
+            }
+        });
         combo.getEditor().focusedProperty().addListener((obs, oldValue, focused) -> {
             if (focused) {
-                Platform.runLater(() -> combo.getEditor().positionCaret(Math.max(3, combo.getEditor().getCaretPosition())));
                 updateSuggestions(combo, counter, ghost, other, combo.getEditor().getText());
             } else {
                 combo.hide();
             }
         });
-        combo.getEditor().setOnMouseClicked(event -> Platform.runLater(() -> {
-            if (combo.getEditor().getCaretPosition() < 3) combo.getEditor().positionCaret(3);
-        }));
+        // HOME/LEFT and mouse placement must remain normal editable-text
+        // operations. Only TAB is special: it accepts the ghost suggestion.
         combo.getEditor().addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-            if (event.getCode() == KeyCode.HOME) {
-                combo.getEditor().positionCaret(3);
-                event.consume();
-                return;
-            }
-            if (event.getCode() == KeyCode.LEFT && combo.getEditor().getCaretPosition() <= 3
-                    && combo.getEditor().getSelection().getLength() == 0) {
-                event.consume();
-                return;
-            }
             if (event.getCode() == KeyCode.TAB) {
                 Object value = combo.getProperties().get(GHOST_KEY);
                 if (value instanceof String suggestion && !suggestion.isBlank()) {
@@ -209,7 +209,9 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
                 .filter(name -> name.length() > normalized.length())
                 .findFirst().orElse("");
         combo.getProperties().put(GHOST_KEY, ghostValue);
-        ghost.prefix().setText(normalized);
+        // The user can also enter the ID without 'GRB'. The invisible ghost
+        // prefix must use the actual editor text to remain aligned with it.
+        ghost.prefix().setText(raw == null ? "" : raw.toUpperCase(Locale.ROOT));
         ghost.suffix().setText(ghostValue.isBlank() ? "" : ghostValue.substring(normalized.length()));
         ghost.box().setVisible(combo.getEditor().isFocused() && !ghostValue.isBlank());
 
@@ -245,17 +247,15 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
     }
 
     private String normalize(String raw) {
-        String text = raw == null ? "GRB" : raw.trim().toUpperCase(Locale.ROOT);
-        if (text.isBlank()) return "GRB";
-        return text.startsWith("GRB") ? text : "GRB" + text;
+        return CompareSearchInput.normalize(raw);
     }
 
     private String exactSelection(ComboBox<String> combo) {
         if (combo == null) return null;
+        // The ComboBox value can retain a previous selection while its
+        // editable text is being deleted. Trust the visible input instead.
         String editor = normalize(combo.getEditor().getText());
-        if (availableNames.contains(editor)) return editor;
-        String value = combo.getValue();
-        return value != null && availableNames.contains(value) ? value : null;
+        return availableNames.contains(editor) ? editor : null;
     }
 
     private void refreshChoices() {
