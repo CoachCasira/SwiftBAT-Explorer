@@ -196,6 +196,16 @@ public final class UiTableAndStartupFixes {
 
     private static void scheduleTableInstall(TableView<?> table) {
         if (table == null || Boolean.TRUE.equals(table.getProperties().get(TABLE_INSTALLED))) return;
+        // Population's included-results table remains virtualized and uses
+        // native JavaFX scrolling. It has no need for a second ScrollBar,
+        // skin rewiring, height observers, or cross-pulse CSS polishing.
+        // Both older external-scrollbar enhancers are marked as owned below
+        // so they also cannot wrap this table when the tab becomes visible.
+        if (Boolean.TRUE.equals(table.getProperties().get("swiftbat.population.nativeTableScroll"))) {
+            markTableOwned(table);
+            table.getProperties().put(TABLE_INSTALLED, Boolean.TRUE);
+            return;
+        }
         table.getProperties().put(TABLE_INSTALLED, Boolean.TRUE);
         Platform.runLater(() -> installExternalScrollbar(table));
     }
