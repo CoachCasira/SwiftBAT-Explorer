@@ -95,6 +95,23 @@ public final class PersistentGrbCache {
                 parseInstant(manifest.getProperty("savedAt"))));
     }
 
+    /**
+     * Reads at most the FITS header region for metadata discovery.
+     * Unlike read(), this does not allocate the full ASCII and FITS payloads
+     * for every GRB merely to discover RA/DEC/T90 on startup.
+     */
+    public Optional<byte[]> readFitsHeaderPrefix(CatalogEntry entry) throws IOException {
+        for (Path directory : List.of(eventDirectory(entry.grbName()),
+                bundledRoot == null ? root : bundledRoot.resolve(cacheKey(entry.grbName())))) {
+            Path fits = directory.resolve(FITS_FILE);
+            if (!Files.isRegularFile(fits)) continue;
+            try (var input = Files.newInputStream(fits)) {
+                return Optional.of(input.readNBytes(128 * 1024));
+            }
+        }
+        return Optional.empty();
+    }
+
     public void write(CatalogEntry entry, CachedProducts products) throws IOException {
         Path directory = eventDirectory(entry.grbName());
         Files.createDirectories(directory);
