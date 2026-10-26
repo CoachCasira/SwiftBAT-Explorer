@@ -961,23 +961,26 @@ public final class PopulationPage extends BorderPane {
     }
 
     private void populateCurveChart(AnalysisResult result) {
-        // Small samples retain the original JavaFX LineChart implementation.
-        // Dense samples use Canvas for individual curves, keeping the same axes,
-        // median, percentiles, chart identity and interaction controls.
+        // Individual GRB data retain all original scientific samples. Once
+        // there are at least two GRBs, render them through the lightweight
+        // Canvas while JavaFX keeps axes, quartiles and the median. This
+        // avoids thousands of PathElements even for the standard 25-GRB run.
         PopulationCanvasRenderer.clear(curveChart);
-        curveChart.getData().clear();
         boolean dense = result.curves().size() >= PopulationCanvasRenderer.MIN_CANVAS_CURVES;
         Map<XYChart.Series<Number, Number>, List<XYChart.Data<Number, Number>>> canvasSources
                 = new LinkedHashMap<>();
+        List<XYChart.Series<Number, Number>> displayedSeries =
+                new ArrayList<>(result.curves().size() + 3);
         for (CumulativeAnalysisService.NormalizedCurve curve : result.curves()) {
             XYChart.Series<Number, Number> scientific = series(curve.grbName(), curve.points());
             XYChart.Series<Number, Number> displayed = dense
                     ? PopulationCanvasRenderer.proxy(curve.grbName(), scientific.getData())
                     : scientific;
-            curveChart.getData().add(displayed);
+            displayedSeries.add(displayed);
             if (dense) {
                 canvasSources.put(displayed, List.copyOf(scientific.getData()));
-                // Proxy nodes affect axis auto-ranging, but are never rendered.
+                // Proxy series retain range and selection identity but cannot
+                // add thousands of full-resolution JavaFX line segments.
                 styleSeries(displayed, "-fx-stroke: transparent; -fx-stroke-width: 0px;");
             } else {
                 styleSeries(displayed, "-fx-stroke: rgba(84, 215, 255, 0.20); -fx-stroke-width: 1px;");
@@ -986,7 +989,7 @@ public final class PopulationPage extends BorderPane {
         XYChart.Series<Number, Number> lower = series("25° percentile", result.profile().lowerQuartile());
         XYChart.Series<Number, Number> upper = series("75° percentile", result.profile().upperQuartile());
         XYChart.Series<Number, Number> median = series("Mediana", result.profile().median());
-        curveChart.getData().addAll(List.of(lower, upper, median));
+        displayedSeries.addAll(List.of(lower, upper, median));
         styleSeries(lower, "-fx-stroke: #aa78db; -fx-stroke-width: 2px; -fx-stroke-dash-array: 7 5;");
         styleSeries(upper, "-fx-stroke: #aa78db; -fx-stroke-width: 2px; -fx-stroke-dash-array: 7 5;");
         styleSeries(median, "-fx-stroke: #ffae4a; -fx-stroke-width: 4px;");
@@ -994,6 +997,9 @@ public final class PopulationPage extends BorderPane {
         curveXAxis.setLowerBound(-result.halfWindow());
         curveXAxis.setUpperBound(result.halfWindow());
         curveXAxis.setTickUnit(result.halfWindow() <= 20 ? 5 : result.halfWindow() <= 60 ? 15 : 30);
+        // One change notification instead of one for every GRB: listeners,
+        // chart layout and focus restoration are triggered only once.
+        curveChart.getData().setAll(displayedSeries);
         if (dense) PopulationCanvasRenderer.install(curveChart, canvasSources);
         curveChart.setTitle(I18n.t(result.curves().size() + " curve normalizzate e allineate a t = 0"));
     }
