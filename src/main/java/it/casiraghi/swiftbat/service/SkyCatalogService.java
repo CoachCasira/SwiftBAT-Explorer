@@ -1,6 +1,7 @@
 package it.casiraghi.swiftbat.service;
 
 import it.casiraghi.swiftbat.model.SkyBurst;
+import it.casiraghi.swiftbat.model.CatalogEntry;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -13,6 +14,8 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
@@ -73,7 +76,9 @@ public final class SkyCatalogService {
                 try {
                     if (Files.isRegularFile(path)) {
                         List<SkyBurst> saved = parseSummary(Files.readString(path, StandardCharsets.UTF_8));
-                        if (!saved.isEmpty()) return saved;
+                        if (!saved.isEmpty()) {
+                            return mergeCachedMetadata(saved, new PersistentGrbCache());
+                        }
                     }
                 } catch (IOException ignored) {
                     // Try the other source.
@@ -84,6 +89,29 @@ public final class SkyCatalogService {
             if (!cached.isEmpty()) return cached;
             throw new IOException("Non sono disponibili coordinate ufficiali né GRB locali.", onlineFailure);
         }
+    }
+
+    /**
+     * Combine the authentic saved NASA summary with only the GRBs absent from
+     * it. Missing RA/DEC/T90 remain unknown rather than excluding a perfectly
+     * usable cached light curve from Population Analysis. This runs on the
+     * existing background Task, never on the JavaFX application thread.
+     */
+    List<SkyBurst> mergeCachedMetadata(List<SkyBurst> saved, PersistentGrbCache cache) {
+        Map<String, SkyBurst> merged = new LinkedHashMap<>();
+        for (SkyBurst burst : saved) merged.put(burst.grbName(), burst);
+        List<CatalogEntry> missing = cache.catalogEntries().stream()
+                .filter(entry -> !merged.containsKey(entry.grbName()))
+                .toList();
+        if (!missing.isEmpty()) {
+            for (SkyBurst burst : new OfflineScientificMetadataService(cache)
+                    .fromCachedProducts(missing)) {
+                merged.putIfAbsent(burst.grbName(), burst);
+            }
+        }
+        List<SkyBurst> result = new ArrayList<>(merged.values());
+        result.sort(Comparator.comparing(SkyBurst::grbName).reversed());
+        return List.copyOf(result);
     }
 
     /** Visibile al package per i test. */
