@@ -155,26 +155,17 @@ public final class FinalRequestedUiFastFixes {
             bar.setPrefWidth(BAR_WIDTH);
             bar.setMaxWidth(BAR_WIDTH);
 
-            double rawVisible = bar.getVisibleAmount();
-            if (bar.getStyleClass().contains("table-external-scrollbar")) {
-                Object internalObject = bar.getProperties().get(INTERNAL_BAR_KEY);
-                if (internalObject instanceof ScrollBar internal) {
-                    rawVisible = internal.getVisibleAmount();
-                    installInternalWatch(internal, bar);
+            // The native TableView skin owns the thumb's visibleAmount.
+            // Mutating it here after a height notification can itself trigger
+            // another layout, producing an endless feedback loop even while
+            // Population Analysis is idle. Style the thumb's geometry only.
+            boolean external = bar.getStyleClass().contains("table-external-scrollbar");
+            if (!external && !bar.visibleAmountProperty().isBound()) {
+                double floor = minimumVisibleAmount(bar);
+                double rawVisible = bar.getVisibleAmount();
+                if (Double.isFinite(floor) && floor > 0 && rawVisible < floor) {
+                    bar.setVisibleAmount(floor);
                 }
-                // Keep the native TableView value/range bindings intact.
-                // Unbinding here breaks automatic updates on the next resize.
-                if (bar.visibleAmountProperty().isBound()) return;
-            } else if (bar.visibleAmountProperty().isBound()) {
-                return;
-            }
-
-            double floor = minimumVisibleAmount(bar);
-            if (Double.isFinite(floor) && floor > 0 && rawVisible < floor) {
-                bar.setVisibleAmount(floor);
-            } else if (Double.isFinite(rawVisible) && rawVisible >= 0
-                    && Math.abs(bar.getVisibleAmount() - rawVisible) > 1e-8) {
-                bar.setVisibleAmount(rawVisible);
             }
 
             // CSS is applied by the JavaFX pulse. Forcing applyCss() and
