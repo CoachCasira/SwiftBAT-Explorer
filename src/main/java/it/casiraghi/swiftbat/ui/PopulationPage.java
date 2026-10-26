@@ -1300,6 +1300,11 @@ public final class PopulationPage extends BorderPane {
     private void clearResults() {
         lastResult = null;
         lastNarrative = null;
+        // The individual GRB curves are painted on a separate Canvas layer,
+        // not stored in curveChart.getData(). Clearing JavaFX series alone
+        // leaves the old cyan lines visible after "Reset filters".
+        // Disable and detach the Canvas BEFORE clearing the chart series.
+        PopulationCanvasRenderer.clear(curveChart);
         curveChart.getData().clear();
         resultTable.getItems().clear();
         exposureHistogram.getData().clear();
@@ -1346,6 +1351,10 @@ public final class PopulationPage extends BorderPane {
     }
 
     private void resetFilters() {
+        // Reset must clear the visualization as well as filter controls.
+        // Do it immediately, without relying on the delayed compatibility
+        // event hook, so stale Canvas pixels cannot remain on screen.
+        clearResults();
         duration.setValue(ALL_T90);
         redshiftAvailability.setValue(ALL_Z);
         zMin.setText("0");
