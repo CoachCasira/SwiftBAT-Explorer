@@ -69,6 +69,8 @@ public final class SpectralCatalogService {
     }
 
     public Map<String, SpectralData> fetchCatalog(boolean forceRefresh) throws IOException, InterruptedException {
+        // Treat the T100 and 1-second peak tables independently. The loss of
+        // one NASA endpoint must not erase valid data from the other interval.
         ParsedInterval t100 = fetchInterval(Interval.T100, T100_URL, "t100", forceRefresh);
         ParsedInterval peak = fetchInterval(
                 Interval.PEAK_ONE_SECOND, PEAK_ONE_SECOND_URL, "peak-1s", forceRefresh);
@@ -88,10 +90,16 @@ public final class SpectralCatalogService {
     }
 
     private ParsedInterval fetchInterval(Interval interval, String baseUrl, String cacheFolder,
-                                         boolean forceRefresh) throws IOException, InterruptedException {
+                                         boolean forceRefresh) throws InterruptedException {
         Map<String, String> content = new LinkedHashMap<>();
+        // Optional PL, CPL and flux tables can be unavailable independently.
+        // Missing sources stay empty; no artificial spectral fit is created.
         for (String file : FILES) {
-            content.put(file, readResource(baseUrl, cacheFolder, file, forceRefresh));
+            try {
+                content.put(file, readResource(baseUrl, cacheFolder, file, forceRefresh));
+            } catch (IOException unavailable) {
+                content.put(file, "");
+            }
         }
         return parseInterval(interval,
                 content.get("best_model.txt"),
