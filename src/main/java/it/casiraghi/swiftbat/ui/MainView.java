@@ -67,6 +67,7 @@ public final class MainView {
     private final ObservableMap<String, GrbData> sessionData = FXCollections.observableHashMap();
     private final Set<String> compareLoadsInFlight = ConcurrentHashMap.newKeySet();
     private List<CatalogEntry> currentCatalog = List.of();
+    private boolean offlineCatalog;
 
     private final BorderPane root = new BorderPane();
     private final StackPane pageHost = new StackPane();
@@ -400,6 +401,7 @@ public final class MainView {
         task.setOnSucceeded(event -> {
             List<CatalogEntry> entries = task.getValue();
             currentCatalog = List.copyOf(entries);
+            offlineCatalog = false;
             explorerPage.setCatalog(entries, false);
             skyMapPage.setBaseCatalog(entries);
             populationPage.setCatalog(entries);
@@ -415,6 +417,7 @@ public final class MainView {
             boolean fromLocalCache = !fallback.isEmpty()
                     && fallback.stream().allMatch(entry -> grbService.cachedLocally(entry.grbName()));
             currentCatalog = List.copyOf(fallback);
+            offlineCatalog = true;
             explorerPage.setCatalog(fallback, true, fromLocalCache);
             skyMapPage.setBaseCatalog(fallback);
             populationPage.setCatalog(fallback);
@@ -450,10 +453,21 @@ public final class MainView {
         };
         task.setOnSucceeded(event -> {
             ScientificCatalog scientific = task.getValue();
-            skyMapPage.setSkyBursts(scientific.bursts());
-            explorerPage.setScientificMetadata(scientific.bursts());
-            populationPage.setBursts(scientific.bursts());
-            if (!scientific.redshiftAvailable()) {
+            // Offline products may have no position: they can be analyzed
+            // temporally but must never be plotted at a fictitious RA/DEC.
+            Set<String> allowed = currentCatalog.stream()
+                    .map(entry -> entry.grbName().toUpperCase(Locale.ROOT))
+                    .collect(java.util.stream.Collectors.toSet());
+            List<SkyBurst> metadata = (offlineCatalog ? scientific.bursts().stream()
+                    .filter(burst -> allowed.contains(burst.grbName().toUpperCase(Locale.ROOT)))
+                    .toList() : scientific.bursts());
+            List<SkyBurst> plottable = metadata.stream().filter(SkyBurst::hasCoordinates).toList();
+            skyMapPage.setSkyBursts(plottable);
+            explorerPage.setScientificMetadata(metadata);
+            populationPage.setBursts(metadata);
+            if (skyCatalogService.lastFetchOffline()) {
+                skyMapPage.showOfflineCoverage(plottable.size(), metadata.size());
+            } else if (!scientific.redshiftAvailable()) {
                 skyMapPage.showWarning("Coordinate e T90 caricati; redshift temporaneamente non disponibile");
             }
         });
