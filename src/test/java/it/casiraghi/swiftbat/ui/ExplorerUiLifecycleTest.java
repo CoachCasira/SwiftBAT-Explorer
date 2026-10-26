@@ -540,6 +540,70 @@ class ExplorerUiLifecycleTest {
     }
 
     @Test
+    void compareCompletedNameKeepsClickedCaretAndDeletesOnFirstBackspaceAfterRefocus()
+            throws Exception {
+        ComparePage page = fx(() -> {
+            var data = FXCollections.<String, GrbData>observableHashMap();
+            data.put("GRB250605A", compareData("GRB250605A", 3));
+            data.put("GRB250603A", compareData("GRB250603A", 1));
+            return new ComparePage(data, ignored -> { });
+        });
+        Stage stage = fx(() -> showStyled(page, 1150, 790));
+        try {
+            fx(() -> {
+                @SuppressWarnings("unchecked")
+                ComboBox<String> first = (ComboBox<String>) field(page, "first");
+                @SuppressWarnings("unchecked")
+                ComboBox<String> second = (ComboBox<String>) field(page, "second");
+                first.getEditor().setText("GRB250605");
+                first.getEditor().requestFocus();
+                first.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.TAB,
+                        false, false, false, false));
+                assertEquals("GRB250605A", first.getEditor().getText());
+                second.getEditor().requestFocus();
+                second.getEditor().setText("GRB250603A");
+                return null;
+            });
+            pulse();
+            fx(() -> {
+                @SuppressWarnings("unchecked")
+                ComboBox<String> first = (ComboBox<String>) field(page, "first");
+                TextField editor = first.getEditor();
+                editor.requestFocus();
+                editor.positionCaret(editor.getLength()); // User clicks after A.
+                assertEquals("GRB250605A", editor.getText());
+                return null;
+            });
+            pulse(); // Allow ComboBoxSkin and focus listeners to run.
+            fx(() -> {
+                @SuppressWarnings("unchecked")
+                ComboBox<String> first = (ComboBox<String>) field(page, "first");
+                TextField editor = first.getEditor();
+                assertEquals(editor.getLength(), editor.getCaretPosition(),
+                        "Focusing Compare must not move a clicked caret back to GRB");
+                var dropdownItems = first.getItems();
+                editor.deletePreviousChar();
+                assertEquals("GRB250605", editor.getText(),
+                        "The FIRST Backspace must delete A, not relocate the caret");
+                assertSame(dropdownItems, first.getItems(),
+                        "Editing must not replace the ComboBox's item list");
+                return null;
+            });
+            pulse();
+            fx(() -> {
+                @SuppressWarnings("unchecked")
+                ComboBox<String> first = (ComboBox<String>) field(page, "first");
+                assertEquals("GRB250605", first.getEditor().getText(),
+                        "An asynchronous suggestion refresh may not restore the old GRB");
+                first.getEditor().positionCaret(first.getEditor().getLength());
+                first.getEditor().deletePreviousChar();
+                assertEquals("GRB25060", first.getEditor().getText());
+                return null;
+            });
+        } finally { fx(() -> { stage.close(); return null; }); }
+    }
+
+    @Test
     void failedCompareLoadCanBeRetriedWithoutRestartingApplication() throws Exception {
         java.util.concurrent.atomic.AtomicInteger requested = new java.util.concurrent.atomic.AtomicInteger();
         fx(() -> {
