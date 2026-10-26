@@ -32,6 +32,13 @@ catalog from locally saved GRB ASCII/FITS manifests and from bundled products.
    or `CREA_PACCHETTI_DISTRIBUZIONE_MAC.command`. They include the available
    offline ASCII/FITS products and any saved scientific/spectroscopic tables.
 
+**Optional full two-way synchronization:** after importing the Mac ZIP, run
+`powershell -NoProfile -ExecutionPolicy Bypass -File .\\ESPORTA_DATI_OFFLINE_WINDOWS.ps1`
+in the Windows project. Copy the resulting
+`dist/SwiftBAT-Offline-Archive-Windows.zip` back to the Mac and extract its
+`offline-data/` folder into the Mac project root. This preserves the union
+of GRBs unique to either computer (without uploading scientific data to Git).
+
 `offline-data/` is deliberately excluded from Git history. Each computer
 keeps its own cache; synchronization occurs when the portable archive is
 transferred. Without that transfer, a clean recipient will not inherit the
