@@ -54,4 +54,19 @@ class CompareSearchInputTest {
         assertTrue(CompareSearchInput.matchesSelection(committedByTab, "250605a"));
     }
 
+    @Test
+    void originalPrefixRemainsWhileLastCharacterCanBeDeleted() {
+        assertTrue(CompareSearchInput.hasFixedPrefix("GRB"));
+        assertTrue(CompareSearchInput.hasFixedPrefix("GRB250605"));
+        assertTrue(CompareSearchInput.hasFixedPrefix("GRB250605A"));
+        assertFalse(CompareSearchInput.hasFixedPrefix("250605A"));
+        assertFalse(CompareSearchInput.hasFixedPrefix("RB250605A"));
+        assertFalse(CompareSearchInput.hasFixedPrefix(""));
+        assertFalse(CompareSearchInput.hasFixedPrefix("GRB250605-"));
+        String completedByTab = "GRB250605A";
+        String afterOneBackspace = completedByTab.substring(0, completedByTab.length() - 1);
+        assertTrue(CompareSearchInput.hasFixedPrefix(afterOneBackspace));
+        assertFalse(CompareSearchInput.matchesSelection(completedByTab, afterOneBackspace));
+    }
+
 }
