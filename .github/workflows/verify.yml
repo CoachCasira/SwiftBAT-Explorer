@@ -55,7 +55,9 @@ jobs:
           sudo apt-get install -y xvfb libgtk-3-0 libgl1
       - name: Test UI reali (input, fullscreen, grafici, scrollbar)
         run: |
-          xvfb-run -a mvn --batch-mode --no-transfer-progress \
+          # A 1920px-wide layout test needs an Xvfb screen wider than 1920px.
+          # xvfb-run defaults to 1280x1024 and clips the window otherwise.
+          xvfb-run -a -s "-screen 0 2560x1600x24" mvn --batch-mode --no-transfer-progress \
             -Dswiftbat.uiTests=true \
             -Dtest=ExplorerUiLifecycleTest \
             -DargLine="-Dprism.order=sw" test
