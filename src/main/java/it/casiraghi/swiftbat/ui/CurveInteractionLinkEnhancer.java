@@ -7,11 +7,16 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.chart.Axis;
+import javafx.scene.chart.Chart;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.ValueAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonBase;
+import javafx.scene.control.Control;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.Tooltip;
 import javafx.scene.effect.Glow;
@@ -237,6 +242,36 @@ public final class CurveInteractionLinkEnhancer {
     private static void watch(Node node) {
         if (node == null) return;
         enhance(node);
+        // JavaFX manages chart/skin internals. The old listener walked all
+        // descendants every time a chart child changed, queuing redundant
+        // scan() jobs and starving the FX pulse in Population Analysis.
+        if (node instanceof Chart) return;
+        if (node instanceof TabPane tabs) {
+            if (Boolean.TRUE.equals(tabs.getProperties().get(WATCHED))) return;
+            tabs.getProperties().put(WATCHED, Boolean.TRUE);
+            for (Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) watch(tab.getContent());
+            }
+            tabs.getTabs().addListener((ListChangeListener<Tab>) change -> {
+                while (change.next()) {
+                    if (!change.wasAdded()) continue;
+                    for (Tab tab : change.getAddedSubList()) {
+                        if (tab.getContent() != null) watch(tab.getContent());
+                    }
+                }
+            });
+            return;
+        }
+        if (node instanceof ScrollPane scroll) {
+            if (Boolean.TRUE.equals(scroll.getProperties().get(WATCHED))) return;
+            scroll.getProperties().put(WATCHED, Boolean.TRUE);
+            if (scroll.getContent() != null) watch(scroll.getContent());
+            scroll.contentProperty().addListener((obs, oldContent, newContent) -> {
+                if (newContent != null) watch(newContent);
+            });
+            return;
+        }
+        if (node instanceof Control) return;
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
@@ -245,7 +280,7 @@ public final class CurveInteractionLinkEnhancer {
                 if (!change.wasAdded()) continue;
                 for (Node added : List.copyOf(change.getAddedSubList())) watch(added);
             }
-            Platform.runLater(() -> scan(parent));
+            // watch(added) already enhances new charts. No subtree rescan.
         });
         for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) watch(child);
     }
@@ -253,6 +288,18 @@ public final class CurveInteractionLinkEnhancer {
     private static void scan(Node node) {
         if (node == null) return;
         enhance(node);
+        if (node instanceof Chart) return;
+        if (node instanceof TabPane tabs) {
+            for (Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) scan(tab.getContent());
+            }
+            return;
+        }
+        if (node instanceof ScrollPane scroll) {
+            if (scroll.getContent() != null) scan(scroll.getContent());
+            return;
+        }
+        if (node instanceof Control) return;
         if (node instanceof Parent parent) {
             for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) scan(child);
         }
