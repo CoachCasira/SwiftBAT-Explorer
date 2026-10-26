@@ -10,6 +10,9 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Properties;
@@ -106,6 +109,48 @@ public final class PersistentGrbCache {
 
     public int count() {
         return cachedNames.size();
+    }
+
+    /**
+     * Reconstructs offline-selectable GRBs from the same manifests used by
+     * the persistent light-curve cache. No connection to NASA is required.
+     * Only events with at least one product file are exposed.
+     */
+    public List<CatalogEntry> catalogEntries() {
+        if (!Files.isDirectory(root)) return List.of();
+        List<CatalogEntry> entries = new ArrayList<>();
+        try (Stream<Path> paths = Files.list(root)) {
+            for (Path directory : paths.filter(Files::isDirectory).toList()) {
+                if (!Files.isRegularFile(directory.resolve(MANIFEST))
+                        || (!Files.isRegularFile(directory.resolve(ASCII_FILE))
+                        && !Files.isRegularFile(directory.resolve(FITS_FILE)))) {
+                    continue;
+                }
+                Properties manifest = new Properties();
+                try (var input = Files.newInputStream(directory.resolve(MANIFEST))) {
+                    manifest.load(input);
+                } catch (IOException | IllegalArgumentException ignored) {
+                    // Skip a damaged entry without hiding the other cached GRBs.
+                    continue;
+                }
+                String name = manifest.getProperty("grb", "").trim().toUpperCase(Locale.ROOT);
+                if (!SCHEMA_VERSION.equals(manifest.getProperty("schema"))
+                        || !name.matches("GRB\\d{6}[A-Z]?")
+                        || !directory.getFileName().toString().equalsIgnoreCase(cacheKey(name))) {
+                    continue;
+                }
+                String trigger = manifest.getProperty("triggerId", "").trim();
+                String productUrl = manifest.getProperty("dataProductUrl", "").trim();
+                if (productUrl.isBlank()) {
+                    productUrl = SwiftCatalogService.CATALOG_URL + name + "/data_product/";
+                }
+                entries.add(new CatalogEntry(name, trigger, productUrl));
+            }
+        } catch (IOException ignored) {
+            // Offline operation is best effort; the legacy fallback remains.
+        }
+        entries.sort(Comparator.comparing(CatalogEntry::grbName).reversed());
+        return List.copyOf(entries);
     }
 
     Path root() {
