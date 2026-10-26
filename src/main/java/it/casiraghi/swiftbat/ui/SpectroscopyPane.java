@@ -62,6 +62,7 @@ public final class SpectroscopyPane extends BorderPane {
     private final ChoiceBox<String> modelChoice = new ChoiceBox<>();
     private final StackPane resultHost = new StackPane();
     private Node modelRadios;
+    private ScrollPane contentScroll;
 
     public SpectroscopyPane(GrbData grbData, SpectralData spectralData, HostServices hostServices) {
         this.grbData = grbData;
@@ -129,10 +130,8 @@ public final class SpectroscopyPane extends BorderPane {
         if (official.isDisable()) {
             official.setTooltip(new Tooltip(I18n.t("Nessun risultato ufficiale disponibile")));
         }
-        tabs.getTabs().addAll(
-                official,
-                timeEnergy,
-                new Tab("Guida scientifica", buildGuide()));
+        Tab scientificGuide = new Tab("Guida scientifica", buildGuide());
+        tabs.getTabs().addAll(official, timeEnergy, scientificGuide);
         if (official.isDisable()) tabs.getSelectionModel().select(timeEnergy);
         // Lascia che la scheda assuma l'altezza reale del contenuto quando i grafici vengono impilati.
         resultHost.setMinHeight(Region.USE_PREF_SIZE);
@@ -144,11 +143,20 @@ public final class SpectroscopyPane extends BorderPane {
 
         root.getChildren().addAll(heading, tabs);
         ScrollPane scroll = new ScrollPane(root);
+        contentScroll = scroll;
         scroll.getStyleClass().add("page-scroll");
         scroll.setFitToWidth(true);
         scroll.setFitToHeight(false);
         scroll.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
         scroll.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
+        tabs.getSelectionModel().selectedItemProperty().addListener((obs, before, selected) -> {
+            if (selected != scientificGuide) return;
+            // The preceding Time–Energy tab is taller. Reset BOTH the inner
+            // Spectroscopy scroll and the surrounding Explorer scroll when
+            // showing the guide so users do not land in an empty lower area.
+            scrollToGuideStart();
+            Platform.runLater(this::scrollToGuideStart);
+        });
         return scroll;
     }
 
@@ -655,7 +663,8 @@ public final class SpectroscopyPane extends BorderPane {
 
         Button fullscreen = UiFactory.button("Schermo intero", "primary-button");
         fullscreen.setDisable(grbData.asciiData().isEmpty());
-        fullscreen.setOnAction(event -> openTimeEnergyFullscreen(timeWindowSeconds(window.getValue())));
+        fullscreen.setOnAction(event ->
+                openTimeEnergyFullscreen(heatmap, timeWindowSeconds(window.getValue())));
         Button threeD = UiFactory.button("Apri vista 3D dei rate", "primary-button");
         threeD.setDisable(grbData.asciiData().isEmpty());
         threeD.setOnAction(event -> openTimeEnergy3D());
@@ -691,10 +700,15 @@ public final class SpectroscopyPane extends BorderPane {
         };
     }
 
-    private void openTimeEnergyFullscreen(double halfWindowSeconds) {
+    private void openTimeEnergyFullscreen(TimeEnergyHeatmapPane source, double halfWindowSeconds) {
         TimeEnergyHeatmapPane enlarged = new TimeEnergyHeatmapPane();
         enlarged.setData(grbData.asciiData());
         enlarged.setHalfWindowSeconds(halfWindowSeconds);
+        // InPlaceFullscreen has a distinct canvas. Transfer selections by
+        // time-bin/band indices (not screen pixels), and forward every edit
+        // back to the original view so returning preserves the selection.
+        enlarged.restoreSelection(source.selectionSnapshot());
+        enlarged.setOnSelectionChanged(source::restoreSelection);
         enlarged.setMinSize(0, 0);
         enlarged.setPrefHeight(760);
         enlarged.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
@@ -728,9 +742,28 @@ public final class SpectroscopyPane extends BorderPane {
         InPlaceFullscreen.show(this, grbData.grbName() + " · Rate nel tempo per banda · vista 3D", content);
     }
 
+    private void scrollToGuideStart() {
+        if (contentScroll != null) {
+            contentScroll.setVvalue(contentScroll.getVmin());
+        }
+        // Explorer contains its own scrollable workspace. Reset only scroll
+        // ancestors of this spectroscopy page, not other unrelated panels.
+        Node ancestor = getParent();
+        while (ancestor != null) {
+            if (ancestor instanceof ScrollPane scroll) {
+                scroll.setVvalue(scroll.getVmin());
+            }
+            ancestor = ancestor.getParent();
+        }
+    }
+
     private Node buildGuide() {
         VBox guide = new VBox(12);
+        guide.getStyleClass().add("spectroscopy-scientific-guide");
         guide.setPadding(new Insets(18));
+        // A guide must never be stretched to the 790px heatmap minimum.
+        guide.setMinHeight(Region.USE_PREF_SIZE);
+        guide.setMaxHeight(Region.USE_PREF_SIZE);
         guide.getChildren().addAll(
                 guideCard("1 · Che cosa arriva dal catalogo BAT",
                         "I parametri PL/CPL, il modello migliore, χ², gradi di libertà, probabilità nulla, intervallo dello spettro e flussi per banda sono letti dalle tabelle ufficiali. L'app non li inventa e non li ricalcola dai quattro canali."),
