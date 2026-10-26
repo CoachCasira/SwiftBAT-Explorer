@@ -34,6 +34,17 @@ echo "Creo lo ZIP Windows per i relatori..."
 rsync -a --exclude='/.git/' --exclude='/.github/' --exclude='/.swiftbat-runtime/' \
   --exclude='/target/' --exclude='/dist/' --exclude='/.idea/' \
   --exclude='/.vscode/' --exclude='.DS_Store' "$SCRIPT_DIR/" "$app_dir/"
+# Include, when available, the original cached NASA products in the ZIP.
+# The recipient can inspect these GRBs even if NASA's TLS endpoint is down.
+offline_cache="$HOME/.swiftbat-explorer/cache/v1"
+if [ -d "$offline_cache" ]; then
+  mkdir -p "$app_dir/offline-data/v1"
+  rsync -a "$offline_cache/" "$app_dir/offline-data/v1/"
+  echo "Prodotti Swift/BAT offline inclusi dal Mac di origine."
+else
+  echo "Nessuna cache Swift/BAT locale trovata: pacchetto senza dataset offline."
+fi
+
 rm -rf "$app_dir/.git" "$app_dir/.github" "$app_dir/.swiftbat-runtime" "$app_dir/target" \
   "$app_dir/dist" "$app_dir/.idea" "$app_dir/.vscode"
 rm -f "$app_dir/.DS_Store" "$app_dir/AVVIA_APP.bat" \
