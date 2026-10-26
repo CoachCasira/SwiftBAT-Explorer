@@ -486,7 +486,11 @@ public final class UiLastMileFixes {
 
     private static boolean replaceTableInParent(TableView<?> table, HBox shell) {
         Parent parent = table.getParent();
-        if (parent == null) return false;
+        // Defensive invariant: shell must be a detached empty replacement.
+        // Never replace a child with its own parent (or with a parent that
+        // already owns that child): JavaFX correctly rejects such cycles.
+        if (parent == null || parent == shell || shell.getParent() != null
+                || shell.getChildren().contains(table)) return false;
 
         if (parent instanceof VBox box) {
             int index = box.getChildren().indexOf(table);
