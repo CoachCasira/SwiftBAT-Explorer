@@ -31,6 +31,12 @@ public final class I18n {
         put("Fonte ufficiale", "Official source");
         put("Fonte ufficiale BAT", "Official BAT source");
         put("Apri tabella ufficiale ↗", "Open official table ↗");
+        put("Tabella redshift BAT senza record validi.", "BAT redshift table contains no valid records.");
+        put("Nessuna tabella redshift ufficiale salvata localmente.", "No official redshift table saved locally.");
+        put("La tabella ufficiale non contiene coordinate leggibili.", "The official table contains no readable coordinates.");
+        put("Non sono disponibili coordinate ufficiali né GRB locali.", "Neither official coordinates nor local GRBs are available.");
+        put("Attendo il catalogo…", "Waiting for catalog…");
+        put("Metadati scientifici non disponibili", "Scientific metadata unavailable");
         put("Connessione…", "Connecting…");
         put("Catalogo…", "Catalog…");
         put("in memoria", "in memory");
