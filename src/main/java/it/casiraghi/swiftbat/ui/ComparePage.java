@@ -47,7 +47,7 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
     private static final int VISIBLE_SUGGESTIONS = 2;
     private static final String GHOST_KEY = ComparePage.class.getName() + ".ghostSuggestion";
     private static final String COMMITTING_KEY = ComparePage.class.getName() + ".committing";
-    private static final String SUGGESTION_UPDATE_KEY = ComparePage.class.getName() + ".suggestionUpdate";
+
 
     private final ObservableMap<String, GrbData> sessionData;
     private final Consumer<CatalogEntry> loadRequest;
@@ -180,35 +180,18 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
             }
         });
         combo.getEditor().focusedProperty().addListener((obs, oldValue, focused) -> {
-            if (focused) {
-                Platform.runLater(() -> {
-                    if (combo.getEditor().isFocused() && combo.getEditor().getCaretPosition() < 3) {
-                        combo.getEditor().positionCaret(3);
-                    }
-                });
-                updateSuggestions(combo, counter, ghost, other, combo.getEditor().getText());
-            } else {
-                combo.hide();
-            }
+            // Never move the caret in a delayed focus/mouse callback.
+            // JavaFX ComboBoxSkin can temporarily report caret=0 when the
+            // editor regains focus. The old Platform.runLater positionCaret(3)
+            // silently overwrote the user's clicked position, so the first
+            // Backspace did nothing and left the cursor after "GRB".
+            updateSuggestions(combo, counter, ghost, other, combo.getEditor().getText());
+            if (!focused) combo.hide();
         });
-        combo.getEditor().setOnMouseClicked(event -> Platform.runLater(() -> {
-            if (combo.getEditor().isFocused() && combo.getEditor().getCaretPosition() < 3) {
-                combo.getEditor().positionCaret(3);
-            }
-        }));
         // A single TAB accepts the ghost suggestion from either field.
         combo.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
-            if (event.getCode() == KeyCode.HOME) {
-                combo.getEditor().positionCaret(3);
-                event.consume();
-                return;
-            }
-            if (event.getCode() == KeyCode.LEFT
-                    && combo.getEditor().getCaretPosition() <= 3
-                    && combo.getEditor().getSelection().getLength() == 0) {
-                event.consume();
-                return;
-            }
+            // HOME and arrow keys remain native text-navigation operations.
+            // The TextFormatter, not caret repositioning, protects "GRB".
             if (event.getCode() == KeyCode.TAB) {
                 String typed = normalize(combo.getEditor().getText());
                 Object ghostName = combo.getProperties().get(GHOST_KEY);
@@ -221,19 +204,12 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
                 }
             }
         });
-        combo.setOnAction(event -> {
-            if (Boolean.TRUE.equals(combo.getProperties().get(COMMITTING_KEY))) return;
-            String value = combo.getValue();
-            // Editable ComboBox also fires ACTION for value/list changes while
-            // the user is deleting characters. After TAB completion the old
-            // value may still be the full GRB; without this guard, deleting
-            // just the final character immediately restores it again.
-            // Commit only if the selected value matches the visible editor.
-            if (value != null && availableNames.contains(value)
-                    && CompareSearchInput.matchesSelection(value, combo.getEditor().getText())) {
-                commitSelection(combo, value);
-            }
-        });
+        // A ComboBox fires ActionEvent on editor/value changes too, not only
+        // dropdown selection. Re-committing from that event used to rewrite
+        // the editor and caret during deletion. The existing text/value
+        // listeners handle searching, rendering and loading; TAB alone calls
+        // commitSelection() explicitly.
+
     }
 
     private void updateSuggestions(ComboBox<String> combo, Label counter, GhostHint ghost,
@@ -259,39 +235,12 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         ghost.suffix().setText(ghostValue.isBlank() ? "" : ghostValue.substring(normalized.length()));
         ghost.box().setVisible(combo.getEditor().isFocused() && !ghostValue.isBlank());
 
-        // The ComboBox popup and its item list must not be mutated from
-        // inside a TextField text-change notification: doing so can move the
-        // caret while JavaFX is still handling Backspace. Defer changes until
-        // after the current key event and ignore stale queued updates.
-        int generation = ((Number) combo.getProperties()
-                .getOrDefault(SUGGESTION_UPDATE_KEY, 0)).intValue() + 1;
-        combo.getProperties().put(SUGGESTION_UPDATE_KEY, generation);
-        boolean completed = availableNames.contains(normalized);
-        List<String> visible = matches.size() <= MAX_SUGGESTIONS && !matches.isEmpty()
-                && normalized.length() > 3 && !completed
-                ? matches.stream().limit(VISIBLE_SUGGESTIONS).toList() : List.of();
-        Platform.runLater(() -> {
-            if (!java.util.Objects.equals(combo.getProperties().get(SUGGESTION_UPDATE_KEY), generation)
-                    || Boolean.TRUE.equals(combo.getProperties().get(COMMITTING_KEY))
-                    || !java.util.Objects.equals(combo.getEditor().getText(), raw)) return;
-            if (!combo.getEditor().isFocused() || completed) {
-                // In a ComboBox, clearing the items also invalidates a
-                // selected value and can rewrite the editor on focus/click.
-                // Never touch the list of a completed/committed GRB.
-                combo.hide();
-                return;
-            }
-            if (visible.isEmpty()) {
-                combo.hide();
-                if (!combo.getItems().isEmpty()) combo.getItems().clear();
-                return;
-            }
-            if (!combo.getItems().equals(visible)) {
-                combo.setItems(FXCollections.observableArrayList(visible));
-            }
-            // TAB always commits the ghost hint; the popup is opened
-            // explicitly with the dropdown arrow, not on every Backspace.
-        });
+        // Keep the ComboBox item list stable while the TextField is being
+        // edited. Even a deferred setItems()/clear() makes ComboBoxSkin reset
+        // selection and caret on the next pulse, especially after changing
+        // pages or clicking an already completed GRB. Ghost completion and
+        // counters are independent of dropdown items.
+        if (!combo.getEditor().isFocused()) combo.hide();
     }
 
     private static void protectGrbPrefix(TextField editor, KeyEvent event) {
@@ -358,6 +307,13 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         names.replaceAll(name -> name.toUpperCase(Locale.ROOT));
         names.sort(Comparator.reverseOrder());
         availableNames = List.copyOf(names);
+        // Update actual dropdown choices only when the catalog/session
+        // changes, never when the user presses Backspace.
+        var choices = FXCollections.observableArrayList(availableNames);
+        if (!first.getItems().equals(availableNames)) first.setItems(choices);
+        if (!second.getItems().equals(availableNames)) {
+            second.setItems(FXCollections.observableArrayList(availableNames));
+        }
         updateSuggestions(first, firstMatches, firstGhost, second, first.getEditor().getText());
         updateSuggestions(second, secondMatches, secondGhost, first, second.getEditor().getText());
     }
