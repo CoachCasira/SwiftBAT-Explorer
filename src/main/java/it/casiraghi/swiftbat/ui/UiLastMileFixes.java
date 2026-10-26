@@ -92,6 +92,10 @@ public final class UiLastMileFixes {
         if (node instanceof TabPane tabs && hasAncestorNamed(tabs, "PopulationPage")) {
             tabs.getProperties().put(FINAL_POP_TABS_DONE, Boolean.TRUE);
         }
+        // The geometry pass only owns logical application content. JavaFX
+        // chart skins may create thousands of nodes while series are rendered.
+        if (node instanceof javafx.scene.chart.Chart
+                || node instanceof TableView<?>) return;
         if (!(node instanceof Parent parent)) return;
 
         if (!Boolean.TRUE.equals(parent.getProperties().get(PREPARED))) {
@@ -145,6 +149,18 @@ public final class UiLastMileFixes {
             }
         }
 
+        if (node instanceof javafx.scene.chart.Chart || node instanceof TableView<?>) return;
+        if (node instanceof TabPane) return; // Logical Tab contents visited above.
+        if (node instanceof javafx.scene.control.ScrollPane scroll) {
+            if (Boolean.TRUE.equals(scroll.getProperties().get(WATCHED))) return;
+            scroll.getProperties().put(WATCHED, Boolean.TRUE);
+            if (scroll.getContent() != null) watch(scroll.getContent(), appRoot);
+            scroll.contentProperty().addListener((obs, oldContent, newContent) -> {
+                if (newContent != null) watch(newContent, appRoot);
+            });
+            return;
+        }
+        if (node instanceof javafx.scene.control.Control) return;
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
