@@ -696,6 +696,12 @@ public final class PopulationPage extends BorderPane {
 
     private void configureTable() {
         resultTable.getStyleClass().add("data-table");
+        // Unlike Explorer, Population constructs a hidden results TableView
+        // before it is ever attached to a scene. Reparenting the table into
+        // an external-scrollbar shell and monitoring its skin has caused
+        // repeated JavaFX pulse work and eventually heap exhaustion.
+        // Keep this one table on the standard virtualized JavaFX scrollbar.
+        resultTable.getProperties().put("swiftbat.population.nativeTableScroll", Boolean.TRUE);
         resultColumnBar = TablePreferences.install(resultTable, "population.results");
         resultTable.setPlaceholder(UiFactory.wrappedLabel(
                 "Nessun GRB incluso. Controlla i filtri oppure esegui una nuova analisi.",
