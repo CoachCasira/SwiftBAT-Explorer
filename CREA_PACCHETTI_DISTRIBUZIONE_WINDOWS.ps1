@@ -168,6 +168,17 @@ function Build-Zip {
                 Add-Entry -Archive $archive -Name $nameInZip -Data $null -FilePath $file.FullName
             }
         }
+
+        # Include the scientific cache when packages are built from Windows too.
+        # On the recipient's computer it is used only as an offline read source.
+        $offlineSource = Join-Path $env:USERPROFILE '.swiftbat-explorer\cache\v1'
+        if (Test-Path -LiteralPath $offlineSource -PathType Container) {
+            foreach ($file in Get-ChildItem -LiteralPath $offlineSource -File -Recurse) {
+                $relative = $file.FullName.Substring($offlineSource.Length + 1).Replace('\','/')
+                Add-Entry -Archive $archive -Name ('SwiftBAT Explorer/Applicazione/offline-data/v1/' + $relative) -Data $null -FilePath $file.FullName
+            }
+            Write-Host 'Prodotti NASA/BAT salvati localmente inclusi nel pacchetto.'
+        }
     } finally {
         if ($null -ne $archive) { $archive.Dispose() }
         elseif ($null -ne $stream) { $stream.Dispose() }
