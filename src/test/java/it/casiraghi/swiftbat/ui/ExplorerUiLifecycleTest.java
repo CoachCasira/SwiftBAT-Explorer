@@ -356,6 +356,64 @@ class ExplorerUiLifecycleTest {
         }
     }
 
+    @Test
+    void defaultModenaTableCellsUseLiteralBorderPaintWhileStyledSeparatorsRemain()
+            throws Exception {
+        TableView<String> generic = fx(() -> {
+            TableView<String> table = new TableView<>();
+            TableColumn<String, String> column = new TableColumn<>("Generic");
+            column.setCellValueFactory(value -> new SimpleStringProperty(value.getValue()));
+            table.getColumns().add(column);
+            table.getItems().setAll("GRB250605A", "GRB250603A");
+            table.setPrefHeight(145);
+            return table;
+        });
+        TableView<String> styled = fx(() -> {
+            TableView<String> table = new TableView<>();
+            table.getStyleClass().addAll("data-table", "final-aligned-table");
+            TableColumn<String, String> column = new TableColumn<>("Styled");
+            column.setCellValueFactory(value -> new SimpleStringProperty(value.getValue()));
+            table.getColumns().add(column);
+            table.getItems().setAll("GRB250605A", "GRB250603A");
+            table.setPrefHeight(145);
+            return table;
+        });
+        Stage stage = fx(() -> showStyled(new VBox(generic, styled), 900, 440));
+        try {
+            pulse();
+            fx(() -> {
+                generic.applyCss();
+                styled.applyCss();
+                javafx.scene.control.TableCell<?, ?> plainCell = generic.lookupAll(".table-cell")
+                        .stream().filter(javafx.scene.control.TableCell.class::isInstance)
+                        .map(node -> (javafx.scene.control.TableCell<?, ?>) node)
+                        .filter(cell -> !cell.isEmpty()).findFirst().orElseThrow();
+                javafx.scene.layout.Border genericBorder = plainCell.getBorder();
+                if (genericBorder != null && !genericBorder.getStrokes().isEmpty()) {
+                    javafx.scene.paint.Paint paint = genericBorder.getStrokes().get(0).getRightStroke();
+                    assertInstanceOf(javafx.scene.paint.Color.class, paint);
+                    assertEquals(0, ((javafx.scene.paint.Color) paint).getOpacity(), 0.001,
+                            "Generic TableView cell fallback should use literal transparent Paint");
+                }
+
+                javafx.scene.control.TableCell<?, ?> themedCell = styled.lookupAll(".table-cell")
+                        .stream().filter(javafx.scene.control.TableCell.class::isInstance)
+                        .map(node -> (javafx.scene.control.TableCell<?, ?>) node)
+                        .filter(cell -> !cell.isEmpty()).findFirst().orElseThrow();
+                javafx.scene.layout.Border themedBorder = themedCell.getBorder();
+                assertNotNull(themedBorder, "The themed table must retain its vertical cell separators");
+                assertFalse(themedBorder.getStrokes().isEmpty());
+                javafx.scene.paint.Paint right = themedBorder.getStrokes().get(0).getRightStroke();
+                assertInstanceOf(javafx.scene.paint.Color.class, right);
+                assertTrue(((javafx.scene.paint.Color) right).getOpacity() > 0,
+                        "The fallback must not remove Explore/Population column separators");
+                return null;
+            });
+        } finally {
+            fx(() -> { stage.close(); return null; });
+        }
+    }
+
     private static Stage showStyled(Parent root, int width, int height) {
         root.getStyleClass().addAll("app-root", "reference-redesign", "black-hole-redesign");
         Stage stage = new Stage();
