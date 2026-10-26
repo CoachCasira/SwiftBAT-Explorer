@@ -10,6 +10,9 @@ import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.chart.BarChart;
+import javafx.scene.chart.Chart;
+import javafx.scene.control.Control;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
@@ -123,6 +126,25 @@ public final class FinalUiStabilityEnhancer {
                 });
             }
         }
+
+        // Never descend into chart skins or virtualized control skins.
+        // A Population analysis can construct thousands of chart/chart-cell
+        // children in a single pulse. Watching each node (and queuing a
+        // runLater for every insertion) used to starve the JavaFX UI thread.
+        // The logical tab/scroll contents are observed explicitly instead.
+        if (node instanceof Chart || node instanceof TableView<?> || node instanceof ListView<?>) return;
+        if (node instanceof TabPane) return;
+        if (node instanceof ScrollPane scroll) {
+            if (scroll.getContent() != null) watch(scroll.getContent(), appRoot);
+            if (!Boolean.TRUE.equals(scroll.getProperties().get(WATCHED))) {
+                scroll.getProperties().put(WATCHED, Boolean.TRUE);
+                scroll.contentProperty().addListener((obs, oldContent, newContent) -> {
+                    if (newContent != null) watch(newContent, appRoot);
+                });
+            }
+            return;
+        }
+        if (node instanceof Control) return;
 
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
