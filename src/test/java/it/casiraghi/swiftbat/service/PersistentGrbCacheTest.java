@@ -38,6 +38,27 @@ class PersistentGrbCacheTest {
         assertEquals(1, reopened.count());
     }
 
+
+    @Test
+    void packagedOfflineCacheIsReadableWithoutModifyingIt() throws Exception {
+        Path userCache = temporary.resolve("user-cache");
+        Path bundledCache = temporary.resolve("offline-data").resolve("v1");
+        PersistentGrbCache source = new PersistentGrbCache(bundledCache);
+        CatalogEntry entry = new CatalogEntry("GRB250605A", "1321323",
+                SwiftCatalogService.CATALOG_URL + "GRB250605A/data_product/");
+        byte[] ascii = "0 1 0.1 2 0.1 3 0.1 4 0.1 10 0.2\n"
+                .getBytes(StandardCharsets.US_ASCII);
+        source.write(entry, new PersistentGrbCache.CachedProducts(
+                ascii, null, entry.dataProductUrl(), "", "", "", "", Instant.EPOCH));
+
+        PersistentGrbCache recipient = new PersistentGrbCache(userCache, bundledCache);
+        assertEquals(1, recipient.count());
+        assertEquals(1, recipient.catalogEntries().size());
+        assertArrayEquals(ascii, recipient.read(entry).orElseThrow().asciiBytes());
+        assertTrue(recipient.contains(entry.grbName()));
+        assertTrue(java.nio.file.Files.notExists(userCache.resolve(entry.grbName())));
+    }
+
     @Test
     void onlineServiceUsesDiskCacheWithoutNetwork() throws Exception {
         PersistentGrbCache cache = new PersistentGrbCache(temporary);
