@@ -300,6 +300,14 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         } finally {
             combo.getProperties().remove(COMMITTING_KEY);
         }
+        // TAB is a programmatic commit; the text listener was intentionally
+        // suppressed while COMMITTING_KEY was set. Refresh the hint/counter
+        // once, now that the editor contains the stable complete name.
+        if (combo == first) {
+            updateSuggestions(first, firstMatches, firstGhost, second, first.getEditor().getText());
+        } else {
+            updateSuggestions(second, secondMatches, secondGhost, first, second.getEditor().getText());
+        }
         ensureLoaded(value);
         refreshComparison();
     }
