@@ -455,19 +455,27 @@ public final class UiLastMileFixes {
         external.setPrefWidth(5.5);
         external.setMaxWidth(5.5);
 
-        HBox shell = new HBox(5, table, external);
+        // IMPORTANT: do not add the table to the shell yet. Attaching a
+        // JavaFX node to an HBox immediately reparents it. The previous
+        // 'new HBox(5, table, external)' changed table.getParent() to shell,
+        // then replaceTableInParent() tried to replace shell's own child with
+        // shell itself, triggering 'Children: cycle detected' upon navigating
+        // to Population Analysis. Replace the table in its ORIGINAL parent
+        // first, and only then attach the detached table to the new shell.
+        HBox shell = new HBox(5);
         shell.getStyleClass().addAll("stable-table-scroll", "external-table-scroll-shell");
         shell.setAlignment(Pos.TOP_LEFT);
         shell.setMinSize(0, 0);
         shell.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        table.setMinWidth(0);
-        table.setMaxWidth(Double.MAX_VALUE);
-        HBox.setHgrow(table, Priority.ALWAYS);
 
         if (!replaceTableInParent(table, shell)) {
             table.getProperties().remove(TABLE_WRAPPED);
             return;
         }
+        shell.getChildren().addAll(table, external);
+        table.setMinWidth(0);
+        table.setMaxWidth(Double.MAX_VALUE);
+        HBox.setHgrow(table, Priority.ALWAYS);
 
         table.skinProperty().addListener((obs, oldSkin, newSkin) -> scheduleScrollbarWire(table, external));
         table.sceneProperty().addListener((obs, oldScene, newScene) -> {
