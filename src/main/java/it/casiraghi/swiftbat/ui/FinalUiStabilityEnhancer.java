@@ -209,7 +209,16 @@ public final class FinalUiStabilityEnhancer {
                 }
                 if (tab.getContent() != null) repairTree(tab.getContent());
             }
+            return;
         }
+        // Repair only logical controls; JavaFX chart/table skins may contain
+        // thousands of descendants and are not translation placeholders.
+        if (node instanceof Chart || node instanceof TableView<?> || node instanceof ListView<?>) return;
+        if (node instanceof ScrollPane scroll) {
+            if (scroll.getContent() != null) repairTree(scroll.getContent());
+            return;
+        }
+        if (node instanceof Control) return;
         if (node instanceof Parent parent) {
             for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) repairTree(child);
         }
