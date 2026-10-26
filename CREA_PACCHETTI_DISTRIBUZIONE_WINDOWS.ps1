@@ -169,15 +169,19 @@ function Build-Zip {
             }
         }
 
-        # Include the scientific cache when packages are built from Windows too.
-        # On the recipient's computer it is used only as an offline read source.
-        $offlineSource = Join-Path $env:USERPROFILE '.swiftbat-explorer\cache\v1'
-        if (Test-Path -LiteralPath $offlineSource -PathType Container) {
+        # Merge the machine's local archive with a previously imported Mac
+        # snapshot. Preserve the imported official bytes when names overlap.
+        foreach ($category in @('v1', 'scientific', 'spectroscopy-v1')) {
+            $offlineSource = Join-Path $env:USERPROFILE ('.swiftbat-explorer\cache\' + $category)
+            if (-not (Test-Path -LiteralPath $offlineSource -PathType Container)) { continue }
             foreach ($file in Get-ChildItem -LiteralPath $offlineSource -File -Recurse) {
-                $relative = $file.FullName.Substring($offlineSource.Length + 1).Replace('\','/')
-                Add-Entry -Archive $archive -Name ('SwiftBAT Explorer/Applicazione/offline-data/v1/' + $relative) -Data $null -FilePath $file.FullName
+                $relative = $file.FullName.Substring($offlineSource.Length + 1)
+                $alreadyImported = Join-Path $root ('offline-data\' + $category + '\' + $relative)
+                if (Test-Path -LiteralPath $alreadyImported -PathType Leaf) { continue }
+                $zipRelative = $relative.Replace('\','/')
+                $target = 'SwiftBAT Explorer/Applicazione/offline-data/' + $category + '/' + $zipRelative
+                Add-Entry -Archive $archive -Name $target -Data $null -FilePath $file.FullName
             }
-            Write-Host 'Prodotti NASA/BAT salvati localmente inclusi nel pacchetto.'
         }
     } finally {
         if ($null -ne $archive) { $archive.Dispose() }
