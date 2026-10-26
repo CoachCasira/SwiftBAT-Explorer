@@ -97,6 +97,12 @@ Il launcher è deliberatamente indipendente dal Java installato sul Mac di svilu
 
 Per simulare un primo avvio pulito, chiudere l’app, eliminare soltanto `SwiftBAT Explorer/Applicazione/.swiftbat-runtime/` dalla cartella estratta e riaprire il launcher. Per rimuovere il runtime dopo la prova, basta eliminare la cartella estratta (inclusi i log locali).
 
+## Archivio scientifico locale in caso di problemi NASA
+
+Il generatore ZIP copia automaticamente, se presente sul Mac che prepara il pacchetto, la cache `~/.swiftbat-explorer/cache/v1/` dentro `Applicazione/offline-data/v1/`. Il destinatario può quindi esplorare i GRB con curve ASCII/FITS già scaricate senza accedere al catalogo NASA. Il numero di GRB disponibili dipende dai prodotti effettivamente inclusi; i 10 eventi di emergenza compaiono solo quando non ci sono dati locali utilizzabili.
+
+Il primo avvio continua a richiedere una connessione per scaricare Java 17, Maven e le librerie dell'app. L'accesso ai dati NASA è invece facoltativo per i GRB inclusi nella cache. Mappa celeste, redshift e alcune analisi spettroscopiche possono essere limitate se le rispettive tabelle non sono disponibili online.
+
 ## Sicurezza e isolamento
 
 Il bootstrap:
