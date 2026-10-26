@@ -60,6 +60,33 @@ class PersistentGrbCacheTest {
     }
 
     @Test
+    void mergesBundledMacArchiveAndWindowsCacheWithoutDuplicateEvents() throws Exception {
+        Path userCache = temporary.resolve("windows-cache");
+        Path macArchive = temporary.resolve("offline-data").resolve("v1");
+        PersistentGrbCache mac = new PersistentGrbCache(macArchive);
+        PersistentGrbCache windows = new PersistentGrbCache(userCache);
+        for (String name : java.util.List.of("GRB250605A", "GRB250603A")) {
+            CatalogEntry item = new CatalogEntry(name, "mac-" + name, "https://example.test/mac/");
+            mac.write(item, new PersistentGrbCache.CachedProducts(
+                    new byte[]{1}, null, item.dataProductUrl(), "", "", "", "", Instant.EPOCH));
+        }
+        for (String name : java.util.List.of("GRB250603A", "GRB250530C")) {
+            CatalogEntry item = new CatalogEntry(name, "win-" + name, "https://example.test/win/");
+            windows.write(item, new PersistentGrbCache.CachedProducts(
+                    new byte[]{2}, null, item.dataProductUrl(), "", "", "", "", Instant.EPOCH));
+        }
+
+        PersistentGrbCache combined = new PersistentGrbCache(userCache, macArchive);
+        assertEquals(3, combined.catalogEntries().size());
+        assertEquals(3, combined.count());
+        CatalogEntry overlapping = combined.catalogEntries().stream()
+                .filter(entry -> entry.grbName().equals("GRB250603A")).findFirst().orElseThrow();
+        assertEquals("win-GRB250603A", overlapping.triggerId());
+        assertArrayEquals(new byte[]{1},
+                combined.read(new CatalogEntry("GRB250605A", "", "")).orElseThrow().asciiBytes());
+    }
+
+    @Test
     void onlineServiceUsesDiskCacheWithoutNetwork() throws Exception {
         PersistentGrbCache cache = new PersistentGrbCache(temporary);
         CatalogEntry entry = new CatalogEntry("GRBTESTA", "123", "https://invalid.test/data/");
