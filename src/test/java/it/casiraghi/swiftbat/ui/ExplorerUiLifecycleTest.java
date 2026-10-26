@@ -483,6 +483,63 @@ class ExplorerUiLifecycleTest {
     }
 
     @Test
+    void compareTabCompletionAndBackspaceNeverCorruptJavaFxCaretRange() throws Exception {
+        ComparePage page = fx(() -> {
+            var data = FXCollections.<String, GrbData>observableHashMap();
+            data.put("GRB250605A", compareData("GRB250605A", 3));
+            data.put("GRB250603A", compareData("GRB250603A", 1));
+            return new ComparePage(data, ignored -> { });
+        });
+        Stage stage = fx(() -> showStyled(page, 1100, 820));
+        try {
+            fx(() -> {
+                @SuppressWarnings("unchecked")
+                ComboBox<String> first = (ComboBox<String>) field(page, "first");
+                @SuppressWarnings("unchecked")
+                ComboBox<String> second = (ComboBox<String>) field(page, "second");
+
+                for (ComboBox<String> combo : List.of(first, second)) {
+                    String grb = combo == first ? "GRB250605A" : "GRB250603A";
+                    TextField editor = combo.getEditor();
+                    editor.requestFocus();
+                    editor.setText(grb.substring(0, grb.length() - 1));
+                    combo.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.TAB,
+                            false, false, false, false));
+                    assertEquals(grb, editor.getText(), "TAB must complete the ghost suggestion");
+                    editor.positionCaret(grb.length());
+                    editor.deletePreviousChar();
+                    assertEquals(grb.substring(0, grb.length() - 1), editor.getText(),
+                            "First Backspace after TAB must remove the final character");
+                    editor.setText(grb);
+                    editor.positionCaret(grb.length());
+                    editor.deletePreviousChar();
+                    assertEquals(grb.substring(0, grb.length() - 1), editor.getText());
+
+                    editor.selectAll();
+                    editor.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.BACK_SPACE,
+                            false, false, false, false));
+                    assertEquals("GRB", editor.getText(),
+                            "Backspace with the complete input selected keeps only the GRB prefix");
+                    editor.positionCaret(3);
+                    editor.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.BACK_SPACE,
+                            false, false, false, false));
+                    assertEquals("GRB", editor.getText(),
+                            "Backspace at the protected prefix boundary must be harmless");
+                }
+                return null;
+            });
+            pulse();
+            fx(() -> {
+                @SuppressWarnings("unchecked")
+                ComboBox<String> first = (ComboBox<String>) field(page, "first");
+                assertEquals("GRB", first.getEditor().getText(),
+                        "Queued suggestion updates may not erase or restore the input");
+                return null;
+            });
+        } finally { fx(() -> { stage.close(); return null; }); }
+    }
+
+    @Test
     void failedCompareLoadCanBeRetriedWithoutRestartingApplication() throws Exception {
         java.util.concurrent.atomic.AtomicInteger requested = new java.util.concurrent.atomic.AtomicInteger();
         fx(() -> {
