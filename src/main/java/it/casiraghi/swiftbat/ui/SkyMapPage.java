@@ -139,6 +139,15 @@ public final class SkyMapPage extends BorderPane {
         setStatusStyle("status-warning");
     }
 
+    public void showOfflineCoverage(int plotted, int total) {
+        String it = "Archivio offline: " + plotted + "/" + total
+                + " GRB con coordinate verificate; le altre curve restano analizzabili";
+        String en = "Offline archive: " + plotted + "/" + total
+                + " GRBs have verified coordinates; other light curves remain analyzable";
+        I18n.setText(status, it, en);
+        setStatusStyle("status-warning");
+    }
+
     public void setSkyBursts(List<SkyBurst> bursts) {
         allBursts = bursts == null ? List.of() : List.copyOf(bursts);
         searchAssist.refresh();
