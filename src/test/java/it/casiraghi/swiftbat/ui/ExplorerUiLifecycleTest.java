@@ -600,6 +600,30 @@ class ExplorerUiLifecycleTest {
                 assertEquals("GRB25060", first.getEditor().getText());
                 return null;
             });
+            // Re-entering Compare after another page must not re-arm any
+            // deferred focus/popup listener that relocates the cursor.
+            fx(() -> {
+                stage.getScene().setRoot(new VBox());
+                stage.getScene().setRoot(page);
+                @SuppressWarnings("unchecked")
+                ComboBox<String> first = (ComboBox<String>) field(page, "first");
+                TextField editor = first.getEditor();
+                editor.setText("GRB250605A");
+                editor.requestFocus();
+                editor.positionCaret(editor.getLength());
+                return null;
+            });
+            pulse();
+            fx(() -> {
+                @SuppressWarnings("unchecked")
+                ComboBox<String> first = (ComboBox<String>) field(page, "first");
+                TextField editor = first.getEditor();
+                assertEquals(editor.getLength(), editor.getCaretPosition(),
+                        "Returning from another page must preserve the clicked caret");
+                editor.deletePreviousChar();
+                assertEquals("GRB250605", editor.getText());
+                return null;
+            });
         } finally { fx(() -> { stage.close(); return null; }); }
     }
 
