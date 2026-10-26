@@ -103,6 +103,17 @@ public final class UiTableAndStartupFixes {
             }
         }
 
+        if (node instanceof javafx.scene.control.ScrollPane scroll) {
+            if (scroll.getContent() != null) prepareNode(scroll.getContent());
+            String key = PREPARED + ".scroll";
+            if (!Boolean.TRUE.equals(scroll.getProperties().get(key))) {
+                scroll.getProperties().put(key, Boolean.TRUE);
+                scroll.contentProperty().addListener((obs, oldContent, newContent) -> {
+                    if (newContent != null) prepareNode(newContent);
+                });
+            }
+            return;
+        }
         // TableView/Chart/Control skins are dynamic JavaFX internals. Mark
         // their logical owner once, never recurse into thousands of cells.
         if (node instanceof javafx.scene.chart.Chart
@@ -155,6 +166,15 @@ public final class UiTableAndStartupFixes {
             }
         }
 
+        if (node instanceof javafx.scene.control.ScrollPane scroll) {
+            if (Boolean.TRUE.equals(scroll.getProperties().get(WATCHED))) return;
+            scroll.getProperties().put(WATCHED, Boolean.TRUE);
+            if (scroll.getContent() != null) watch(scroll.getContent());
+            scroll.contentProperty().addListener((obs, oldContent, newContent) -> {
+                if (newContent != null) watch(newContent);
+            });
+            return;
+        }
         if (node instanceof javafx.scene.chart.Chart
                 || (node instanceof javafx.scene.control.Control
                     && !(node instanceof TabPane))) return;
