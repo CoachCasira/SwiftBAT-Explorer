@@ -818,3 +818,10 @@
     -fx-background-insets: 0;
     -fx-padding: 0;
 }
+
+/* Explore > 2D light curve: indent only the time-window selector value.
+   All window presets share this ChoiceBox; its size, arrow and behaviour
+   remain unchanged. The energy-band selector is intentionally unaffected. */
+.reference-redesign .choice-box.choice-box-modern.explorer-time-window-choice > .label {
+    -fx-padding: 0 11px 0 18px;
+}
