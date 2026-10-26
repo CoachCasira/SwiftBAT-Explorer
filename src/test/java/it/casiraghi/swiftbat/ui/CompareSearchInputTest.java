@@ -38,4 +38,20 @@ class CompareSearchInputTest {
         assertEquals("GRB", CompareSearchInput.normalize(""));
         assertEquals("GRB240101B", CompareSearchInput.normalize("240101b"));
     }
+    @Test
+    void tabCompletedSelectionMustNotReappearAfterDeletingFinalCharacter() {
+        String committedByTab = "GRB250605A";
+        // Cursor at the end, one Backspace. The old ComboBox selection is
+        // still GRB250605A but the visible input is now GRB250605.
+        String edited = committedByTab.substring(0, committedByTab.length() - 1);
+        assertTrue(CompareSearchInput.isEditable(edited));
+        assertFalse(CompareSearchInput.matchesSelection(committedByTab, edited));
+        assertTrue(CompareSearchInput.matchesSelection(committedByTab, committedByTab));
+
+        // Also cover deleting a different character and full Ctrl+A deletion.
+        assertFalse(CompareSearchInput.matchesSelection(committedByTab, "GRB25060A"));
+        assertFalse(CompareSearchInput.matchesSelection(committedByTab, ""));
+        assertTrue(CompareSearchInput.matchesSelection(committedByTab, "250605a"));
+    }
+
 }
