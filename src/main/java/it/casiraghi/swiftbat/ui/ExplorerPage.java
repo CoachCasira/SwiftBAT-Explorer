@@ -640,7 +640,7 @@ public final class ExplorerPage extends BorderPane {
         }
 
         ChoiceBox<String> windowChoice = new ChoiceBox<>(FXCollections.observableArrayList(WINDOWS.keySet()));
-        windowChoice.getStyleClass().add("choice-box-modern");
+        windowChoice.getStyleClass().addAll("choice-box-modern", "explorer-time-window-choice");
         windowChoice.setValue("±60 s dal trigger");
         UiFactory.autoTooltip(channelChoice);
         UiFactory.autoTooltip(windowChoice);
