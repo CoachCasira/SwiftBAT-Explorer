@@ -173,6 +173,22 @@ public final class SpectroscopyStartupLayoutFix {
             tabs.setMinHeight(770);
             tabs.setPrefHeight(790);
             tabs.setMaxHeight(Double.MAX_VALUE);
+        } else if (selectedContent instanceof Region guide
+                && guide.getStyleClass().contains("spectroscopy-scientific-guide")) {
+            // JavaFX TabPane's computed preferred height can retain the
+            // tallest OFF-SCREEN tab (the 790px heatmap), leaving hundreds
+            // of blank pixels below the five guide cards. Size the active
+            // tab from its own natural height and wrap width instead.
+            double contentWidth = Math.max(320,
+                    tabs.getWidth() > 0 ? tabs.getWidth() - 20
+                            : spectroscopy.getLayoutBounds().getWidth() - 40);
+            guide.applyCss();
+            double guideHeight = guide.prefHeight(contentWidth);
+            if (Double.isFinite(guideHeight) && guideHeight > 0) {
+                tabs.setMinHeight(Region.USE_PREF_SIZE);
+                tabs.setPrefHeight(Math.ceil(guideHeight + 52));
+                tabs.setMaxHeight(Region.USE_PREF_SIZE);
+            }
         } else {
             tabs.setMinHeight(Region.USE_PREF_SIZE);
             tabs.setPrefHeight(Region.USE_COMPUTED_SIZE);
