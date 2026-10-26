@@ -13,7 +13,9 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
@@ -34,19 +36,33 @@ public final class PersistentGrbCache {
     private static final String FITS_FILE = "fits-1chan-1s.lc";
 
     private final Path root;
+    private final Path bundledRoot;
     private final Set<String> cachedNames = ConcurrentHashMap.newKeySet();
 
     public PersistentGrbCache() {
-        this(defaultRoot());
+        this(defaultRoot(), defaultBundledRoot());
     }
 
     PersistentGrbCache(Path root) {
+        this(root, null);
+    }
+
+    PersistentGrbCache(Path root, Path bundledRoot) {
         this.root = root.toAbsolutePath().normalize();
+        this.bundledRoot = bundledRoot == null ? null : bundledRoot.toAbsolutePath().normalize();
         indexExistingEntries();
     }
 
     public Optional<CachedProducts> read(CatalogEntry entry) throws IOException {
-        Path directory = eventDirectory(entry.grbName());
+        Optional<CachedProducts> local = readFromDirectory(eventDirectory(entry.grbName()), entry);
+        if (local.isPresent()) return local;
+        if (bundledRoot != null && !bundledRoot.equals(root)) {
+            return readFromDirectory(bundledRoot.resolve(cacheKey(entry.grbName())), entry);
+        }
+        return Optional.empty();
+    }
+
+    private Optional<CachedProducts> readFromDirectory(Path directory, CatalogEntry entry) throws IOException {
         Path manifestPath = directory.resolve(MANIFEST);
         if (!Files.isRegularFile(manifestPath)) {
             return Optional.empty();
@@ -117,9 +133,20 @@ public final class PersistentGrbCache {
      * Only events with at least one product file are exposed.
      */
     public List<CatalogEntry> catalogEntries() {
-        if (!Files.isDirectory(root)) return List.of();
-        List<CatalogEntry> entries = new ArrayList<>();
-        try (Stream<Path> paths = Files.list(root)) {
+        Map<String, CatalogEntry> entries = new LinkedHashMap<>();
+        if (bundledRoot != null && !bundledRoot.equals(root)) {
+            collectCatalogEntries(bundledRoot, entries);
+        }
+        // User-downloaded copies override bundled copies of the same GRB.
+        collectCatalogEntries(root, entries);
+        List<CatalogEntry> result = new ArrayList<>(entries.values());
+        result.sort(Comparator.comparing(CatalogEntry::grbName).reversed());
+        return List.copyOf(result);
+    }
+
+    private void collectCatalogEntries(Path source, Map<String, CatalogEntry> entries) {
+        if (!Files.isDirectory(source)) return;
+        try (Stream<Path> paths = Files.list(source)) {
             for (Path directory : paths.filter(Files::isDirectory).toList()) {
                 if (!Files.isRegularFile(directory.resolve(MANIFEST))
                         || (!Files.isRegularFile(directory.resolve(ASCII_FILE))
@@ -130,7 +157,7 @@ public final class PersistentGrbCache {
                 try (var input = Files.newInputStream(directory.resolve(MANIFEST))) {
                     manifest.load(input);
                 } catch (IOException | IllegalArgumentException ignored) {
-                    // Skip a damaged entry without hiding the other cached GRBs.
+                    // Skip one damaged entry, not the entire offline catalog.
                     continue;
                 }
                 String name = manifest.getProperty("grb", "").trim().toUpperCase(Locale.ROOT);
@@ -144,13 +171,11 @@ public final class PersistentGrbCache {
                 if (productUrl.isBlank()) {
                     productUrl = SwiftCatalogService.CATALOG_URL + name + "/data_product/";
                 }
-                entries.add(new CatalogEntry(name, trigger, productUrl));
+                entries.put(name, new CatalogEntry(name, trigger, productUrl));
             }
         } catch (IOException ignored) {
-            // Offline operation is best effort; the legacy fallback remains.
+            // Unavailable disk storage must not prevent using other sources.
         }
-        entries.sort(Comparator.comparing(CatalogEntry::grbName).reversed());
-        return List.copyOf(entries);
     }
 
     Path root() {
@@ -167,14 +192,21 @@ public final class PersistentGrbCache {
     }
 
     private void indexExistingEntries() {
-        if (!Files.isDirectory(root)) return;
-        try (Stream<Path> entries = Files.list(root)) {
+        indexExistingEntries(root);
+        if (bundledRoot != null && !bundledRoot.equals(root)) {
+            indexExistingEntries(bundledRoot);
+        }
+    }
+
+    private void indexExistingEntries(Path directory) {
+        if (!Files.isDirectory(directory)) return;
+        try (Stream<Path> entries = Files.list(directory)) {
             entries.filter(Files::isDirectory)
                     .filter(path -> Files.isRegularFile(path.resolve(MANIFEST)))
                     .map(path -> path.getFileName().toString().toUpperCase(Locale.ROOT))
                     .forEach(cachedNames::add);
         } catch (IOException ignored) {
-            // The cache is an optimization: an unreadable index must not block startup.
+            // An unreadable cache directory must not block startup.
         }
     }
 
@@ -215,6 +247,11 @@ public final class PersistentGrbCache {
         } catch (DateTimeParseException ignored) {
             return Instant.now();
         }
+    }
+
+    private static Path defaultBundledRoot() {
+        // The ZIP launchers set the working directory to Applicazione/.
+        return Path.of(System.getProperty("user.dir"), "offline-data", "v1");
     }
 
     private static Path defaultRoot() {
