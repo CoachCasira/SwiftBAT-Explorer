@@ -17,11 +17,11 @@ public record SkyBurst(
     public SkyBurst {
         grbName = normalizeName(grbName);
         triggerId = triggerId == null ? "" : triggerId.trim();
-        if (!Double.isFinite(raDeg) || raDeg < 0.0 || raDeg >= 360.0) {
-            throw new IllegalArgumentException("RA fuori intervallo: " + raDeg);
-        }
-        if (!Double.isFinite(decDeg) || decDeg < -90.0 || decDeg > 90.0) {
-            throw new IllegalArgumentException("DEC fuori intervallo: " + decDeg);
+        // Unknown coordinates are represented by a NaN pair, never 0,0.
+        boolean unknown = Double.isNaN(raDeg) && Double.isNaN(decDeg);
+        if (!unknown && (!Double.isFinite(raDeg) || raDeg < 0.0 || raDeg >= 360.0
+                || !Double.isFinite(decDeg) || decDeg < -90.0 || decDeg > 90.0)) {
+            throw new IllegalArgumentException("Coordinate RA/DEC non valide: " + raDeg + ", " + decDeg);
         }
         if (t90Sec != null && (!Double.isFinite(t90Sec) || t90Sec < 0.0)) {
             t90Sec = null;
@@ -35,6 +35,14 @@ public record SkyBurst(
 
     public SkyBurst withRedshift(RedshiftInfo value) {
         return new SkyBurst(grbName, triggerId, raDeg, decDeg, t90Sec, value);
+    }
+
+    public static SkyBurst withoutCoordinates(String grbName, String triggerId) {
+        return new SkyBurst(grbName, triggerId, Double.NaN, Double.NaN, null);
+    }
+
+    public boolean hasCoordinates() {
+        return Double.isFinite(raDeg) && Double.isFinite(decDeg);
     }
 
     public boolean hasT90() {
