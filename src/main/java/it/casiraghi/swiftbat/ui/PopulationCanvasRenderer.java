@@ -205,15 +205,22 @@ public final class PopulationCanvasRenderer {
                                  String newSpotlight, boolean isLocked) {
             Set<XYChart.Series<Number, Number>> next = new LinkedHashSet<>();
             for (XYChart.Series raw : focus) next.add(raw);
+            boolean changed = false;
             if (!selected.equals(next) || locked != isLocked
                     || !java.util.Objects.equals(spotlight, newSpotlight)) {
                 selected = Collections.unmodifiableSet(next);
                 locked = isLocked;
                 spotlight = newSpotlight;
                 dirtyBase = true;
+                changed = true;
             }
-            if (hovered != hover) hovered = hover;
-            request();
+            if (hovered != hover) {
+                hovered = hover;
+                changed = true;
+            }
+            // Do not schedule Canvas work on unchanged selection/hover state.
+            // This matters when multiple JavaFX listeners forward one pulse.
+            if (changed) request();
         }
 
         private void request() {
