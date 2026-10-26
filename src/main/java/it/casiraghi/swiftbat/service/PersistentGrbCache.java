@@ -133,7 +133,14 @@ public final class PersistentGrbCache {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         manifest.store(output, "SwiftBAT Explorer local cache");
         writeAtomically(directory.resolve(MANIFEST), output.toByteArray());
-        cachedNames.add(cacheKey(entry.grbName()));
+        // A manifest without either original product is not a usable curve.
+        // The counter and offline selector must agree about availability.
+        if (Files.isRegularFile(directory.resolve(ASCII_FILE))
+                || Files.isRegularFile(directory.resolve(FITS_FILE))) {
+            cachedNames.add(cacheKey(entry.grbName()));
+        } else {
+            cachedNames.remove(cacheKey(entry.grbName()));
+        }
     }
 
     public boolean contains(String grbName) {
@@ -220,6 +227,8 @@ public final class PersistentGrbCache {
         try (Stream<Path> entries = Files.list(directory)) {
             entries.filter(Files::isDirectory)
                     .filter(path -> Files.isRegularFile(path.resolve(MANIFEST)))
+                    .filter(path -> Files.isRegularFile(path.resolve(ASCII_FILE))
+                            || Files.isRegularFile(path.resolve(FITS_FILE)))
                     .map(path -> path.getFileName().toString().toUpperCase(Locale.ROOT))
                     .forEach(cachedNames::add);
         } catch (IOException ignored) {
