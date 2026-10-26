@@ -502,7 +502,12 @@ class ExplorerUiLifecycleTest {
                 ResponsiveRow row = (ResponsiveRow) card.getChildren().get(0);
                 Node last = row.getChildren().get(row.getChildren().size() - 1);
                 assertEquals(row.getWidth(), last.getLayoutX() + ((Region) last).getWidth(), 1);
-                assertTrue(((Region) last).getWidth() > 150);
+                // The five controls fill the row, but the final Maximum
+                // sample selector deliberately stays compact (see
+                // ResponsiveRow.widths, population-filter-top-row branch).
+                double sampleWidth = ((Region) last).getWidth();
+                assertTrue(sampleWidth >= 110 && sampleWidth <= 180,
+                        "Maximum sample must stay compact on wide screens, actual=" + sampleWidth);
                 ((javafx.scene.control.ToggleButton) card.getChildren().get(1)).fire();
                 return null;
             });
