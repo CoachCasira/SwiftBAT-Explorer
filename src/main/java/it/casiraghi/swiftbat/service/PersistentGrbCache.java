@@ -54,11 +54,24 @@ public final class PersistentGrbCache {
     }
 
     public Optional<CachedProducts> read(CatalogEntry entry) throws IOException {
-        Optional<CachedProducts> local = readFromDirectory(eventDirectory(entry.grbName()), entry);
-        if (local.isPresent()) return local;
-        if (bundledRoot != null && !bundledRoot.equals(root)) {
-            return readFromDirectory(bundledRoot.resolve(cacheKey(entry.grbName())), entry);
+        IOException localFailure = null;
+        try {
+            Optional<CachedProducts> local = readFromDirectory(eventDirectory(entry.grbName()), entry);
+            if (local.isPresent()) return local;
+        } catch (IOException error) {
+            localFailure = error;
         }
+        if (bundledRoot != null && !bundledRoot.equals(root)) {
+            try {
+                Optional<CachedProducts> bundled =
+                        readFromDirectory(bundledRoot.resolve(cacheKey(entry.grbName())), entry);
+                if (bundled.isPresent()) return bundled;
+            } catch (IOException bundledFailure) {
+                if (localFailure != null) bundledFailure.addSuppressed(localFailure);
+                throw bundledFailure;
+            }
+        }
+        if (localFailure != null) throw localFailure;
         return Optional.empty();
     }
 
@@ -71,6 +84,8 @@ public final class PersistentGrbCache {
         Properties manifest = new Properties();
         try (var input = Files.newInputStream(manifestPath)) {
             manifest.load(input);
+        } catch (IllegalArgumentException invalidManifest) {
+            throw new IOException("Invalid cache manifest: " + manifestPath, invalidManifest);
         }
         if (!SCHEMA_VERSION.equals(manifest.getProperty("schema"))
                 || !entry.grbName().equalsIgnoreCase(manifest.getProperty("grb", ""))) {
