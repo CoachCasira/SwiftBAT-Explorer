@@ -1235,7 +1235,14 @@ public final class PopulationPage extends BorderPane {
         analyze.setDisable(!ready || runningTask != null);
         updateCandidatePreview();
         if (ready && runningTask == null) {
-            setStatus(metadata.size() + " GRB con T90/coordinate · redshift integrato", "status-online");
+            long knownPositions = metadata.values().stream().filter(SkyBurst::hasCoordinates).count();
+            long knownDurations = metadata.values().stream().filter(SkyBurst::hasT90).count();
+            if (knownPositions < metadata.size() || knownDurations < metadata.size()) {
+                setStatus(metadata.size() + " GRB disponibili · T90 noti: " + knownDurations
+                        + " · coordinate note: " + knownPositions, "status-warning");
+            } else {
+                setStatus(metadata.size() + " GRB con T90/coordinate · redshift integrato", "status-online");
+            }
         }
     }
 
@@ -1277,8 +1284,9 @@ public final class PopulationPage extends BorderPane {
         if (catalog.isEmpty() || metadata.isEmpty() || duration.getValue() == null
                 || redshiftAvailability.getValue() == null || limit.getValue() == null
                 || window.getValue() == null) {
-            I18n.setText(candidatePreview, "Attendo catalogo e metadati scientifici…",
-                    "Waiting for catalog and scientific metadata…");
+            I18n.setText(candidatePreview,
+                    catalog.isEmpty() ? "Attendo il catalogo…" : "Metadati scientifici non disponibili",
+                    catalog.isEmpty() ? "Waiting for catalog…" : "Scientific metadata unavailable");
             return;
         }
         try {
@@ -1456,6 +1464,11 @@ public final class PopulationPage extends BorderPane {
             if (WITH_Z.equals(redshiftAvailability) && !hasZ) return false;
             if (WITHOUT_Z.equals(redshiftAvailability) && hasZ) return false;
             if (hasZ && !burst.redshift().matches(zMin, zMax)) return false;
+            // If RA/DEC are absent, retain the event only for an unrestricted
+            // temporal analysis; never claim it matches a specific sky region.
+            if (!burst.hasCoordinates()) {
+                return raMin == 0 && raMax == 360 && decMin == -90 && decMax == 90;
+            }
             if (burst.decDeg() < decMin || burst.decDeg() > decMax) return false;
             if (raMin == 0 && raMax == 360) return true;
             return raMin <= raMax ? burst.raDeg() >= raMin && burst.raDeg() <= raMax
