@@ -65,6 +65,24 @@ public final class UiLocalizationWatcher {
             });
         }
 
+        // A chart's axes/ticks/series are generated dynamically and have no
+        // user-authored text to translate here. Monitoring their insertion
+        // creates thousands of redundant listeners and localization passes.
+        if (node instanceof javafx.scene.chart.Chart) return;
+        if (node instanceof TabPane) return; // Tabs observed explicitly above.
+        if (node instanceof javafx.scene.control.ScrollPane scroll) {
+            if (Boolean.TRUE.equals(scroll.getProperties().get(WATCHED))) return;
+            scroll.getProperties().put(WATCHED, Boolean.TRUE);
+            if (scroll.getContent() != null) watch(scroll.getContent());
+            scroll.contentProperty().addListener((obs, beforeContent, afterContent) -> {
+                if (afterContent != null) {
+                    watch(afterContent);
+                    localize(afterContent);
+                }
+            });
+            return;
+        }
+        if (node instanceof javafx.scene.control.Control) return;
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
