@@ -36,6 +36,17 @@ rsync -a --exclude='/.git/' --exclude='/.github/' --exclude='/.swiftbat-runtime/
   --exclude='/target/' --exclude='/dist/' --exclude='/.idea/' \
   --exclude='/.vscode/' --exclude='.DS_Store' "$SCRIPT_DIR/" "$app_dir/"
 
+# Package the locally downloaded NASA products as read-only offline data.
+# All curves remain available to the recipient if NASA is unreachable.
+offline_cache="$HOME/.swiftbat-explorer/cache/v1"
+if [ -d "$offline_cache" ]; then
+  mkdir -p "$app_dir/offline-data/v1"
+  rsync -a "$offline_cache/" "$app_dir/offline-data/v1/"
+  echo "Prodotti Swift/BAT offline inclusi dal Mac di origine."
+else
+  echo "Nessuna cache Swift/BAT locale trovata: pacchetto senza dataset offline."
+fi
+
 rm -rf   "$app_dir/.git"   "$app_dir/.github"   "$app_dir/.swiftbat-runtime"   "$app_dir/target"   "$app_dir/dist"   "$app_dir/.idea"   "$app_dir/.vscode"
 
 rm -f   "$app_dir/.DS_Store"   "$app_dir/AVVIA_APP_MAC.command"   "$app_dir/CREA_APP_MAC.command"   "$app_dir/CREA_PACCHETTO_ESPERTI_MAC.command"   "$app_dir/AVVIA_APP.bat"   "$app_dir/CREA_APP_WINDOWS.bat" \
