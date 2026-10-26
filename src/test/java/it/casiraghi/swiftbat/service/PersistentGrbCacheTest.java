@@ -87,6 +87,19 @@ class PersistentGrbCacheTest {
     }
 
     @Test
+    void metadataLookupDoesNotReadEntireFITSFile() throws Exception {
+        PersistentGrbCache cache = new PersistentGrbCache(temporary);
+        CatalogEntry entry = new CatalogEntry("GRB250605A", "1321323", "https://example.test/data/");
+        byte[] largeFits = new byte[2 * 1024 * 1024];
+        largeFits[0] = 'S';
+        cache.write(entry, new PersistentGrbCache.CachedProducts(
+                null, largeFits, entry.dataProductUrl(), "", "", "", "", Instant.EPOCH));
+        byte[] prefix = cache.readFitsHeaderPrefix(entry).orElseThrow();
+        assertEquals(128 * 1024, prefix.length);
+        assertEquals('S', prefix[0]);
+    }
+
+    @Test
     void onlineServiceUsesDiskCacheWithoutNetwork() throws Exception {
         PersistentGrbCache cache = new PersistentGrbCache(temporary);
         CatalogEntry entry = new CatalogEntry("GRBTESTA", "123", "https://invalid.test/data/");
