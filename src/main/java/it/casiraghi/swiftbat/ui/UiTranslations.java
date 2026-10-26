@@ -6,6 +6,8 @@ import javafx.scene.chart.Axis;
 import javafx.scene.chart.Chart;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.ComboBox;
+import javafx.scene.control.Control;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Labeled;
 import javafx.scene.control.MenuButton;
 import javafx.scene.control.MenuItem;
@@ -329,7 +331,10 @@ public final class UiTranslations {
         if (node instanceof XYChart<?, ?> xyChart) {
             for (Object raw : xyChart.getData()) {
                 XYChart.Series<?, ?> series = (XYChart.Series<?, ?>) raw;
-                if (series.getName() != null) series.setName(t(series.getName()));
+                if (series.getName() != null) {
+                    String translated = t(series.getName());
+                    if (!java.util.Objects.equals(series.getName(), translated)) series.setName(translated);
+                }
             }
         }
         if (node instanceof MenuButton menuButton) {
@@ -354,9 +359,23 @@ public final class UiTranslations {
         }
         if (node instanceof TableView<?> table) {
             for (TableColumn<?, ?> column : table.getColumns()) localizeColumn(column);
+            return; // Never walk virtualized table rows and their thousands of cells.
         }
         if (node instanceof javafx.scene.control.ChoiceBox<?> choice) choice.requestLayout();
         if (node instanceof ComboBox<?> combo) combo.requestLayout();
+        if (node instanceof XYChart<?, ?> chart) {
+            localizeTree(chart.getXAxis());
+            localizeTree(chart.getYAxis());
+        }
+        // The labels/series above are translated; chart plots and control skins
+        // must NOT be recursively visited on every navigation or button action.
+        if (node instanceof Chart || node instanceof Axis<?>) return;
+        if (node instanceof TabPane) return; // Tab contents were visited above.
+        if (node instanceof ScrollPane scroll) {
+            if (scroll.getContent() != null) localizeTree(scroll.getContent());
+            return;
+        }
+        if (node instanceof Control) return;
         if (node instanceof Parent parent) {
             for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) localizeTree(child);
         }
