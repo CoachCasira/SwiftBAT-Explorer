@@ -903,6 +903,100 @@ class ExplorerUiLifecycleTest {
     }
 
     @Test
+    void scientificGuideResetsScrollAndFitsItsFiveCardsWithoutHeatmapBlankSpace()
+            throws Exception {
+        SpectroscopyPane pane = fx(() ->
+                new SpectroscopyPane(compareData("GRBTEST", 3), null, null));
+        Stage stage = fx(() -> showStyled(pane, 1240, 650));
+        try {
+            fx(() -> {
+                SpectroscopyStartupLayoutFix.install(pane);
+                javafx.scene.control.ScrollPane scroll =
+                        (javafx.scene.control.ScrollPane) pane.getCenter();
+                javafx.scene.control.TabPane tabs =
+                        (javafx.scene.control.TabPane) pane.lookup(".spectroscopy-tabs");
+                tabs.getSelectionModel().select(1); // The taller Time-Energy map.
+                scroll.setVvalue(0.94);
+                tabs.getSelectionModel().select(2); // The Scientific Guide.
+                return null;
+            });
+            pulse(); pulse(); pulse();
+            fx(() -> {
+                javafx.scene.control.ScrollPane scroll =
+                        (javafx.scene.control.ScrollPane) pane.getCenter();
+                javafx.scene.control.TabPane tabs =
+                        (javafx.scene.control.TabPane) pane.lookup(".spectroscopy-tabs");
+                Region guide = (Region) tabs.getTabs().get(2).getContent();
+                assertEquals(scroll.getVmin(), scroll.getVvalue(), 0.0001,
+                        "Scientific Guide must always open at its first card");
+                assertEquals(5, ((VBox) guide).getChildren().size());
+                double natural = guide.prefHeight(Math.max(320, tabs.getWidth() - 20));
+                assertTrue(tabs.getPrefHeight() <= natural + 65,
+                        "Scientific Guide cannot retain the previous 790px heatmap height: "
+                                + tabs.getPrefHeight() + " vs guide " + natural);
+                assertTrue(tabs.getHeight() <= natural + 90,
+                        "No long empty area may follow the five guide cards");
+                return null;
+            });
+        } finally { fx(() -> { stage.close(); return null; }); }
+    }
+
+    @Test
+    void timeEnergySelectionSurvivesFullscreenAndEditsReturnToOriginalMap()
+            throws Exception {
+        var headers = List.of("TIME_FROM_TRIGGER_CENTER_S",
+                "RATE_100_350_KEV", "RATE_50_100_KEV",
+                "RATE_25_50_KEV", "RATE_15_25_KEV");
+        var dataRows = IntStream.range(-30, 31)
+                .mapToObj(i -> List.of(Integer.toString(i), "1", "2", "3", "4"))
+                .toList();
+        TabularData data = new TabularData(headers, dataRows);
+        it.casiraghi.swiftbat.ui.components.TimeEnergyHeatmapPane original =
+                fx(() -> new it.casiraghi.swiftbat.ui.components.TimeEnergyHeatmapPane());
+        StackPane normal = fx(() -> new StackPane(original));
+        Stage stage = fx(() -> showStyled(normal, 1050, 700));
+        try {
+            fx(() -> {
+                original.setData(data);
+                original.resize(940, 520);
+                original.layout();
+                original.fireEvent(mouse(original, MouseEvent.MOUSE_PRESSED, 450, 190, true));
+                original.fireEvent(mouse(original, MouseEvent.MOUSE_RELEASED, 450, 190, false));
+                assertEquals(1, original.selectionSnapshot().bins().size());
+                return null;
+            });
+            var enlarged = fx(() -> {
+                var view = new it.casiraghi.swiftbat.ui.components.TimeEnergyHeatmapPane();
+                view.setData(data);
+                view.setHalfWindowSeconds(60);
+                view.restoreSelection(original.selectionSnapshot());
+                view.setOnSelectionChanged(original::restoreSelection);
+                assertEquals(original.selectionSnapshot(), view.selectionSnapshot());
+                InPlaceFullscreen.show(normal, "Time–Energy Map", view);
+                return view;
+            });
+            pulse();
+            fx(() -> {
+                enlarged.resize(1050, 700);
+                enlarged.layout();
+                enlarged.fireEvent(mouse(enlarged, MouseEvent.MOUSE_PRESSED, 600, 300, true));
+                enlarged.fireEvent(mouse(enlarged, MouseEvent.MOUSE_RELEASED, 600, 300, false));
+                assertEquals(enlarged.selectionSnapshot(), original.selectionSnapshot(),
+                        "Fullscreen changes must immediately reach the original map");
+                InPlaceFullscreen.close(stage.getScene().getRoot());
+                return null;
+            });
+            pulse(); pulse();
+            fx(() -> {
+                assertSame(normal, stage.getScene().getRoot());
+                assertFalse(original.selectionSnapshot().bins().isEmpty(),
+                        "Leaving fullscreen must retain the selected time-energy bins");
+                return null;
+            });
+        } finally { fx(() -> { stage.close(); return null; }); }
+    }
+
+    @Test
     void officialControlsFollowScrollAndReturnToTheirOriginalPosition() throws Exception {
         SpectroscopyPane pane = fx(() -> {
             var interval = it.casiraghi.swiftbat.model.SpectralData.Interval.T100;
