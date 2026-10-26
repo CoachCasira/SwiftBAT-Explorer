@@ -36,6 +36,12 @@ public final class UiBugFixes {
     private static void watch(Node node) {
         if (node == null) return;
         fixNode(node);
+        // Only editable ComboBox skins need our bound-prompt workaround.
+        // Chart skins and other virtualized controls must never be traversed:
+        // each child notification used to trigger a complete recursive scan.
+        if (node instanceof javafx.scene.chart.Chart
+                || (node instanceof javafx.scene.control.Control
+                    && !(node instanceof ComboBox<?>))) return;
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
 
@@ -46,7 +52,7 @@ public final class UiBugFixes {
                     for (Node added : change.getAddedSubList()) watch(added);
                 }
             }
-            Platform.runLater(() -> scan(parent));
+            // watch(added) has already fixed every newly inserted node.
         });
         for (Node child : parent.getChildrenUnmodifiable()) watch(child);
     }
@@ -54,6 +60,9 @@ public final class UiBugFixes {
     private static void scan(Node node) {
         if (node == null) return;
         fixNode(node);
+        if (node instanceof javafx.scene.chart.Chart
+                || (node instanceof javafx.scene.control.Control
+                    && !(node instanceof ComboBox<?>))) return;
         if (node instanceof Parent parent) {
             for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) scan(child);
         }
