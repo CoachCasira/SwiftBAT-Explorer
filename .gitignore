@@ -6,3 +6,4 @@
 *.log
 /packaging/app-icon.ico
 /.swiftbat-runtime/
+/offline-data/
