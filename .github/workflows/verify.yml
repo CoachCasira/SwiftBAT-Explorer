@@ -37,6 +37,29 @@ jobs:
       - name: Verifica Maven
         run: mvn --batch-mode --no-transfer-progress verify
 
+  javafx-integration:
+    name: Test interfaccia JavaFX con display virtuale
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scarica il progetto
+        uses: actions/checkout@v4
+      - name: Configura Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - name: Abilita display virtuale JavaFX
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y xvfb libgtk-3-0 libgl1
+      - name: Test UI reali (input, fullscreen, grafici, scrollbar)
+        run: |
+          xvfb-run -a mvn --batch-mode --no-transfer-progress \
+            -Dswiftbat.uiTests=true \
+            -Dtest=ExplorerUiLifecycleTest \
+            -DargLine="-Dprism.order=sw" test
+
   packaging-macos:
     name: Crea e controlla ZIP macOS/Windows
     runs-on: macos-latest
