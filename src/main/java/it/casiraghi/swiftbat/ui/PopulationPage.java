@@ -1001,6 +1001,10 @@ public final class PopulationPage extends BorderPane {
         // chart layout and focus restoration are triggered only once.
         curveChart.getData().setAll(displayedSeries);
         if (dense) PopulationCanvasRenderer.install(curveChart, canvasSources);
+        // One diagnostic line per finished analysis makes it easy to verify
+        // which renderer the Windows/macOS launcher actually loaded.
+        System.out.println("[SwiftBAT] Population: " + result.curves().size()
+                + " GRBs, renderer=" + (dense ? "Canvas" : "JavaFX"));
         curveChart.setTitle(I18n.t(result.curves().size() + " curve normalizzate e allineate a t = 0"));
     }
 
