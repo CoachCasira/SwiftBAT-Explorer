@@ -16,6 +16,15 @@ import java.util.Locale;
 public final class SwiftCatalogService {
     public static final String CATALOG_URL = "https://swift.gsfc.nasa.gov/results/batgrbcat/";
     private static final String USER_AGENT = "SwiftBAT-Explorer/1.3.0 (academic thesis application; JavaFX)";
+    private final PersistentGrbCache offlineCache;
+
+    public SwiftCatalogService() {
+        this(new PersistentGrbCache());
+    }
+
+    SwiftCatalogService(PersistentGrbCache offlineCache) {
+        this.offlineCache = java.util.Objects.requireNonNull(offlineCache);
+    }
 
     public List<CatalogEntry> fetchCatalog() throws IOException {
         Document document = Jsoup.connect(CATALOG_URL)
@@ -64,6 +73,13 @@ public final class SwiftCatalogService {
     }
 
     public List<CatalogEntry> fallbackCatalog() {
+        // Before showing the ten legacy sample events, expose all locally
+        // downloaded bursts. Their original ASCII/FITS data can be loaded
+        // without contacting the server, even when its TLS certificate fails.
+        List<CatalogEntry> locallyAvailable = offlineCache.catalogEntries();
+        if (!locallyAvailable.isEmpty()) {
+            return locallyAvailable;
+        }
         return List.of(
                 entry("GRB250605A", "1321323"),
                 entry("GRB250603A", "1320335"),
