@@ -31,6 +31,7 @@ public final class AdaptiveChromeEnhancer {
     private static final double ROOMY_WIDTH = 1450.0;
     private static final double VERY_WIDE_WIDTH = 1800.0;
     private static final String WATCHED = AdaptiveChromeEnhancer.class.getName() + ".watched";
+    private static final String APPLY_PENDING = AdaptiveChromeEnhancer.class.getName() + ".applyPending";
     private static final String SCENE_WATCHED = AdaptiveChromeEnhancer.class.getName() + ".sceneWatched";
     private static final String FLUX_POLISHED = AdaptiveChromeEnhancer.class.getName() + ".fluxPolished";
 
@@ -75,6 +76,21 @@ public final class AdaptiveChromeEnhancer {
             }
         }
 
+        // Shell geometry does not depend on chart/tick/control skin children.
+        // Monitoring these used to enqueue thousands of apply(root) callbacks
+        // while Population graphs were being rendered.
+        if (node instanceof TabPane) return; // Its logical tabs were visited above.
+        if (node instanceof javafx.scene.control.ScrollPane scroll) {
+            if (Boolean.TRUE.equals(scroll.getProperties().get(WATCHED))) return;
+            scroll.getProperties().put(WATCHED, Boolean.TRUE);
+            if (scroll.getContent() != null) watch(scroll.getContent(), root);
+            scroll.contentProperty().addListener((obs, before, after) -> {
+                if (after != null) watch(after, root);
+            });
+            return;
+        }
+        if (node instanceof javafx.scene.chart.Chart
+                || node instanceof javafx.scene.control.Control) return;
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
@@ -89,7 +105,12 @@ public final class AdaptiveChromeEnhancer {
     }
 
     private static void requestApply(Parent root) {
-        Platform.runLater(() -> apply(root));
+        if (Boolean.TRUE.equals(root.getProperties().get(APPLY_PENDING))) return;
+        root.getProperties().put(APPLY_PENDING, Boolean.TRUE);
+        Platform.runLater(() -> {
+            root.getProperties().remove(APPLY_PENDING);
+            if (root.getScene() != null) apply(root);
+        });
     }
 
     private static void apply(Parent root) {
