@@ -20,7 +20,7 @@ done
 
 number=0
 if [ -d "$STAGING/offline-data/v1" ]; then
-  number="$(find "$STAGING/offline-data/v1" -mindepth 2 -maxdepth 2 -name manifest.properties -type f | wc -l | tr -d ' ')"
+  number="$(find "$STAGING/offline-data/v1" -type f -name manifest.properties | wc -l | tr -d ' ')"
 fi
 if [ "$number" -eq 0 ]; then
   echo "[ERRORE] Nessun GRB salvato: esportazione annullata."
