@@ -11,6 +11,43 @@ Il progetto è configurato per:
 - dati letti direttamente dal catalogo NASA/GSFC;
 - nessun caricamento manuale di Excel, DAT o FITS.
 
+## Offline scientific archive and Windows/macOS transfer (Oct 2026)
+
+The NASA Swift/BAT HTTPS endpoint may be unavailable due to a TLS hostname mismatch.
+Do not bypass TLS certificate validation. The app now reconstructs the offline
+catalog from locally saved GRB ASCII/FITS manifests and from bundled products.
+
+**Bring the richer Mac dataset to Windows and to experts (one-time transfer):**
+
+1. On the Mac containing the larger cache, update this development branch and run
+   `bash ESPORTA_DATI_OFFLINE_MAC.command` in Terminal.
+2. Copy `dist/SwiftBAT-Offline-Archive.zip` to the Windows computer, for example
+   by USB drive or a file-sharing service.
+3. From PowerShell in the **root of the Windows project**, run
+   `Expand-Archive -LiteralPath "C:\\path\\to\\SwiftBAT-Offline-Archive.zip" -DestinationPath . -Force`
+   (replace the quoted path with the archive's actual location).
+4. Check for `offline-data/v1/GRB.../manifest.properties`. Launch the app;
+   it uses the union of this portable archive and the computer's own cache.
+5. Build both recipient ZIPs with `CREA_PACCHETTI_DISTRIBUZIONE_WINDOWS.bat`
+   or `CREA_PACCHETTI_DISTRIBUZIONE_MAC.command`. They include the available
+   offline ASCII/FITS products and any saved scientific/spectroscopic tables.
+
+`offline-data/` is deliberately excluded from Git history. Each computer
+keeps its own cache; synchronization occurs when the portable archive is
+transferred. Without that transfer, a clean recipient will not inherit the
+author's 208 GRBs automatically. Counts can exceed 208 if local caches have
+different valid bursts.
+
+**Scientific correctness offline:** Sky Map displays only GRBs with real
+RA/DEC coordinates found in official summary data or verified FITS headers.
+Population Analysis can use cached light curves without T90/redshift if the
+filters permit unknown values; missing scientific metadata is clearly
+reported, never synthesized. The bundled archive can include the original
+`summary_general.txt`, redshift table and spectroscopic tables if they
+were successfully saved before the NASA outage. If not present, those
+specific measurements remain unavailable. Downloading Java/Maven
+dependencies at first launch still requires Internet.
+
 ## Verifica e applicazioni standalone
 
 Sul branch di sviluppo il workflow GitHub Actions esegue soltanto la verifica
