@@ -68,6 +68,10 @@ public final class FinalRequestedUiFastFixes {
     private static void watch(Node node) {
         if (node == null) return;
         enhance(node);
+        // Scrollbar and table controls are handled once at the logical level.
+        // Their internal skins can add hundreds of nodes on page activation.
+        if (node instanceof javafx.scene.chart.Chart
+                || node instanceof javafx.scene.control.Control) return;
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
@@ -105,8 +109,16 @@ public final class FinalRequestedUiFastFixes {
         scheduleBarPolish(bar);
     }
 
+    private static final String BAR_POLISH_PENDING =
+            FinalRequestedUiFastFixes.class.getName() + ".barPolishPending";
+
     private static void scheduleBarPolish(ScrollBar bar) {
-        Platform.runLater(() -> polishScrollBar(bar));
+        if (Boolean.TRUE.equals(bar.getProperties().get(BAR_POLISH_PENDING))) return;
+        bar.getProperties().put(BAR_POLISH_PENDING, Boolean.TRUE);
+        Platform.runLater(() -> {
+            bar.getProperties().remove(BAR_POLISH_PENDING);
+            if (bar.getScene() != null) polishScrollBar(bar);
+        });
     }
 
     private static void polishScrollBar(ScrollBar bar) {
@@ -124,7 +136,9 @@ public final class FinalRequestedUiFastFixes {
                     rawVisible = internal.getVisibleAmount();
                     installInternalWatch(internal, bar);
                 }
-                if (bar.visibleAmountProperty().isBound()) bar.visibleAmountProperty().unbind();
+                // Keep the native TableView value/range bindings intact.
+                // Unbinding here breaks automatic updates on the next resize.
+                if (bar.visibleAmountProperty().isBound()) return;
             } else if (bar.visibleAmountProperty().isBound()) {
                 return;
             }
@@ -137,18 +151,17 @@ public final class FinalRequestedUiFastFixes {
                 bar.setVisibleAmount(rawVisible);
             }
 
-            try {
-                bar.applyCss();
-            } catch (RuntimeException ignored) {
-                return;
-            }
+            // CSS is applied by the JavaFX pulse. Forcing applyCss() and
+            // requestLayout() after every scrollbar height change caused an
+            // endless stream of expensive pulses on the idle Population page.
+            if (bar.getSkin() == null) return;
             Node thumb = bar.lookup(".thumb");
             if (thumb instanceof javafx.scene.layout.Region region) {
-                region.setMinHeight(targetThumbPixels(bar));
-                region.setPrefWidth(BAR_WIDTH);
-                region.setMinWidth(BAR_WIDTH);
+                double minHeight = targetThumbPixels(bar);
+                if (Double.compare(region.getMinHeight(), minHeight) != 0) region.setMinHeight(minHeight);
+                if (Double.compare(region.getPrefWidth(), BAR_WIDTH) != 0) region.setPrefWidth(BAR_WIDTH);
+                if (Double.compare(region.getMinWidth(), BAR_WIDTH) != 0) region.setMinWidth(BAR_WIDTH);
             }
-            bar.requestLayout();
         } finally {
             bar.getProperties().remove(BAR_SYNC);
         }
