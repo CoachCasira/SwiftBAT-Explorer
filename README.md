@@ -32,6 +32,17 @@ catalog from locally saved GRB ASCII/FITS manifests and from bundled products.
    or `CREA_PACCHETTI_DISTRIBUZIONE_MAC.command`. They include the available
    offline ASCII/FITS products and any saved scientific/spectroscopic tables.
 
+**Preflight obbligatorio prima dell'invio ai relatori/esperti.** Dopo aver
+generato i due ZIP con i dati del Mac, eseguire su Windows
+`powershell -NoProfile -ExecutionPolicy Bypass -File .\\VERIFICA_PACCHETTI_WINDOWS.ps1 -MinimumGrbs 208`,
+oppure su Mac `bash VERIFICA_PACCHETTI_MAC.command 208`. Il controllo legge
+entrambi gli ZIP, verifica che ogni GRB abbia un manifest e almeno un prodotto
+ASCII/FITS e fallisce se uno degli ZIP contiene meno di 208 eventi utilizzabili
+o percorsi duplicati. Non sostituisce il test del launcher/GUI su sistemi puliti.
+Le tabelle NASA di coordinate e redshift, se assenti, sono segnalate ma non
+inventate. Il numero di 208 si riferisce all'archivio del Mac già osservato,
+non implica che i due pacchetti lo possiedano finché non viene esportato.
+
 **Optional full two-way synchronization:** after importing the Mac ZIP, run
 `powershell -NoProfile -ExecutionPolicy Bypass -File .\\ESPORTA_DATI_OFFLINE_WINDOWS.ps1`
 in the Windows project. Copy the resulting
