@@ -804,3 +804,17 @@
     -fx-line-spacing: 3px;
     -fx-opacity: 1;
 }
+
+/*
+ * JavaFX Modena defaults sometimes try to interpret looked-up chart-series
+ * colours as Strings when a chart-line-symbol skin node is materialised. All
+ * SwiftBAT light-curve LineCharts explicitly disable point symbols, so a
+ * stable literal colour avoids repeated CSS ClassCastException warnings
+ * without changing any scientific curve, tooltip, or marker coordinates.
+ */
+.app-root .chart-line-symbol,
+.app-root .default-color2.chart-line-symbol {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-padding: 0;
+}
