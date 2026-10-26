@@ -167,7 +167,7 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
                 }
                 return null;
             }
-            if (!CompareSearchInput.isEditable(nextText)) return null;
+            if (!CompareSearchInput.hasFixedPrefix(nextText)) return null;
             return change;
         }));
         combo.getEditor().textProperty().addListener((obs, oldValue, raw) -> {
