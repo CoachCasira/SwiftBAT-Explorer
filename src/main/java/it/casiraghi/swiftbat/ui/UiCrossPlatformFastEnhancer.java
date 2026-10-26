@@ -76,6 +76,9 @@ public final class UiCrossPlatformFastEnhancer {
     private static void watch(Node node) {
         if (node == null) return;
         enhance(node);
+        // This class polishes application-owned controls, not thousands of
+        // axis/tick/series nodes generated internally by a JavaFX chart.
+        if (node instanceof javafx.scene.chart.Chart) return;
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
