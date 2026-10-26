@@ -150,13 +150,24 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         combo.getEditor().setText("GRB");
         combo.getEditor().setPromptText("");
         combo.getEditor().setTextFormatter(new TextFormatter<String>(change -> {
-            // Permit complete deletion, Ctrl+A / Backspace, editing from the
-            // first character and typing a bare numerical GRB ID. The old
-            // startsWith("GRB") check rejected all these legitimate edits.
+            // Preserve the historical non-deletable GRB prefix. The original
+            // regression was specifically the LAST character being restored
+            // after TAB completion, not the prefix restriction.
+            change.setText(change.getText().toUpperCase(Locale.ROOT));
             String nextText = change.getControlNewText() == null ? ""
                     : change.getControlNewText().toUpperCase(Locale.ROOT);
+            if (!nextText.startsWith("GRB")) {
+                // Ctrl+A and Backspace reset the value to its initial prefix.
+                if (nextText.isEmpty()) {
+                    change.setRange(0, change.getControlText().length());
+                    change.setText("GRB");
+                    change.setAnchor(3);
+                    change.setCaretPosition(3);
+                    return change;
+                }
+                return null;
+            }
             if (!CompareSearchInput.isEditable(nextText)) return null;
-            change.setText(change.getText().toUpperCase(Locale.ROOT));
             return change;
         }));
         combo.getEditor().textProperty().addListener((obs, oldValue, raw) -> {
@@ -172,17 +183,41 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         });
         combo.getEditor().focusedProperty().addListener((obs, oldValue, focused) -> {
             if (focused) {
+                Platform.runLater(() -> {
+                    if (combo.getEditor().isFocused() && combo.getEditor().getCaretPosition() < 3) {
+                        combo.getEditor().positionCaret(3);
+                    }
+                });
                 updateSuggestions(combo, counter, ghost, other, combo.getEditor().getText());
             } else {
                 combo.hide();
             }
         });
-        // HOME/LEFT and mouse placement must remain normal editable-text
-        // operations. Only TAB is special: it accepts the ghost suggestion.
-        combo.getEditor().addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+        combo.getEditor().setOnMouseClicked(event -> Platform.runLater(() -> {
+            if (combo.getEditor().isFocused() && combo.getEditor().getCaretPosition() < 3) {
+                combo.getEditor().positionCaret(3);
+            }
+        }));
+        // A single TAB accepts the ghost suggestion from either field.
+        combo.addEventFilter(KeyEvent.KEY_PRESSED, event -> {
+            if (event.getCode() == KeyCode.HOME) {
+                combo.getEditor().positionCaret(3);
+                event.consume();
+                return;
+            }
+            if (event.getCode() == KeyCode.LEFT
+                    && combo.getEditor().getCaretPosition() <= 3
+                    && combo.getEditor().getSelection().getLength() == 0) {
+                event.consume();
+                return;
+            }
             if (event.getCode() == KeyCode.TAB) {
-                Object value = combo.getProperties().get(GHOST_KEY);
-                if (value instanceof String suggestion && !suggestion.isBlank()) {
+                String typed = normalize(combo.getEditor().getText());
+                Object ghostName = combo.getProperties().get(GHOST_KEY);
+                String suggestion = availableNames.contains(typed) ? typed
+                        : ghostName instanceof String name ? name : null;
+                if (suggestion != null && !suggestion.isBlank()
+                        && !suggestion.equals(exactSelection(other))) {
                     commitSelection(combo, suggestion);
                     event.consume();
                 }
@@ -205,6 +240,9 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
 
     private void updateSuggestions(ComboBox<String> combo, Label counter, GhostHint ghost,
                                    ComboBox<String> other, String raw) {
+        // Programmatic TAB commitment is not a user edit. In particular,
+        // reconfiguring the popup items here may replace the editor's text.
+        if (Boolean.TRUE.equals(combo.getProperties().get(COMMITTING_KEY))) return;
         String normalized = normalize(raw);
         String excluded = exactSelection(other);
         List<String> matches = availableNames.stream()
@@ -227,13 +265,25 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
             combo.hide();
             return;
         }
+        // A complete name should NEVER open a popup on focus/click:
+        // the JavaFX ComboBox skin can otherwise reselect an item and
+        // silently change the editor or restore a deleted last character.
+        boolean completed = availableNames.contains(normalized);
+        if (completed) {
+            combo.hide();
+            return;
+        }
         if (matches.size() <= MAX_SUGGESTIONS && !matches.isEmpty() && normalized.length() > 3) {
             List<String> visible = matches.stream().limit(VISIBLE_SUGGESTIONS).toList();
-            combo.setItems(FXCollections.observableArrayList(visible));
-            if (!combo.isShowing()) Platform.runLater(combo::show);
+            if (!combo.getItems().equals(visible)) {
+                combo.setItems(FXCollections.observableArrayList(visible));
+            }
+            // Keep keyboard focus in the editable field, so TAB accepts the
+            // gray ghost completion rather than navigating the popup list.
+            // The dropdown remains accessible using its arrow.
         } else {
             combo.hide();
-            combo.setItems(FXCollections.observableArrayList());
+            if (!combo.getItems().isEmpty()) combo.getItems().clear();
         }
     }
 
