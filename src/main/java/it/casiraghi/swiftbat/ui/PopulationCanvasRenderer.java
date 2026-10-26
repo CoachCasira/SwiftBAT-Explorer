@@ -31,7 +31,11 @@ import java.util.Set;
  * hover paints just a single individual GRB on a separate transparent canvas.
  */
 public final class PopulationCanvasRenderer {
-    public static final int MIN_CANVAS_CURVES = 50;
+    // JavaFX LineChart builds one PathElement per light-curve bin. Even 24
+    // individual GRBs (24 x 121+ points) can saturate the FX pulse once
+    // filters/layout/tooltip effects run. Preserve original data and labels
+    // but render individuals in the Canvas as soon as curves are compared.
+    public static final int MIN_CANVAS_CURVES = 2;
     private static final String KEY = PopulationCanvasRenderer.class.getName() + ".layer";
     private static final Color CYAN = Color.rgb(84, 215, 255);
     private static final Color EMPHASIS = Color.rgb(102, 228, 255);
