@@ -116,12 +116,18 @@ public final class ExplorerPage extends BorderPane {
     }
 
     public void setCatalog(List<CatalogEntry> entries, boolean fallback) {
+        setCatalog(entries, fallback, false);
+    }
+
+    public void setCatalog(List<CatalogEntry> entries, boolean fallback, boolean localCache) {
         catalog.setAll(entries);
         catalogSearchAssist.refresh();
         applyCatalogFilters();
         I18n.setText(catalogCount,
-                entries.size() + (fallback ? " GRB di emergenza" : " GRB nel catalogo online"),
-                entries.size() + (fallback ? " fallback GRBs" : " GRBs in the online catalog"));
+                entries.size() + (localCache ? " GRB nella cache locale"
+                        : fallback ? " GRB di emergenza" : " GRB nel catalogo online"),
+                entries.size() + (localCache ? " GRBs in the local cache"
+                        : fallback ? " fallback GRBs" : " GRBs in the online catalog"));
     }
 
     public void setScientificMetadata(List<SkyBurst> bursts) {
