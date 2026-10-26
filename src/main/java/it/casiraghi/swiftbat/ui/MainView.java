@@ -410,12 +410,18 @@ public final class MainView {
         });
         task.setOnFailed(event -> {
             List<CatalogEntry> fallback = catalogService.fallbackCatalog();
+            // All recoverable cached bursts are selectable offline; the old
+            // ten-item sample is used only when no local product is present.
+            boolean fromLocalCache = !fallback.isEmpty()
+                    && fallback.stream().allMatch(entry -> grbService.cachedLocally(entry.grbName()));
             currentCatalog = List.copyOf(fallback);
-            explorerPage.setCatalog(fallback, true);
+            explorerPage.setCatalog(fallback, true, fromLocalCache);
             skyMapPage.setBaseCatalog(fallback);
             populationPage.setCatalog(fallback);
             comparePage.setCatalog(fallback);
-            I18n.setText(catalogStatus, fallback.size() + " GRB ridotti", fallback.size() + " GRBs · fallback");
+            I18n.setText(catalogStatus,
+                    fallback.size() + (fromLocalCache ? " GRB locali" : " GRB ridotti"),
+                    fallback.size() + (fromLocalCache ? " GRBs · local cache" : " GRBs · fallback"));
             setConnection("Offline parziale", "status-warning");
             loadSkyCatalog();
         });
