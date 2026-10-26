@@ -68,6 +68,9 @@ public final class MainView {
     private final Set<String> compareLoadsInFlight = ConcurrentHashMap.newKeySet();
     private List<CatalogEntry> currentCatalog = List.of();
     private boolean offlineCatalog;
+    // Only the most recent Explore request may replace the visible chart.
+    // Older completions still populate the session cache for later use.
+    private long explorerRequestVersion;
 
     private final BorderPane root = new BorderPane();
     private final StackPane pageHost = new StackPane();
@@ -338,15 +341,20 @@ public final class MainView {
             return;
         }
         String query = raw.toUpperCase(Locale.ROOT).replace(" ", "");
-        CatalogEntry match = currentCatalog.stream()
-                .filter(entry -> {
-                    String name = entry.grbName().toUpperCase(Locale.ROOT).replace(" ", "");
-                    return name.equals(query)
-                            || ("GRB" + name).equals(query)
-                            || name.contains(query.replaceFirst("^GRB", ""));
-                })
-                .findFirst()
-                .orElse(null);
+        // "GRB" by itself matches every burst. Never open an arbitrary event.
+        if (query.equals("GRB") || query.length() < 3) {
+            navigate("explorer");
+            return;
+        }
+        List<CatalogEntry> exact = currentCatalog.stream()
+                .filter(entry -> entry.grbName().equalsIgnoreCase(query)
+                        || entry.triggerId().equalsIgnoreCase(query))
+                .toList();
+        List<CatalogEntry> partial = currentCatalog.stream()
+                .filter(entry -> entry.grbName().toUpperCase(Locale.ROOT).contains(query))
+                .toList();
+        CatalogEntry match = exact.size() == 1 ? exact.get(0)
+                : exact.isEmpty() && partial.size() == 1 ? partial.get(0) : null;
         if (match != null) {
             loadGrb(match, false);
             field.selectAll();
@@ -507,10 +515,11 @@ public final class MainView {
             compareLoadsInFlight.remove(entry.grbName());
             GrbData data = task.getValue();
             if (data != null) sessionData.put(data.grbName(), data);
-            setConnection("Online", "status-online");
+            restoreCatalogConnection();
         });
         task.setOnFailed(event -> {
             compareLoadsInFlight.remove(entry.grbName());
+            comparePage.loadFailed(entry.grbName());
             setConnection(I18n.dynamic("Errore caricamento confronto", "Comparison load failed"), "status-warning");
         });
         DOWNLOAD_EXECUTOR.execute(task);
@@ -520,6 +529,7 @@ public final class MainView {
         if (entry == null) {
             return;
         }
+        final long requestVersion = ++explorerRequestVersion;
         navigate("explorer");
         explorerPage.setSelectedEntry(entry);
 
@@ -527,31 +537,54 @@ public final class MainView {
             GrbData cached = sessionData.get(entry.grbName());
             if (cached != null) {
                 explorerPage.showData(cached);
-                setConnection("In memoria", "status-online");
+                restoreCatalogConnection();
                 return;
             }
         }
 
         explorerPage.showLoading(0.02,
                 I18n.dynamic("Apro " + entry.grbName(), "Opening " + entry.grbName()),
-                I18n.dynamic("Recupero i prodotti Swift/BAT online.", "Retrieving Swift/BAT products online."));
+                offlineCatalog
+                        ? I18n.dynamic("Leggo i prodotti Swift/BAT dalla cache locale.",
+                                "Reading Swift/BAT products from the local cache.")
+                        : I18n.dynamic("Recupero i prodotti Swift/BAT.",
+                                "Retrieving Swift/BAT products."));
 
         Task<GrbData> task = new Task<>() {
             @Override
             protected GrbData call() throws Exception {
                 return grbService.load(entry, forceRefresh, update ->
-                        Platform.runLater(() -> explorerPage.showLoading(
-                                update.progress(), update.title(), update.detail())));
+                        Platform.runLater(() -> {
+                            if (requestVersion == explorerRequestVersion) {
+                                explorerPage.showLoading(
+                                        update.progress(), update.title(), update.detail());
+                            }
+                        }));
             }
         };
         task.setOnSucceeded(event -> {
             GrbData data = task.getValue();
+            if (data == null) return;
             sessionData.put(data.grbName(), data);
+            if (requestVersion != explorerRequestVersion) return;
             explorerPage.showData(data);
-            setConnection("Online", "status-online");
+            restoreCatalogConnection();
         });
-        task.setOnFailed(event -> explorerPage.showError(entry, task.getException()));
+        task.setOnFailed(event -> {
+            if (requestVersion == explorerRequestVersion) {
+                explorerPage.showError(entry, task.getException());
+                restoreCatalogConnection();
+            }
+        });
         DOWNLOAD_EXECUTOR.execute(task);
+    }
+
+    private void restoreCatalogConnection() {
+        if (offlineCatalog) {
+            setConnection("Offline parziale", "status-warning");
+        } else {
+            setConnection("Online", "status-online");
+        }
     }
 
     private void updateCacheStatus() {
