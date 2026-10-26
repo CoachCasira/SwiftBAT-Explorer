@@ -38,6 +38,8 @@ public final class UiTableAndStartupFixes {
     private static final String PREPARED = UiTableAndStartupFixes.class.getName() + ".prepared";
     private static final String WATCHED = UiTableAndStartupFixes.class.getName() + ".watched";
     private static final String TABLE_INSTALLED = UiTableAndStartupFixes.class.getName() + ".tableInstalled";
+    private static final String WIRE_PENDING = UiTableAndStartupFixes.class.getName() + ".wirePending";
+    private static final String POLISH_PENDING = UiTableAndStartupFixes.class.getName() + ".polishPending";
     private static final String HEATMAP_INSTALLED = UiTableAndStartupFixes.class.getName() + ".heatmapInstalled";
     private static final String SPECTRO_TABS_INSTALLED = UiTableAndStartupFixes.class.getName() + ".spectroTabsInstalled";
     private static final String INTERNAL_BAR = UiTableAndStartupFixes.class.getName() + ".internalBar";
@@ -218,15 +220,20 @@ public final class UiTableAndStartupFixes {
         table.sceneProperty().addListener((obs, oldScene, newScene) -> {
             if (newScene != null) scheduleWire(table, external);
         });
-        table.heightProperty().addListener((obs, oldHeight, newHeight) -> scheduleWire(table, external));
+        // The native vertical scrollbar is owned by the TableView skin.
+        // Rewiring it on every height change caused a feedback loop:
+        // table height -> wire() -> table.requestLayout() -> height changes.
+        // The binding follows ordinary resizing automatically.
         scheduleExternalPolish(external);
         scheduleWire(table, external);
     }
 
     private static void scheduleExternalPolish(ScrollBar external) {
+        if (Boolean.TRUE.equals(external.getProperties().get(POLISH_PENDING))) return;
+        external.getProperties().put(POLISH_PENDING, Boolean.TRUE);
         Platform.runLater(() -> {
-            polishExternalScrollbar(external);
-            Platform.runLater(() -> polishExternalScrollbar(external));
+            external.getProperties().remove(POLISH_PENDING);
+            if (external.getScene() != null) polishExternalScrollbar(external);
         });
     }
 
@@ -235,18 +242,19 @@ public final class UiTableAndStartupFixes {
         external.setMinWidth(TABLE_SCROLLBAR_WIDTH);
         external.setPrefWidth(TABLE_SCROLLBAR_WIDTH);
         external.setMaxWidth(TABLE_SCROLLBAR_WIDTH);
-        try {
-            external.applyCss();
-        } catch (RuntimeException ignored) {
-            return;
-        }
+        // Set CSS/geometry only when it changes. Calling requestLayout()
+        // unconditionally here turns height notifications into a permanent
+        // pulse loop on an otherwise idle Population page.
+        if (external.getSkin() == null) return;
         Node thumb = external.lookup(".thumb");
         if (thumb instanceof Region region) {
-            region.setMinHeight(TABLE_THUMB_MIN_LENGTH);
-            region.setPrefWidth(TABLE_SCROLLBAR_WIDTH);
-            region.setMinWidth(TABLE_SCROLLBAR_WIDTH);
+            if (region.getMinHeight() != TABLE_THUMB_MIN_LENGTH)
+                region.setMinHeight(TABLE_THUMB_MIN_LENGTH);
+            if (region.getPrefWidth() != TABLE_SCROLLBAR_WIDTH)
+                region.setPrefWidth(TABLE_SCROLLBAR_WIDTH);
+            if (region.getMinWidth() != TABLE_SCROLLBAR_WIDTH)
+                region.setMinWidth(TABLE_SCROLLBAR_WIDTH);
         }
-        external.requestLayout();
     }
 
     private static ScrollBar findExternalScrollbar(Parent parent) {
@@ -361,15 +369,22 @@ public final class UiTableAndStartupFixes {
     }
 
     private static void scheduleWire(TableView<?> table, ScrollBar external) {
+        if (Boolean.TRUE.equals(table.getProperties().get(WIRE_PENDING))) return;
+        table.getProperties().put(WIRE_PENDING, Boolean.TRUE);
         Platform.runLater(() -> {
-            if (!wire(table, external)) Platform.runLater(() -> wire(table, external));
+            table.getProperties().remove(WIRE_PENDING);
+            if (table.getScene() == null) return;
+            if (!wire(table, external)) {
+                Platform.runLater(() -> wire(table, external));
+            }
         });
     }
 
     private static boolean wire(TableView<?> table, ScrollBar external) {
         markTableOwned(table);
         if (table.getSkin() == null) return false;
-        table.applyCss();
+        // The skin is already present: forcing CSS while the table is laying
+        // itself out triggers redundant scene layout passes.
 
         ScrollBar internal = null;
         for (Node node : table.lookupAll(".scroll-bar")) {
@@ -381,6 +396,7 @@ public final class UiTableAndStartupFixes {
         if (internal == null) return false;
 
         Object previous = external.getProperties().get(INTERNAL_BAR);
+        if (previous == internal) return true; // Already bound, no relayout.
         if (previous != internal) {
             if (previous instanceof ScrollBar old) unbind(external, old);
             external.getProperties().put(INTERNAL_BAR, internal);
@@ -395,9 +411,7 @@ public final class UiTableAndStartupFixes {
         }
 
         collapseNativeBar(internal);
-        polishExternalScrollbar(external);
         scheduleExternalPolish(external);
-        table.requestLayout();
         return true;
     }
 
