@@ -16,6 +16,10 @@ final class CompareSearchInput {
         return text != null && text.matches("[A-Z0-9]*");
     }
 
+    static boolean hasFixedPrefix(String text) {
+        return text != null && text.startsWith("GRB") && isEditable(text);
+    }
+
     /**
      * A previously committed GRB must never be re-inserted while the editor
      * contains a different (usually shortened) search string.
