@@ -825,3 +825,15 @@
 .reference-redesign .choice-box.choice-box-modern.explorer-time-window-choice > .label {
     -fx-padding: 0 11px 0 12px;
 }
+
+/*
+ * JavaFX 17 Modena sometimes resolves the looked-up
+ * -fx-table-cell-border-color as a String instead of a Paint while
+ * evaluating Modena's *.table-cell border. Give generic TableView cells a
+ * literal fallback Paint. Scoped .reference-redesign .data-table .table-cell
+ * and final-aligned-table rules are more specific and retain all existing
+ * column separators, insets and sizing.
+ */
+.table-view .table-cell {
+    -fx-border-color: transparent;
+}
