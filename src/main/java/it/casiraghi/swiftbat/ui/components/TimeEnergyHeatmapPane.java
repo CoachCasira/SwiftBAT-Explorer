@@ -17,6 +17,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /** Heatmap descrittiva tempo-energia costruita dai quattro rate ASCII a 1 s. */
 public final class TimeEnergyHeatmapPane extends Region {
@@ -32,6 +33,7 @@ public final class TimeEnergyHeatmapPane extends Region {
     private final Canvas canvas = new Canvas();
     private final Label hoverCard = new Label();
     private final Set<Cell> selectedCells = new LinkedHashSet<>();
+    private Consumer<SelectionSnapshot> onSelectionChanged = ignored -> { };
     private TabularData data = TabularData.empty();
     private double halfWindowSeconds = 60.0;
     private List<Row> visibleRows = List.of();
@@ -78,13 +80,17 @@ public final class TimeEnergyHeatmapPane extends Region {
             pressedCell = cellAt(event.getX(), event.getY());
             pressedCellWasSelected = pressedCell != null && selectedCells.contains(pressedCell);
             if (pressedCell != null) {
-                if (!pressedCellWasSelected) selectedCells.add(pressedCell);
+                if (!pressedCellWasSelected) {
+                    selectedCells.add(pressedCell);
+                    selectionChanged();
+                }
                 draw();
                 return;
             }
             int column = headerColumnAt(event.getX(), event.getY());
             if (column >= 0) {
                 toggleWholeColumn(column);
+                selectionChanged();
                 draw();
             }
         });
@@ -92,13 +98,17 @@ public final class TimeEnergyHeatmapPane extends Region {
             if (!event.isPrimaryButtonDown()) return;
             draggedSelection = true;
             Cell cell = cellAt(event.getX(), event.getY());
-            if (cell != null && selectedCells.add(cell)) draw();
+            if (cell != null && selectedCells.add(cell)) {
+                selectionChanged();
+                draw();
+            }
             updateHover(event.getX(), event.getY());
         });
         setOnMouseReleased(event -> {
             if (event.getButton() != MouseButton.PRIMARY) return;
             if (pressedCell != null && !draggedSelection && pressedCellWasSelected) {
                 selectedCells.remove(pressedCell);
+                selectionChanged();
                 draw();
             }
             pressedCell = null;
@@ -107,11 +117,58 @@ public final class TimeEnergyHeatmapPane extends Region {
         setOnMouseClicked(event -> {
             if (event.getButton() == MouseButton.PRIMARY && event.getClickCount() >= 2) {
                 selectedCells.clear();
+                selectionChanged();
                 clearHover();
                 draw();
                 event.consume();
             }
         });
+    }
+
+    /** Immutable selection in scientific time-bin and energy-band indices. */
+    public record SelectedBin(int timeBin, int energyBand) { }
+
+    public record SelectionSnapshot(List<SelectedBin> bins) {
+        public SelectionSnapshot {
+            bins = List.copyOf(bins);
+        }
+    }
+
+    public SelectionSnapshot selectionSnapshot() {
+        return new SelectionSnapshot(selectedCells.stream()
+                .map(cell -> new SelectedBin(cell.rowIndex(), cell.bandIndex()))
+                .toList());
+    }
+
+    /**
+     * A matching Time–Energy view has identical data and time-window
+     * indexing, irrespective of its on-screen width. Restore the indices,
+     * not screen pixels: resizing/fullscreen cannot change the selection.
+     */
+    public void restoreSelection(SelectionSnapshot snapshot) {
+        selectedCells.clear();
+        if (snapshot != null) {
+            for (SelectedBin bin : snapshot.bins()) {
+                if (bin.timeBin() >= 0 && bin.energyBand() >= 0
+                        && bin.energyBand() < BANDS.size()) {
+                    selectedCells.add(new Cell(bin.timeBin(), bin.energyBand()));
+                }
+            }
+        }
+        pressedCell = null;
+        draggedSelection = false;
+        pressedCellWasSelected = false;
+        clearHover();
+        draw();
+    }
+
+    /** Forwards deliberate user edits to another view; restoreSelection is silent. */
+    public void setOnSelectionChanged(Consumer<SelectionSnapshot> listener) {
+        onSelectionChanged = listener == null ? ignored -> { } : listener;
+    }
+
+    private void selectionChanged() {
+        onSelectionChanged.accept(selectionSnapshot());
     }
 
     public void setData(TabularData data) {
