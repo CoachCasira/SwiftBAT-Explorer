@@ -66,23 +66,65 @@ public final class ChartInteractionEnhancer {
     private static void watch(Node node) {
         if (node == null) return;
         enhance(node);
+        // Enhancing the chart itself is enough. Installing recursive listeners
+        // on the JavaFX chart skin generates a full subtree scan per plotted
+        // tick/series node, starving the application thread during Population.
+        if (node instanceof javafx.scene.chart.Chart) return;
+        if (node instanceof TabPane tabs) {
+            if (Boolean.TRUE.equals(tabs.getProperties().get(WATCHED))) return;
+            tabs.getProperties().put(WATCHED, Boolean.TRUE);
+            for (Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) watch(tab.getContent());
+            }
+            tabs.getTabs().addListener((ListChangeListener<Tab>) change -> {
+                while (change.next()) {
+                    if (!change.wasAdded()) continue;
+                    for (Tab tab : change.getAddedSubList()) {
+                        if (tab.getContent() != null) watch(tab.getContent());
+                    }
+                }
+            });
+            return;
+        }
+        if (node instanceof javafx.scene.control.ScrollPane scroll) {
+            if (Boolean.TRUE.equals(scroll.getProperties().get(WATCHED))) return;
+            scroll.getProperties().put(WATCHED, Boolean.TRUE);
+            if (scroll.getContent() != null) watch(scroll.getContent());
+            scroll.contentProperty().addListener((obs, oldContent, newContent) -> {
+                if (newContent != null) watch(newContent);
+            });
+            return;
+        }
+        if (node instanceof Control) return;
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
         parent.getChildrenUnmodifiable().addListener((ListChangeListener<Node>) change -> {
             while (change.next()) {
                 if (change.wasAdded()) {
-                    for (Node added : change.getAddedSubList()) watch(added);
+                    for (Node added : List.copyOf(change.getAddedSubList())) watch(added);
                 }
             }
-            Platform.runLater(() -> scan(parent));
+            // No scan(parent): all newly added nodes were already enhanced.
         });
-        for (Node child : parent.getChildrenUnmodifiable()) watch(child);
+        for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) watch(child);
     }
 
     private static void scan(Node node) {
         if (node == null) return;
         enhance(node);
+        if (node instanceof javafx.scene.chart.Chart) return;
+        if (node instanceof TabPane tabs) {
+            for (Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) scan(tab.getContent());
+            }
+            return;
+        }
+        if (node instanceof javafx.scene.control.ScrollPane scroll) {
+            if (scroll.getContent() != null) scan(scroll.getContent());
+            return;
+        }
+        if (node instanceof Control) return;
         if (node instanceof Parent parent) {
             for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) scan(child);
         }
