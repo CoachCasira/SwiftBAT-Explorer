@@ -42,4 +42,42 @@ class OfflineScientificMetadataServiceTest {
         SkyBurst documented = new SkyBurst("GRB250605A", "1321323", 123.4, -12.5, null);
         assertTrue(documented.hasCoordinates());
     }
+    @Test
+    void readsRealCoordinatesAndT90FromFITSHeadersWithoutOpeningRateTable() {
+        CatalogEntry entry = new CatalogEntry("GRB250605A", "1321323", "https://example.test/");
+        byte[] primary = fitsHeader("SIMPLE  = T", "BITPIX  = 8", "NAXIS   = 0");
+        byte[] rates = fitsHeader("XTENSION= 'BINTABLE'", "BITPIX  = 8",
+                "NAXIS   = 2", "NAXIS1  = 32", "NAXIS2  = 999999",
+                "RA_OBJ  = 123.456", "DEC_OBJ = -34.567", "T90     = 18.5");
+        byte[] onlyHeaders = new byte[primary.length + rates.length];
+        System.arraycopy(primary, 0, onlyHeaders, 0, primary.length);
+        System.arraycopy(rates, 0, onlyHeaders, primary.length, rates.length);
+
+        var result = OfflineScientificMetadataService.fromFitsHeaders(entry, onlyHeaders);
+        assertTrue(result.hasCoordinates());
+        assertEquals(123.456, result.raDeg(), 1e-6);
+        assertEquals(-34.567, result.decDeg(), 1e-6);
+        assertEquals(18.5, result.t90Sec(), 1e-6);
+    }
+
+    @Test
+    void doesNotConfuseMissingCoordinatesWithZeroZero() {
+        CatalogEntry entry = new CatalogEntry("GRB250605A", "1321323", "");
+        var result = OfflineScientificMetadataService.fromFitsHeaders(entry,
+                fitsHeader("SIMPLE  = T", "BITPIX  = 8", "NAXIS   = 0", "T90     = 12.0"));
+        assertFalse(result.hasCoordinates());
+        assertTrue(result.hasT90());
+        assertEquals(12.0, result.t90Sec(), 1e-6);
+    }
+
+    private static byte[] fitsHeader(String... cards) {
+        var builder = new StringBuilder();
+        for (String card : cards) {
+            builder.append(String.format(java.util.Locale.ROOT, "%-80s", card));
+        }
+        builder.append(String.format(java.util.Locale.ROOT, "%-80s", "END"));
+        while (builder.length() % 2880 != 0) builder.append(' ');
+        return builder.toString().getBytes(StandardCharsets.US_ASCII);
+    }
+
 }
