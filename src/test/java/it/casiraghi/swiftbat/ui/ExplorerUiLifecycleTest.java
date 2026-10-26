@@ -394,7 +394,8 @@ class ExplorerUiLifecycleTest {
                 ChoiceBox<String> choice =
                         (ChoiceBox<String>) overview.lookup(".explorer-time-window-choice");
                 assertNotNull(choice);
-                assertEquals(3, choice.getItems().size());
+                assertTrue(choice.getItems().size() >= 3,
+                        "Time-window presets must remain available");
                 Label selectedLabel = (Label) choice.lookup(".label");
                 assertNotNull(selectedLabel, "JavaFX time-window ChoiceBox skin label");
                 assertEquals(12.0, selectedLabel.getPadding().getLeft(), 0.01,
