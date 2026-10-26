@@ -92,6 +92,23 @@ public final class InteractiveViewSyncEnhancer {
             }
         }
 
+        // Observe only application-owned logical content. The chart/Control
+        // skin is populated dynamically by JavaFX and can contain thousands of
+        // nodes; traversing and rescanning it on every child insertion causes
+        // severe lag in Population Analysis.
+        if (node instanceof TabPane) return; // Logical tabs handled above.
+        if (node instanceof javafx.scene.control.ScrollPane scroll) {
+            if (Boolean.TRUE.equals(scroll.getProperties().get(WATCHED))) return;
+            scroll.getProperties().put(WATCHED, Boolean.TRUE);
+            if (scroll.getContent() != null) watch(scroll.getContent());
+            scroll.contentProperty().addListener((obs, before, after) -> {
+                if (after != null) watch(after);
+            });
+            return;
+        }
+        if (node instanceof javafx.scene.chart.Chart
+                || node instanceof javafx.scene.control.Control) return;
+
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
@@ -100,7 +117,7 @@ public final class InteractiveViewSyncEnhancer {
                 if (!change.wasAdded()) continue;
                 for (Node added : List.copyOf(change.getAddedSubList())) watch(added);
             }
-            Platform.runLater(() -> scan(parent));
+            // Newly added nodes were already processed by watch(added).
         });
         for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) watch(child);
     }
@@ -108,6 +125,18 @@ public final class InteractiveViewSyncEnhancer {
     private static void scan(Node node) {
         if (node == null) return;
         enhance(node);
+        if (node instanceof javafx.scene.chart.Chart) return;
+        if (node instanceof TabPane tabs) {
+            for (Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) scan(tab.getContent());
+            }
+            return;
+        }
+        if (node instanceof javafx.scene.control.ScrollPane scroll) {
+            if (scroll.getContent() != null) scan(scroll.getContent());
+            return;
+        }
+        if (node instanceof javafx.scene.control.Control) return;
         if (node instanceof TabPane tabs) {
             for (Tab tab : tabs.getTabs()) if (tab.getContent() != null) scan(tab.getContent());
         }
