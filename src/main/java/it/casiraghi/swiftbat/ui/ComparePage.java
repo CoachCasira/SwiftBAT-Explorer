@@ -274,7 +274,14 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
             if (!java.util.Objects.equals(combo.getProperties().get(SUGGESTION_UPDATE_KEY), generation)
                     || Boolean.TRUE.equals(combo.getProperties().get(COMMITTING_KEY))
                     || !java.util.Objects.equals(combo.getEditor().getText(), raw)) return;
-            if (!combo.getEditor().isFocused() || completed || visible.isEmpty()) {
+            if (!combo.getEditor().isFocused() || completed) {
+                // In a ComboBox, clearing the items also invalidates a
+                // selected value and can rewrite the editor on focus/click.
+                // Never touch the list of a completed/committed GRB.
+                combo.hide();
+                return;
+            }
+            if (visible.isEmpty()) {
                 combo.hide();
                 if (!combo.getItems().isEmpty()) combo.getItems().clear();
                 return;
