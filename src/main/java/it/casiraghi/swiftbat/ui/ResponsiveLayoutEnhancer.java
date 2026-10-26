@@ -11,6 +11,9 @@ import javafx.scene.Scene;
 import javafx.scene.chart.BarChart;
 import javafx.scene.chart.LineChart;
 import javafx.scene.control.Button;
+import javafx.scene.chart.Chart;
+import javafx.scene.control.Control;
+import javafx.scene.control.ScrollPane;
 import javafx.scene.control.Label;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
@@ -46,6 +49,7 @@ import java.util.Locale;
 public final class ResponsiveLayoutEnhancer {
     private static final double WIDE_WIDTH = 1700.0;
     private static final String WATCHED = ResponsiveLayoutEnhancer.class.getName() + ".watched";
+    private static final String APPLY_PENDING = ResponsiveLayoutEnhancer.class.getName() + ".applyPending";
     private static final String TABS_WATCHED = ResponsiveLayoutEnhancer.class.getName() + ".tabsWatched";
     private static final String RESTORE_WATCHED = ResponsiveLayoutEnhancer.class.getName() + ".restoreWatched";
     private static final String TABLE_WATCHED = ResponsiveLayoutEnhancer.class.getName() + ".tableWatched";
@@ -91,6 +95,23 @@ public final class ResponsiveLayoutEnhancer {
             installTabWatcher(tabs, root);
         }
 
+        // Chart and control skins are owned by JavaFX. Observing their children
+        // caused a relayout for every plot line/axis/tick, and at times an
+        // avalanche of FX runLater callbacks on Population Analysis.
+        if (node instanceof Chart || node instanceof TabPane
+                || node instanceof TableView<?>) return;
+        if (node instanceof ScrollPane scroll) {
+            if (scroll.getContent() != null) watch(scroll.getContent(), root);
+            if (!Boolean.TRUE.equals(scroll.getProperties().get(WATCHED))) {
+                scroll.getProperties().put(WATCHED, Boolean.TRUE);
+                scroll.contentProperty().addListener((obs, oldContent, newContent) -> {
+                    if (newContent != null) watch(newContent, root);
+                    requestApply(root);
+                });
+            }
+            return;
+        }
+        if (node instanceof Control) return;
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
@@ -156,7 +177,12 @@ public final class ResponsiveLayoutEnhancer {
     }
 
     private static void requestApply(Parent root) {
-        Platform.runLater(() -> apply(root));
+        if (Boolean.TRUE.equals(root.getProperties().get(APPLY_PENDING))) return;
+        root.getProperties().put(APPLY_PENDING, Boolean.TRUE);
+        Platform.runLater(() -> {
+            root.getProperties().remove(APPLY_PENDING);
+            if (root.getScene() != null) apply(root);
+        });
     }
 
     private static void requestPopulationApply(Parent root) {
