@@ -70,6 +70,32 @@ public final class FinalRequestedUiFastFixes {
         enhance(node);
         // Scrollbar and table controls are handled once at the logical level.
         // Their internal skins can add hundreds of nodes on page activation.
+        // Follow only real tab/scroll content, never internal skin children.
+        if (node instanceof javafx.scene.control.TabPane tabs) {
+            if (Boolean.TRUE.equals(tabs.getProperties().get(WATCHED))) return;
+            tabs.getProperties().put(WATCHED, Boolean.TRUE);
+            for (javafx.scene.control.Tab tab : tabs.getTabs()) {
+                if (tab.getContent() != null) watch(tab.getContent());
+            }
+            tabs.getTabs().addListener((javafx.collections.ListChangeListener<javafx.scene.control.Tab>) change -> {
+                while (change.next()) {
+                    if (!change.wasAdded()) continue;
+                    for (javafx.scene.control.Tab tab : change.getAddedSubList()) {
+                        if (tab.getContent() != null) watch(tab.getContent());
+                    }
+                }
+            });
+            return;
+        }
+        if (node instanceof javafx.scene.control.ScrollPane scroll) {
+            if (Boolean.TRUE.equals(scroll.getProperties().get(WATCHED))) return;
+            scroll.getProperties().put(WATCHED, Boolean.TRUE);
+            if (scroll.getContent() != null) watch(scroll.getContent());
+            scroll.contentProperty().addListener((obs, oldContent, newContent) -> {
+                if (newContent != null) watch(newContent);
+            });
+            return;
+        }
         if (node instanceof javafx.scene.chart.Chart
                 || node instanceof javafx.scene.control.Control) return;
         if (!(node instanceof Parent parent)) return;
