@@ -3,6 +3,9 @@ package it.casiraghi.swiftbat.service;
 import it.casiraghi.swiftbat.model.RedshiftInfo;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -25,26 +28,52 @@ public final class RedshiftCatalogService {
             "SwiftBAT-Explorer/1.3.0 (academic thesis application; redshift-catalog)";
     private static final Pattern NUMBER = Pattern.compile("(?<![A-Za-z])([0-9]+(?:[.,][0-9]+)?)");
 
+    private static final Path LOCAL_TABLE = Path.of(System.getProperty("user.home"),
+            ".swiftbat-explorer", "cache", "scientific", "GRBlist_redshift_BAT.txt");
+    private static final Path BUNDLED_TABLE = Path.of(System.getProperty("user.dir"),
+            "offline-data", "scientific", "GRBlist_redshift_BAT.txt");
+
     private final HttpClient client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(15))
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
     public Map<String, RedshiftInfo> fetchRedshifts() throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(REDSHIFT_URL))
-                .header("User-Agent", USER_AGENT)
-                .timeout(Duration.ofSeconds(30))
-                .GET()
-                .build();
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IOException("HTTP " + response.statusCode() + " leggendo la tabella redshift Swift/BAT.");
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(REDSHIFT_URL))
+                    .header("User-Agent", USER_AGENT)
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new IOException("HTTP " + response.statusCode() + " leggendo il redshift Swift/BAT.");
+            }
+            Map<String, RedshiftInfo> result = parseRedshifts(response.body());
+            if (result.isEmpty()) {
+                throw new IOException("Tabella redshift BAT senza record validi.");
+            }
+            try {
+                Files.createDirectories(LOCAL_TABLE.getParent());
+                Files.writeString(LOCAL_TABLE, response.body(), StandardCharsets.UTF_8);
+            } catch (IOException ignored) {
+                // A writable cache is not required for successful downloads.
+            }
+            return result;
+        } catch (IOException onlineFailure) {
+            for (Path path : List.of(LOCAL_TABLE, BUNDLED_TABLE)) {
+                try {
+                    if (Files.isRegularFile(path)) {
+                        Map<String, RedshiftInfo> local =
+                                parseRedshifts(Files.readString(path, StandardCharsets.UTF_8));
+                        if (!local.isEmpty()) return local;
+                    }
+                } catch (IOException ignored) {
+                    // Continue to the bundled snapshot.
+                }
+            }
+            throw new IOException("Nessuna tabella redshift ufficiale salvata localmente.", onlineFailure);
         }
-        Map<String, RedshiftInfo> result = parseRedshifts(response.body());
-        if (result.isEmpty()) {
-            throw new IOException("La tabella redshift BAT non contiene record leggibili.");
-        }
-        return result;
     }
 
     /** Visibile al package per i test. */
