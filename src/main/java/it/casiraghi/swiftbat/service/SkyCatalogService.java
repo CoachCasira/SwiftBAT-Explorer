@@ -3,6 +3,9 @@ package it.casiraghi.swiftbat.service;
 import it.casiraghi.swiftbat.model.SkyBurst;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -26,26 +29,61 @@ public final class SkyCatalogService {
             "SwiftBAT-Explorer/1.3.0 (academic thesis application; celestial-map)";
     private static final Pattern GRB_PATTERN = Pattern.compile("(?i)(?:GRB)?\\d{6}[A-Z]?");
 
+    private static final Path LOCAL_SUMMARY = Path.of(System.getProperty("user.home"),
+            ".swiftbat-explorer", "cache", "scientific", "summary_general.txt");
+    private static final Path BUNDLED_SUMMARY = Path.of(System.getProperty("user.dir"),
+            "offline-data", "scientific", "summary_general.txt");
+    private volatile boolean lastFetchOffline;
+
+    public boolean lastFetchOffline() {
+        return lastFetchOffline;
+    }
+
     private final HttpClient client = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(15))
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
 
     public List<SkyBurst> fetchSkyCatalog() throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder(URI.create(SUMMARY_URL))
-                .header("User-Agent", USER_AGENT)
-                .timeout(Duration.ofSeconds(30))
-                .GET()
-                .build();
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IOException("HTTP " + response.statusCode() + " leggendo la tabella generale Swift/BAT.");
+        try {
+            HttpRequest request = HttpRequest.newBuilder(URI.create(SUMMARY_URL))
+                    .header("User-Agent", USER_AGENT)
+                    .timeout(Duration.ofSeconds(30))
+                    .GET()
+                    .build();
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                throw new IOException("HTTP " + response.statusCode() + " leggendo la tabella Swift/BAT.");
+            }
+            List<SkyBurst> parsed = parseSummary(response.body());
+            if (parsed.isEmpty()) {
+                throw new IOException("La tabella ufficiale non contiene coordinate leggibili.");
+            }
+            lastFetchOffline = false;
+            try {
+                Files.createDirectories(LOCAL_SUMMARY.getParent());
+                Files.writeString(LOCAL_SUMMARY, response.body(), StandardCharsets.UTF_8);
+            } catch (IOException ignored) {
+                // Failure to persist metadata must not lose the online result.
+            }
+            return parsed;
+        } catch (IOException onlineFailure) {
+            lastFetchOffline = true;
+            for (Path path : List.of(LOCAL_SUMMARY, BUNDLED_SUMMARY)) {
+                try {
+                    if (Files.isRegularFile(path)) {
+                        List<SkyBurst> saved = parseSummary(Files.readString(path, StandardCharsets.UTF_8));
+                        if (!saved.isEmpty()) return saved;
+                    }
+                } catch (IOException ignored) {
+                    // Try the other source.
+                }
+            }
+            List<SkyBurst> cached = new OfflineScientificMetadataService()
+                    .fromCachedProducts(new PersistentGrbCache().catalogEntries());
+            if (!cached.isEmpty()) return cached;
+            throw new IOException("Non sono disponibili coordinate ufficiali né GRB locali.", onlineFailure);
         }
-        List<SkyBurst> parsed = parseSummary(response.body());
-        if (parsed.isEmpty()) {
-            throw new IOException("La tabella generale Swift/BAT è stata scaricata ma non contiene coordinate leggibili.");
-        }
-        return parsed;
     }
 
     /** Visibile al package per i test. */
