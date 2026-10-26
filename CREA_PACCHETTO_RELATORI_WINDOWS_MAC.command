@@ -39,11 +39,16 @@ rsync -a --exclude='/.git/' --exclude='/.github/' --exclude='/.swiftbat-runtime/
 offline_cache="$HOME/.swiftbat-explorer/cache/v1"
 if [ -d "$offline_cache" ]; then
   mkdir -p "$app_dir/offline-data/v1"
-  rsync -a "$offline_cache/" "$app_dir/offline-data/v1/"
-  echo "Prodotti Swift/BAT offline inclusi dal Mac di origine."
-else
-  echo "Nessuna cache Swift/BAT locale trovata: pacchetto senza dataset offline."
+  rsync -a --ignore-existing "$offline_cache/" "$app_dir/offline-data/v1/"
 fi
+for category in scientific spectroscopy-v1; do
+  source_dir="$HOME/.swiftbat-explorer/cache/$category"
+  if [ -d "$source_dir" ]; then
+    mkdir -p "$app_dir/offline-data/$category"
+    rsync -a --ignore-existing "$source_dir/" "$app_dir/offline-data/$category/"
+  fi
+done
+echo "Archivio offline incluso nel pacchetto (dati scientifici disponibili)."
 
 rm -rf "$app_dir/.git" "$app_dir/.github" "$app_dir/.swiftbat-runtime" "$app_dir/target" \
   "$app_dir/dist" "$app_dir/.idea" "$app_dir/.vscode"
