@@ -100,6 +100,26 @@ class PersistentGrbCacheTest {
     }
 
     @Test
+    void corruptUserManifestFallsBackToBundledScientificProducts() throws Exception {
+        Path userCache = temporary.resolve("user-broken");
+        Path bundledCache = temporary.resolve("offline-data").resolve("v1");
+        CatalogEntry entry = new CatalogEntry("GRB250605A", "1321323",
+                "https://example.test/data/");
+        byte[] ascii = "0 1 0.1 2 0.1 3 0.1 4 0.1 10 0.2\\n"
+                .getBytes(StandardCharsets.US_ASCII);
+        new PersistentGrbCache(bundledCache).write(entry,
+                new PersistentGrbCache.CachedProducts(
+                        ascii, null, entry.dataProductUrl(), "", "", "", "", Instant.EPOCH));
+        Path broken = userCache.resolve(entry.grbName());
+        java.nio.file.Files.createDirectories(broken);
+        java.nio.file.Files.writeString(broken.resolve("manifest.properties"),
+                "schema=1\\ngr b=invalid\\nsavedAt=\\\\uZZZZ\\n");
+
+        PersistentGrbCache reader = new PersistentGrbCache(userCache, bundledCache);
+        assertArrayEquals(ascii, reader.read(entry).orElseThrow().asciiBytes());
+    }
+
+    @Test
     void metadataLookupDoesNotReadEntireFITSFile() throws Exception {
         PersistentGrbCache cache = new PersistentGrbCache(temporary);
         CatalogEntry entry = new CatalogEntry("GRB250605A", "1321323", "https://example.test/data/");
