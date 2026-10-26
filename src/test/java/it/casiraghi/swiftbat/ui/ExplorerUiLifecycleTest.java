@@ -649,6 +649,65 @@ class ExplorerUiLifecycleTest {
     }
 
     @Test
+    void includedGrbsTableAlignsCellsAfterFirstHiddenTabReveal() throws Exception {
+        // The analysis normally finishes while Temporal profile is selected.
+        // More rows than the viewport forces JavaFX to show its native vbar
+        // only AFTER Included GRBs becomes visible.
+        PopulationPage page = fx(() -> new PopulationPage((entry, progress) -> null,
+                Runnable::run, null, FXCollections.observableHashMap()));
+        Stage stage = fx(() -> showStyled(page, 1280, 820));
+        try {
+            fx(() -> {
+                @SuppressWarnings("unchecked")
+                TableView<Object> table = (TableView<Object>) field(page, "resultTable");
+                var type = Class.forName("it.casiraghi.swiftbat.ui.PopulationPage$PopulationEvent");
+                var ctor = type.getDeclaredConstructor(String.class,
+                        it.casiraghi.swiftbat.model.SkyBurst.class, double.class, String.class);
+                ctor.setAccessible(true);
+                var items = FXCollections.<Object>observableArrayList();
+                for (int i = 0; i < 50; i++) {
+                    String name = String.format("GRB250%03dA", i);
+                    items.add(ctor.newInstance(name,
+                            it.casiraghi.swiftbat.model.SkyBurst.withoutCoordinates(name, ""),
+                            99.9, "Regolare"));
+                }
+                table.setItems(items); // Hidden tab, so no scrollbar measured yet.
+                javafx.scene.control.TabPane tabs =
+                        (javafx.scene.control.TabPane) field(page, "resultTabs");
+                tabs.getSelectionModel().select(2);
+                return null;
+            });
+            pulse();
+            pulse(); // One-shot synchronization occurs after first visible pulse.
+            fx(() -> {
+                @SuppressWarnings("unchecked")
+                TableView<Object> table = (TableView<Object>) field(page, "resultTable");
+                assertTrue(table.getWidth() > 500);
+                assertEquals(50, table.getItems().size());
+                var rows = table.lookupAll(".table-row-cell").stream()
+                        .filter(javafx.scene.control.TableRow.class::isInstance)
+                        .map(n -> (javafx.scene.control.TableRow<?>) n)
+                        .filter(row -> !row.isEmpty() && row.getIndex() >= 0)
+                        .toList();
+                assertFalse(rows.isEmpty(), "Included GRBs must display table rows");
+                int matched = 0;
+                for (Node child : rows.get(0).getChildrenUnmodifiable()) {
+                    if (!(child instanceof javafx.scene.control.TableCell<?, ?> cell)
+                            || cell.getTableColumn() == null || !cell.getTableColumn().isVisible()) {
+                        continue;
+                    }
+                    assertEquals(cell.getTableColumn().getWidth(), cell.getWidth(), 2.0,
+                            "Body cell and its header must share the same column width on first reveal");
+                    matched++;
+                }
+                assertEquals(table.getVisibleLeafColumns().size(), matched,
+                        "Each visible header must correspond to an aligned body cell");
+                return null;
+            });
+        } finally { fx(() -> { stage.close(); return null; }); }
+    }
+
+    @Test
     void populationFilterRowsUseAvailableWidthAndWrapOnSmallWindows() throws Exception {
         PopulationPage page = fx(() -> new PopulationPage((entry, progress) -> null, Runnable::run, null,
                 FXCollections.observableHashMap()));
