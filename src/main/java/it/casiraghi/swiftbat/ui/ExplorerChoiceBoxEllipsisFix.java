@@ -25,6 +25,11 @@ public final class ExplorerChoiceBoxEllipsisFix {
     private static final String RADIO_TOOLTIP = ExplorerChoiceBoxEllipsisFix.class.getName() + ".radioTooltip";
     private static final double RIGHT_TEXT_RESERVE = 38.0;
     private static final Insets LABEL_PADDING = new Insets(0, RIGHT_TEXT_RESERVE, 0, 0);
+    // Explorer's time-window filter uses the same 12px left inset as the
+    // neighbouring energy-band menu. This enhancer applies padding directly
+    // to the JavaFX skin Label, so a CSS-only rule cannot override it.
+    private static final Insets WINDOW_LABEL_PADDING =
+            new Insets(0, RIGHT_TEXT_RESERVE, 0, 12);
 
     private ExplorerChoiceBoxEllipsisFix() { }
 
@@ -136,7 +141,9 @@ public final class ExplorerChoiceBoxEllipsisFix {
             if (label.isWrapText()) label.setWrapText(false);
             if (label.getTextOverrun() != OverrunStyle.ELLIPSIS) label.setTextOverrun(OverrunStyle.ELLIPSIS);
             if (!"...".equals(label.getEllipsisString())) label.setEllipsisString("...");
-            if (!LABEL_PADDING.equals(label.getPadding())) label.setPadding(LABEL_PADDING);
+            Insets desired = choice.getStyleClass().contains("explorer-time-window-choice")
+                    ? WINDOW_LABEL_PADDING : LABEL_PADDING;
+            if (!desired.equals(label.getPadding())) label.setPadding(desired);
             if (label.getClip() != null) label.setClip(null);
         } catch (RuntimeException ignored) {
             // The ChoiceBox can briefly be between skins during tab replacement.
