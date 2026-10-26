@@ -127,6 +127,11 @@ public final class SpectralCatalogService {
             if (Files.isRegularFile(cached)) {
                 return Files.readString(cached, StandardCharsets.UTF_8);
             }
+            Path bundled = Path.of(System.getProperty("user.dir"),
+                    "offline-data", "spectroscopy-v1", cacheFolder, file);
+            if (Files.isRegularFile(bundled)) {
+                return Files.readString(bundled, StandardCharsets.UTF_8);
+            }
             if (downloadError instanceof IOException io) throw io;
             throw new IOException("Download spettroscopia non riuscito: " + file, downloadError);
         }
