@@ -20,6 +20,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollBar;
 import javafx.scene.control.TextField;
 import javafx.scene.control.CheckBox;
+import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
@@ -368,6 +369,54 @@ class ExplorerUiLifecycleTest {
         root.applyCss();
         root.layout();
         return stage;
+    }
+
+    @Test
+    void explorerTimeWindowHasRealTwelvePixelLeftInsetAfterSkinPolish() throws Exception {
+        ExplorerOverviewPane overview = fx(() -> {
+            ExplorerPage page = new ExplorerPage(null, (entry, refresh) -> { }, entry -> false);
+            var builder = ExplorerPage.class.getDeclaredMethod("buildOverview", GrbData.class);
+            builder.setAccessible(true);
+            ExplorerOverviewPane pane = (ExplorerOverviewPane) builder.invoke(page,
+                    compareData("GRB250605A", 3));
+            page.setCenter(pane);
+            return pane;
+        });
+        Stage stage = fx(() -> showStyled(overview.getParent(), 1366, 820));
+        try {
+            fx(() -> {
+                ExplorerChoiceBoxEllipsisFix.install(overview);
+                return null;
+            });
+            pulse(); pulse();
+            fx(() -> {
+                @SuppressWarnings("unchecked")
+                ChoiceBox<String> choice =
+                        (ChoiceBox<String>) overview.lookup(".explorer-time-window-choice");
+                assertNotNull(choice);
+                assertEquals(3, choice.getItems().size());
+                Label selectedLabel = (Label) choice.lookup(".label");
+                assertNotNull(selectedLabel, "JavaFX time-window ChoiceBox skin label");
+                assertEquals(12.0, selectedLabel.getPadding().getLeft(), 0.01,
+                        "The actual skin Label, not just CSS, must have band-like left spacing");
+                assertEquals(38.0, selectedLabel.getPadding().getRight(), 0.01,
+                        "Reserve sufficient room for the dropdown arrow");
+                choice.getSelectionModel().selectLast();
+                return null;
+            });
+            pulse();
+            fx(() -> {
+                @SuppressWarnings("unchecked")
+                ChoiceBox<String> choice =
+                        (ChoiceBox<String>) overview.lookup(".explorer-time-window-choice");
+                Label selectedLabel = (Label) choice.lookup(".label");
+                assertEquals(12.0, selectedLabel.getPadding().getLeft(), 0.01,
+                        "Changing the time preset must not remove the left margin");
+                return null;
+            });
+        } finally {
+            fx(() -> { stage.close(); return null; });
+        }
     }
 
     @Test
