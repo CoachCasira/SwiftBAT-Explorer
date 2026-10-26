@@ -66,8 +66,7 @@ public final class UiRefinements {
         polishNode(node);
         // Keep high-level UI refinements but never observe thousands of
         // chart/axis ticks or virtualized TableView/ComboBox skin children.
-        if (node instanceof javafx.scene.chart.Chart
-                || node instanceof javafx.scene.control.Control) return;
+        if (node instanceof javafx.scene.chart.Chart) return;
         if (node instanceof javafx.scene.control.TabPane tabs) {
             for (javafx.scene.control.Tab tab : tabs.getTabs()) {
                 if (tab.getContent() != null) watch(tab.getContent());
@@ -95,6 +94,7 @@ public final class UiRefinements {
             });
             return;
         }
+        if (node instanceof javafx.scene.control.Control) return;
         if (!(node instanceof Parent parent)) return;
         if (Boolean.TRUE.equals(parent.getProperties().get(WATCHED))) return;
         parent.getProperties().put(WATCHED, Boolean.TRUE);
@@ -112,8 +112,7 @@ public final class UiRefinements {
     private static void polish(Node node) {
         if (node == null) return;
         polishNode(node);
-        if (node instanceof javafx.scene.chart.Chart
-                || node instanceof javafx.scene.control.Control) return;
+        if (node instanceof javafx.scene.chart.Chart) return;
         if (node instanceof javafx.scene.control.TabPane tabs) {
             for (javafx.scene.control.Tab tab : tabs.getTabs()) {
                 if (tab.getContent() != null) polish(tab.getContent());
@@ -124,6 +123,7 @@ public final class UiRefinements {
             if (scroll.getContent() != null) polish(scroll.getContent());
             return;
         }
+        if (node instanceof javafx.scene.control.Control) return;
         if (node instanceof Parent parent) {
             for (Node child : List.copyOf(parent.getChildrenUnmodifiable())) polish(child);
         }
