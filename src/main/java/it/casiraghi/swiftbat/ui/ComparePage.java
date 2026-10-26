@@ -337,6 +337,21 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         return exactSelection(combo);
     }
 
+    /**
+     * A failed download must not permanently poison the per-session request
+     * guard. Re-entering or confirming the GRB will attempt the load again.
+     * Do not retry automatically while the NASA server is unavailable.
+     */
+    public void loadFailed(String name) {
+        if (name == null) return;
+        requestedLoads.remove(name);
+        if (name.equals(exactSelection(first)) || name.equals(exactSelection(second))) {
+            comparisonVersion++; // Invalidate delayed render callbacks.
+            showEmpty("Caricamento di " + name + " non riuscito. Seleziona di nuovo il GRB per riprovare.",
+                    "Loading " + name + " failed. Select the GRB again to retry.");
+        }
+    }
+
     private void ensureLoaded(String name) {
         if (name == null || sessionData.containsKey(name) || requestedLoads.contains(name)) return;
         CatalogEntry entry = catalogEntries.get(name);
