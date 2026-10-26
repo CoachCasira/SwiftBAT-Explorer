@@ -191,7 +191,15 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         combo.setOnAction(event -> {
             if (Boolean.TRUE.equals(combo.getProperties().get(COMMITTING_KEY))) return;
             String value = combo.getValue();
-            if (value != null && availableNames.contains(value)) commitSelection(combo, value);
+            // Editable ComboBox also fires ACTION for value/list changes while
+            // the user is deleting characters. After TAB completion the old
+            // value may still be the full GRB; without this guard, deleting
+            // just the final character immediately restores it again.
+            // Commit only if the selected value matches the visible editor.
+            if (value != null && availableNames.contains(value)
+                    && CompareSearchInput.matchesSelection(value, combo.getEditor().getText())) {
+                commitSelection(combo, value);
+            }
         });
     }
 
