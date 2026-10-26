@@ -21,6 +21,7 @@ import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.ProgressIndicator;
+import javafx.scene.control.TextField;
 import javafx.scene.control.TextFormatter;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
@@ -46,6 +47,7 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
     private static final int VISIBLE_SUGGESTIONS = 2;
     private static final String GHOST_KEY = ComparePage.class.getName() + ".ghostSuggestion";
     private static final String COMMITTING_KEY = ComparePage.class.getName() + ".committing";
+    private static final String SUGGESTION_UPDATE_KEY = ComparePage.class.getName() + ".suggestionUpdate";
 
     private final ObservableMap<String, GrbData> sessionData;
     private final Consumer<CatalogEntry> loadRequest;
@@ -150,26 +152,22 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         combo.getEditor().setText("GRB");
         combo.getEditor().setPromptText("");
         combo.getEditor().setTextFormatter(new TextFormatter<String>(change -> {
-            // Preserve the historical non-deletable GRB prefix. The original
-            // regression was specifically the LAST character being restored
-            // after TAB completion, not the prefix restriction.
-            change.setText(change.getText().toUpperCase(Locale.ROOT));
-            String nextText = change.getControlNewText() == null ? ""
-                    : change.getControlNewText().toUpperCase(Locale.ROOT);
-            if (!nextText.startsWith("GRB")) {
-                // Ctrl+A and Backspace reset the value to its initial prefix.
-                if (nextText.isEmpty()) {
-                    change.setRange(0, change.getControlText().length());
-                    change.setText("GRB");
-                    change.setAnchor(3);
-                    change.setCaretPosition(3);
-                    return change;
-                }
-                return null;
-            }
-            if (!CompareSearchInput.hasFixedPrefix(nextText)) return null;
-            return change;
+            // NEVER rewrite Change ranges, anchors or caret positions while
+            // TextFieldBehavior.deletePreviousChar() is active. The former
+            // setRange()/setAnchor() path caused JavaFX to throw
+            // "The start must be <= the end" after Backspace in Compare.
+            // Keep the original fixed GRB prefix, while suffix edits remain
+            // normal native TextField operations.
+            String typed = change.getText().toUpperCase(Locale.ROOT);
+            change.setText(typed);
+            return CompareSearchInput.hasFixedPrefix(change.getControlNewText())
+                    ? change : null;
         }));
+        // Handle full-selection deletion and prefix boundaries BEFORE JavaFX
+        // starts the text-control delete operation. This never changes a
+        // TextFormatter.Change's range during an in-progress deletion.
+        combo.getEditor().addEventFilter(KeyEvent.KEY_PRESSED, event ->
+                protectGrbPrefix(combo.getEditor(), event));
         combo.getEditor().textProperty().addListener((obs, oldValue, raw) -> {
             updateSuggestions(combo, counter, ghost, other, raw);
             // Do not keep comparing the previously selected GRB after the
@@ -261,29 +259,53 @@ public final class ComparePage extends javafx.scene.layout.BorderPane {
         ghost.suffix().setText(ghostValue.isBlank() ? "" : ghostValue.substring(normalized.length()));
         ghost.box().setVisible(combo.getEditor().isFocused() && !ghostValue.isBlank());
 
-        if (!combo.getEditor().isFocused()) {
-            combo.hide();
-            return;
-        }
-        // A complete name should NEVER open a popup on focus/click:
-        // the JavaFX ComboBox skin can otherwise reselect an item and
-        // silently change the editor or restore a deleted last character.
+        // The ComboBox popup and its item list must not be mutated from
+        // inside a TextField text-change notification: doing so can move the
+        // caret while JavaFX is still handling Backspace. Defer changes until
+        // after the current key event and ignore stale queued updates.
+        int generation = ((Number) combo.getProperties()
+                .getOrDefault(SUGGESTION_UPDATE_KEY, 0)).intValue() + 1;
+        combo.getProperties().put(SUGGESTION_UPDATE_KEY, generation);
         boolean completed = availableNames.contains(normalized);
-        if (completed) {
-            combo.hide();
-            return;
-        }
-        if (matches.size() <= MAX_SUGGESTIONS && !matches.isEmpty() && normalized.length() > 3) {
-            List<String> visible = matches.stream().limit(VISIBLE_SUGGESTIONS).toList();
+        List<String> visible = matches.size() <= MAX_SUGGESTIONS && !matches.isEmpty()
+                && normalized.length() > 3 && !completed
+                ? matches.stream().limit(VISIBLE_SUGGESTIONS).toList() : List.of();
+        Platform.runLater(() -> {
+            if (!java.util.Objects.equals(combo.getProperties().get(SUGGESTION_UPDATE_KEY), generation)
+                    || Boolean.TRUE.equals(combo.getProperties().get(COMMITTING_KEY))
+                    || !java.util.Objects.equals(combo.getEditor().getText(), raw)) return;
+            if (!combo.getEditor().isFocused() || completed || visible.isEmpty()) {
+                combo.hide();
+                if (!combo.getItems().isEmpty()) combo.getItems().clear();
+                return;
+            }
             if (!combo.getItems().equals(visible)) {
                 combo.setItems(FXCollections.observableArrayList(visible));
             }
-            // Keep keyboard focus in the editable field, so TAB accepts the
-            // gray ghost completion rather than navigating the popup list.
-            // The dropdown remains accessible using its arrow.
-        } else {
-            combo.hide();
-            if (!combo.getItems().isEmpty()) combo.getItems().clear();
+            // TAB always commits the ghost hint; the popup is opened
+            // explicitly with the dropdown arrow, not on every Backspace.
+        });
+    }
+
+    private static void protectGrbPrefix(TextField editor, KeyEvent event) {
+        KeyCode key = event.getCode();
+        if (key != KeyCode.BACK_SPACE && key != KeyCode.DELETE) return;
+
+        int start = editor.getSelection().getStart();
+        int end = editor.getSelection().getEnd();
+        if (end > start && start < 3) {
+            // Ctrl+A, Backspace and selections crossing GRB reset the suffix;
+            // the prefix itself never disappears.
+            event.consume();
+            editor.setText("GRB");
+            editor.positionCaret(3);
+            return;
+        }
+        int caret = editor.getCaretPosition();
+        if (end == start && ((key == KeyCode.BACK_SPACE && caret <= 3)
+                || (key == KeyCode.DELETE && caret < 3))) {
+            event.consume();
+            if (caret < 3) editor.positionCaret(3);
         }
     }
 
