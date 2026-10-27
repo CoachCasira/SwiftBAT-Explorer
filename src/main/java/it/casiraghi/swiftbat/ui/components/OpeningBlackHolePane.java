@@ -1,6 +1,11 @@
 package it.casiraghi.swiftbat.ui.components;
 
 import javafx.animation.AnimationTimer;
+import javafx.beans.property.DoubleProperty;
+import javafx.scene.CacheHint;
+import javafx.scene.image.Image;
+import javafx.scene.paint.LinearGradient;
+import java.io.InputStream;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.Region;
@@ -20,7 +25,12 @@ import javafx.scene.shape.ArcType;
  */
 public final class OpeningBlackHolePane extends Region {
     private final Canvas backdrop = new Canvas();
+    private final Canvas tunnelLayer = new Canvas();
     private final Canvas particles = new Canvas();
+    // Optional classpath assets. The stable branch and fresh CI checkout still
+    // have the old procedural opening as a safe, fully working fallback.
+    private final Image cinematicArt = loadArt("/opening-cinematic/black-hole-cinematic.jpg");
+    private final Image tunnelArt = loadArt("/opening-cinematic/event-horizon-tunnel.jpg");
     private long firstFrame;
     private long lastFrame;
     private boolean disposed;
@@ -40,7 +50,9 @@ public final class OpeningBlackHolePane extends Region {
         getStyleClass().add("opening-black-hole");
         setMouseTransparent(true);
         setMinSize(0, 0);
-        getChildren().addAll(backdrop, particles);
+        getChildren().addAll(backdrop, tunnelLayer, particles);
+        tunnelLayer.setOpacity(0);
+        setCacheHint(CacheHint.SPEED);
         widthProperty().addListener((obs, before, after) -> requestLayout());
         heightProperty().addListener((obs, before, after) -> requestLayout());
         sceneProperty().addListener((obs, before, after) -> {
@@ -62,12 +74,74 @@ public final class OpeningBlackHolePane extends Region {
         backdrop.setHeight(height);
         particles.setWidth(width);
         particles.setHeight(height);
+        tunnelLayer.setWidth(width);
+        tunnelLayer.setHeight(height);
         paintStatic(width, height);
+        paintTunnel(width, height);
         paintParticles(0);
+    }
+
+    private static Image loadArt(String resource) {
+        try (InputStream bytes = OpeningBlackHolePane.class.getResourceAsStream(resource)) {
+            if (bytes == null) return null;
+            Image image = new Image(bytes);
+            return image.isError() || image.getWidth() < 20 ? null : image;
+        } catch (Exception ignored) {
+            return null;  // Cinematic resource is optional; use procedural art.
+        }
+    }
+
+    public boolean hasCinematicArt() {
+        return cinematicArt != null;
+    }
+
+    public DoubleProperty tunnelOpacityProperty() {
+        return tunnelLayer.opacityProperty();
+    }
+
+    public void pauseParticles() {
+        animation.stop();
+        particles.getGraphicsContext2D().clearRect(
+                0, 0, particles.getWidth(), particles.getHeight());
+    }
+
+    private static void cover(GraphicsContext gc, Image img, double width, double height) {
+        if (img == null) return;
+        double iw = img.getWidth();
+        double ih = img.getHeight();
+        double scale = Math.max(width / iw, height / ih);
+        double sourceWidth = Math.min(iw, width / scale);
+        double sourceHeight = Math.min(ih, height / scale);
+        gc.drawImage(img, (iw - sourceWidth) * 0.5,
+                (ih - sourceHeight) * 0.5, sourceWidth, sourceHeight,
+                0, 0, width, height);
+    }
+
+    private void paintTunnel(double width, double height) {
+        GraphicsContext gc = tunnelLayer.getGraphicsContext2D();
+        gc.clearRect(0, 0, width, height);
+        if (tunnelArt != null) {
+            cover(gc, tunnelArt, width, height);
+        } else {
+            gc.setFill(Color.rgb(2, 3, 12, 0.93));
+            gc.fillRect(0, 0, width, height);
+        }
     }
 
     private void paintStatic(double width, double height) {
         GraphicsContext gc = backdrop.getGraphicsContext2D();
+        if (cinematicArt != null) {
+            gc.clearRect(0, 0, width, height);
+            cover(gc, cinematicArt, width, height);
+            // Text remains real, interactive JavaFX controls. Darken only
+            // the caption area; the photographic accretion is untouched.
+            gc.setFill(new LinearGradient(0, 0.50, 0, 1.0, true,
+                    CycleMethod.NO_CYCLE,
+                    new Stop(0, Color.TRANSPARENT),
+                    new Stop(1, Color.rgb(1, 3, 11, 0.30))));
+            gc.fillRect(0, 0, width, height);
+            return;
+        }
         gc.clearRect(0, 0, width, height);
         gc.setFill(Color.web("#02050e"));
         gc.fillRect(0, 0, width, height);
@@ -281,6 +355,10 @@ public final class OpeningBlackHolePane extends Region {
         double height = particles.getHeight();
         if (width <= 0 || height <= 0) return;
         gc.clearRect(0, 0, width, height);
+        if (cinematicArt != null) {
+            paintCinematicParticles(gc, width, height, seconds);
+            return;
+        }
         double core = Math.min(width * 0.112, height * 0.150);
         double cx = width * 0.51;
         double cy = height * 0.405;
@@ -307,6 +385,27 @@ public final class OpeningBlackHolePane extends Region {
                     Math.sin(angle) * radius * 0.28);
         }
         gc.restore();
+    }
+
+    private void paintCinematicParticles(GraphicsContext gc,
+            double width, double height, double seconds) {
+        // The expensive photorealistic background is decoded ONCE, while
+        // this tiny transparent Canvas is updated at a capped 25 fps.
+        double cx = width * 0.56;
+        double cy = height * 0.31;
+        double radius = Math.min(width * 0.16, height * 0.25);
+        for (int i = 0; i < 27; i++) {
+            double phase = fract(seconds * (0.085 + i % 6 * 0.008) + i * 0.149);
+            double angle = i * 2.39996 + phase * Math.PI * 4;
+            double distance = radius * (2.15 - phase * 1.46);
+            double alpha = Math.min(1, Math.min(phase * 9, (1 - phase) * 8));
+            gc.setFill(i % 3 == 0
+                    ? Color.rgb(255, 178, 111, 0.39 * alpha)
+                    : Color.rgb(130, 168, 250, 0.30 * alpha));
+            double x = cx + Math.cos(angle) * distance * 1.7;
+            double y = cy + Math.sin(angle) * distance * 0.47;
+            gc.fillOval(x, y, 1.0 + i % 3 * 0.60, 1.0 + i % 3 * 0.60);
+        }
     }
 
     private static double fract(double number) {
