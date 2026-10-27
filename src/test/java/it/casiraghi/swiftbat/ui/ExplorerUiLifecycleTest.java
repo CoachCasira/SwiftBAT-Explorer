@@ -1246,6 +1246,67 @@ class ExplorerUiLifecycleTest {
         }
     }
 
+    @Test
+    void experimentalOpeningStaysInsideOriginalSceneAndSkipRemovesCanvas() throws Exception {
+        CompletableFuture<Void> complete = new CompletableFuture<>();
+        StackPane home = fx(() -> new StackPane(new Label("HOME")));
+        BlackHoleOpening opening = fx(() -> new BlackHoleOpening(() -> complete.complete(null)));
+        StackPane host = fx(() -> new StackPane(home, opening));
+        Stage stage = fx(() -> showStyled(host, 1360, 860));
+        Scene original = fx(stage::getScene);
+        try {
+            pulse();
+            fx(() -> {
+                assertSame(original, stage.getScene());
+                assertEquals(2, host.getChildren().size());
+                assertNotNull(opening.lookup("#opening-start"));
+                assertNotNull(opening.lookup("#opening-skip"));
+                assertEquals(1, opening.lookupAll(".opening-black-hole").size());
+                ((Button) opening.lookup("#opening-skip")).fire();
+                return null;
+            });
+            complete.get(5, TimeUnit.SECONDS);
+            fx(() -> {
+                assertSame(original, stage.getScene(), "Intro must never replace the Scene");
+                assertSame(host, original.getRoot(), "Intro must never replace the application root");
+                assertEquals(List.of(home), host.getChildren());
+                return null;
+            });
+        } finally {
+            fx(() -> { stage.close(); return null; });
+        }
+    }
+
+    @Test
+    void experimentalOpeningBeginUsesSingleWindowAndDisposesAfterZoom() throws Exception {
+        CompletableFuture<Void> complete = new CompletableFuture<>();
+        StackPane home = fx(() -> new StackPane(new Label("HOME")));
+        BlackHoleOpening opening = fx(() -> new BlackHoleOpening(() -> complete.complete(null)));
+        StackPane host = fx(() -> new StackPane(home, opening));
+        Stage stage = fx(() -> showStyled(host, 1360, 860));
+        Scene original = fx(stage::getScene);
+        try {
+            pulse();
+            fx(() -> {
+                ((Button) opening.lookup("#opening-start")).fire();
+                assertSame(original, stage.getScene());
+                assertTrue(host.getChildren().contains(opening),
+                        "The zoom must happen on top of the existing window");
+                return null;
+            });
+            complete.get(5, TimeUnit.SECONDS);
+            fx(() -> {
+                assertSame(original, stage.getScene());
+                assertSame(host, original.getRoot());
+                assertEquals(List.of(home), host.getChildren(),
+                        "Remove the animated overlay after entering Home");
+                return null;
+            });
+        } finally {
+            fx(() -> { stage.close(); return null; });
+        }
+    }
+
     private static final class DeferredContent extends StackPane implements InPlaceFullscreen.CloseParticipant {
         final CompletableFuture<Void> ready = new CompletableFuture<>();
         int preparations;
