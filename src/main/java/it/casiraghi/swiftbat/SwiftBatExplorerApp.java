@@ -114,6 +114,22 @@ public final class SwiftBatExplorerApp extends Application {
         // MainView's real scientific services are already initialized.
         arrival.prepare();
 
+        // Reopen this SAME cinematic overlay from the rotating black hole
+        // inside Home. Each replay gets fresh one-shot timelines; Begin
+        // reconstructs the Home reveal and Skip restores it immediately.
+        // Never replace the existing Scene, Stage or scientific session.
+        mainView.getHomePage().setOnOpeningRequested(() -> {
+            if (applicationLayers.getChildren().stream()
+                    .anyMatch(BlackHoleOpening.class::isInstance)) return;
+            HomeEntranceReveal replayArrival = new HomeEntranceReveal(
+                    mainView.getRoot(), mainView.getHomePage());
+            BlackHoleOpening replayOpening = new BlackHoleOpening(
+                    replayArrival::play, replayArrival::showImmediately);
+            applicationLayers.getChildren().add(replayOpening);
+            replayArrival.prepare();
+            Platform.runLater(replayOpening::requestFocus);
+        });
+
         FinalMacAndPopulationPolish.install(mainView.getRoot());
         PageScopedPolishRouter.install(mainView.getRoot());
 
