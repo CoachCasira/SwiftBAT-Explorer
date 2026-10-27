@@ -5,9 +5,11 @@ import javafx.beans.value.ObservableValue;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
+import javafx.scene.Cursor;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.Tooltip;
 import javafx.scene.input.MouseButton;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
@@ -15,6 +17,13 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 
 public final class HomePage extends ScrollPane {
+    private Runnable onOpeningRequested = () -> { };
+
+    /** Only the rotating black hole in the Home hero reopens the intro. */
+    public void setOnOpeningRequested(Runnable onOpeningRequested) {
+        this.onOpeningRequested = onOpeningRequested == null ? () -> { } : onOpeningRequested;
+    }
+
     public HomePage(Runnable openExplorer,
                     Runnable openSky,
                     Runnable openPopulation,
@@ -107,6 +116,20 @@ public final class HomePage extends ScrollPane {
 
         BlackHoleHeroPane graphic = new BlackHoleHeroPane();
         graphic.getStyleClass().add("mockup-hero-graphic");
+        // The animation Canvas was previously mouse-transparent. Make only
+        // this graphic clickable, without changing the surrounding buttons.
+        graphic.setMouseTransparent(false);
+        graphic.setCursor(Cursor.HAND);
+        Tooltip.install(graphic, new Tooltip(
+                I18n.language() == I18n.Language.IT
+                        ? "Rivedi l'apertura di SwiftBAT Explorer"
+                        : "Replay the SwiftBAT Explorer opening"));
+        graphic.setOnMouseClicked(event -> {
+            if (event.getButton() == MouseButton.PRIMARY) {
+                onOpeningRequested.run();
+                event.consume();
+            }
+        });
         graphic.setMinWidth(390);
         graphic.setPrefWidth(590);
         HBox.setHgrow(graphic, Priority.ALWAYS);
