@@ -4,6 +4,10 @@ Il relatore riceve il file **SwiftBAT-Explorer-Relatori-Windows.zip**, lo estrae
 
 Il launcher usa Windows PowerShell 5.1 incluso in Windows 10/11. **Non** richiede l'installazione preventiva di Java, Maven, GitHub, Python, Visual Studio o privilegi amministrativi.
 
+## Apertura cinematografica e accesso alla Home
+
+All'avvio compare una schermata introduttiva con un buco nero animato. Selezionare **Inizia l'esplorazione** per vedere la breve transizione e la comparsa progressiva della Home, oppure **Salta l'apertura** per entrare subito nell'applicazione. La schermata iniziale e la Home si trovano nella **stessa finestra**: non viene aperta una seconda applicazione. Dalla Home è possibile cliccare sull'**immagine animata del buco nero** per rivedere l'apertura in qualsiasi momento. Questa funzione è solo grafica: il catalogo e la sessione scientifica non vengono azzerati.
+
 ## Struttura semplificata dello ZIP
 
 Nella cartella estratta `SwiftBAT Explorer` si vedono soltanto `AVVIA_SWIFTBAT.bat` e la cartella `Applicazione`. Tutti gli altri file, compreso il launcher PowerShell e l'ambiente creato al primo avvio, sono nella cartella `Applicazione`; non occorre aprirla.
