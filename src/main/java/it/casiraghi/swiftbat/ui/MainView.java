@@ -122,6 +122,11 @@ public final class MainView {
         return root;
     }
 
+    /** Opening experiment: access the existing Home content without CSS lookup. */
+    public HomePage getHomePage() {
+        return homePage;
+    }
+
     public void initialize() {
         navigate("home");
         loadCatalog();

@@ -13,6 +13,8 @@ import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
 import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
 import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
 import it.casiraghi.swiftbat.ui.MainView;
+import it.casiraghi.swiftbat.ui.BlackHoleOpening;
+import it.casiraghi.swiftbat.ui.HomeEntranceReveal;
 import it.casiraghi.swiftbat.ui.PageScopedPolishRouter;
 import it.casiraghi.swiftbat.ui.PopulationDurationMultiSelectEnhancer;
 import it.casiraghi.swiftbat.ui.PopulationFracexpSliderFix;
@@ -27,6 +29,8 @@ import it.casiraghi.swiftbat.ui.UiRefinements;
 import it.casiraghi.swiftbat.ui.UiTableAndStartupFixes;
 import it.casiraghi.swiftbat.ui.components.BrandLogoAsset;
 import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.scene.layout.StackPane;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
@@ -39,7 +43,15 @@ public final class SwiftBatExplorerApp extends Application {
         GlobalSearchAssistEnhancer.install(mainView);
         PopulationDurationMultiSelectEnhancer.install(mainView);
         PopulationFracexpSliderFix.install(mainView);
-        Scene scene = new Scene(mainView.getRoot(), 1580, 960);
+        // Experimental game-style opening. One Stage, one Scene: the
+        // already-built app sits behind an opaque cinematic overlay, so the
+        // user's first click never launches another window. The overlay and
+        // its animation timer are disposed when Enter/Skip completes.
+        StackPane applicationLayers = new StackPane(mainView.getRoot());
+        HomeEntranceReveal arrival = new HomeEntranceReveal(mainView.getRoot(), mainView.getHomePage());
+        BlackHoleOpening opening = new BlackHoleOpening(arrival::play, arrival::showImmediately);
+        applicationLayers.getChildren().add(opening);
+        Scene scene = new Scene(applicationLayers, 1580, 960);
 
         /*
          * CSS performance: four base/theme sheets plus one consolidated final
@@ -98,6 +110,25 @@ public final class SwiftBatExplorerApp extends Application {
         ExplorerRegressionFixes.install(mainView.getRoot());
 
         mainView.initialize();
+        // Hide only the controls that should assemble AFTER the horizon dive.
+        // MainView's real scientific services are already initialized.
+        arrival.prepare();
+
+        // Reopen this SAME cinematic overlay from the rotating black hole
+        // inside Home. Each replay gets fresh one-shot timelines; Begin
+        // reconstructs the Home reveal and Skip restores it immediately.
+        // Never replace the existing Scene, Stage or scientific session.
+        mainView.getHomePage().setOnOpeningRequested(() -> {
+            if (applicationLayers.getChildren().stream()
+                    .anyMatch(BlackHoleOpening.class::isInstance)) return;
+            HomeEntranceReveal replayArrival = new HomeEntranceReveal(
+                    mainView.getRoot(), mainView.getHomePage());
+            BlackHoleOpening replayOpening = new BlackHoleOpening(
+                    replayArrival::play, replayArrival::showImmediately);
+            applicationLayers.getChildren().add(replayOpening);
+            replayArrival.prepare();
+            Platform.runLater(replayOpening::requestFocus);
+        });
 
         FinalMacAndPopulationPolish.install(mainView.getRoot());
         PageScopedPolishRouter.install(mainView.getRoot());
@@ -105,6 +136,10 @@ public final class SwiftBatExplorerApp extends Application {
         /* Adds only the scoped spectroscopy hover labels. Catalogue search,
            filtering and scrollbar behaviour are owned by the page itself. */
         ExplorerUiRegressionFix.install(mainView);
+
+        // MainView and its services initialize normally in the background.
+        // Focus stays on the opening until Enter or Skip is pressed.
+        Platform.runLater(opening::requestFocus);
     }
 
     @Override

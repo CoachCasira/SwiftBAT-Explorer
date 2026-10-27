@@ -30,6 +30,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.PickResult;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -1243,6 +1244,219 @@ class ExplorerUiLifecycleTest {
             } finally {
                 fx(() -> { h.stage.close(); return null; });
             }
+        }
+    }
+
+    @Test
+    void experimentalHomeArrivesInStagesAndLeavesNoHiddenControls() throws Exception {
+        HomePage page = fx(() -> new HomePage(
+                () -> { }, () -> { }, () -> { }, () -> { }, () -> { },
+                new SimpleStringProperty("218 local"),
+                new SimpleStringProperty("0 RAM"),
+                new SimpleStringProperty("Partial offline")));
+        BorderPane app = fx(() -> {
+            BorderPane root = new BorderPane();
+            VBox navigation = new VBox(5);
+            for (int i = 0; i < 6; i++) navigation.getChildren().add(new Button("Nav " + i));
+            root.setLeft(navigation);
+            root.setTop(new Label("SWIFTBAT"));
+            root.setCenter(new StackPane(page));
+            return root;
+        });
+        HomeEntranceReveal reveal = new HomeEntranceReveal(app, page);
+        Stage stage = fx(() -> showStyled(app, 1360, 900));
+        try {
+            fx(() -> {
+                reveal.prepare();
+                assertEquals(0, app.getLeft().getOpacity(), 0.01);
+                assertEquals(0, app.getTop().getOpacity(), 0.01);
+                VBox sections = (VBox) page.getContent();
+                assertEquals(4, sections.getChildren().size());
+                assertTrue(sections.getChildren().stream().allMatch(n -> n.getOpacity() == 0));
+                reveal.play();
+                return null;
+            });
+            for (int i = 0; i < 9; i++) pulse(); // 9 × 200 ms > all staggered stages
+            fx(() -> {
+                assertEquals(1, app.getLeft().getOpacity(), 0.01);
+                assertEquals(1, app.getTop().getOpacity(), 0.01);
+                assertFalse(app.isMouseTransparent(), "Home remains interactive");
+                for (Node item : ((VBox) app.getLeft()).getChildren()) {
+                    assertEquals(1, item.getOpacity(), 0.01);
+                }
+                for (Node section : ((VBox) page.getContent()).getChildren()) {
+                    assertEquals(1, section.getOpacity(), 0.01);
+                    assertEquals(0, section.getTranslateY(), 0.01);
+                }
+                return null;
+            });
+        } finally { fx(() -> { stage.close(); return null; }); }
+    }
+
+    @Test
+    void experimentalHomeSkipRevealsEverythingWithoutPlayingAnimation() throws Exception {
+        HomePage home = fx(() -> new HomePage(
+                () -> { }, () -> { }, () -> { }, () -> { }, () -> { },
+                new SimpleStringProperty("218 local"),
+                new SimpleStringProperty("0 RAM"),
+                new SimpleStringProperty("Partial offline")));
+        BorderPane app = fx(() -> {
+            BorderPane root = new BorderPane();
+            root.setLeft(new VBox(new Button("Home"), new Button("Explore")));
+            root.setTop(new Label("HEADER"));
+            root.setCenter(home);
+            return root;
+        });
+        fx(() -> {
+            HomeEntranceReveal reveal = new HomeEntranceReveal(app, home);
+            reveal.prepare();
+            reveal.showImmediately();
+            assertEquals(1, app.getLeft().getOpacity(), 0.01);
+            assertEquals(1, app.getTop().getOpacity(), 0.01);
+            assertTrue(((VBox) home.getContent()).getChildren().stream()
+                    .allMatch(n -> n.getOpacity() == 1 && n.getTranslateY() == 0));
+            assertFalse(app.isMouseTransparent());
+            return null;
+        });
+    }
+
+    @Test
+    void homeBlackHoleReopensIntroRepeatedlyWithoutChangingStageOrHomeData()
+            throws Exception {
+        SimpleStringProperty catalog = new SimpleStringProperty("218 GRBs - local");
+        HomePage home = fx(() -> new HomePage(
+                () -> { }, () -> { }, () -> { }, () -> { }, () -> { },
+                catalog, new SimpleStringProperty("0 RAM"),
+                new SimpleStringProperty("Partial offline")));
+        BorderPane app = fx(() -> {
+            BorderPane pane = new BorderPane();
+            pane.setTop(new Label("SwiftBAT"));
+            pane.setLeft(new VBox(new Button("Home"), new Button("Explore")));
+            pane.setCenter(home);
+            return pane;
+        });
+        StackPane layers = fx(() -> new StackPane(app));
+        // Use the same callback wiring as SwiftBatExplorerApp: a NEW intro and
+        // a NEW HomeEntranceReveal for each user click, on the same Scene.
+        fx(() -> {
+            home.setOnOpeningRequested(() -> {
+                if (layers.getChildren().stream()
+                        .anyMatch(BlackHoleOpening.class::isInstance)) return;
+                HomeEntranceReveal arrival = new HomeEntranceReveal(app, home);
+                BlackHoleOpening opening = new BlackHoleOpening(
+                        arrival::play, arrival::showImmediately);
+                layers.getChildren().add(opening);
+                arrival.prepare();
+                Platform.runLater(opening::requestFocus);
+            });
+            return null;
+        });
+        Stage stage = fx(() -> showStyled(layers, 1320, 880));
+        Scene originalScene = fx(stage::getScene);
+        try {
+            pulse();
+            fx(() -> {
+                Node graphic = home.lookup(".black-hole-hero-pane");
+                assertNotNull(graphic, "The animated Home black hole must be present");
+                assertFalse(graphic.isMouseTransparent(), "The graphic must accept clicks");
+                graphic.fireEvent(mouse(graphic, MouseEvent.MOUSE_CLICKED,
+                        graphic.getLayoutBounds().getWidth() / 2,
+                        graphic.getLayoutBounds().getHeight() / 2, false));
+                assertEquals(2, layers.getChildren().size());
+                assertTrue(layers.getChildren().get(1) instanceof BlackHoleOpening);
+                BlackHoleOpening first = (BlackHoleOpening) layers.getChildren().get(1);
+                ((Button) first.lookup("#opening-skip")).fire();
+                assertEquals(List.of(app), layers.getChildren());
+                assertSame(originalScene, stage.getScene());
+                assertEquals("218 GRBs - local", catalog.get(),
+                        "Replay must not reload or mutate the scientific catalog");
+                return null;
+            });
+            pulse();
+            fx(() -> {
+                Node graphic = home.lookup(".black-hole-hero-pane");
+                graphic.fireEvent(mouse(graphic, MouseEvent.MOUSE_CLICKED, 40, 40, false));
+                assertEquals(2, layers.getChildren().size());
+                BlackHoleOpening second = (BlackHoleOpening) layers.getChildren().get(1);
+                ((Button) second.lookup("#opening-start")).fire();
+                return null;
+            });
+            // The cinematic dive is ~980 ms and the staged Home entrance
+            // completes after another ~1.5 s. No other Stage is ever opened.
+            for (int i = 0; i < 15; i++) pulse();
+            fx(() -> {
+                assertSame(originalScene, stage.getScene());
+                assertSame(layers, stage.getScene().getRoot());
+                assertEquals(List.of(app), layers.getChildren());
+                assertFalse(app.isMouseTransparent());
+                assertEquals(1, app.getTop().getOpacity(), 0.001);
+                assertEquals(1, app.getLeft().getOpacity(), 0.001);
+                assertEquals("218 GRBs - local", catalog.get());
+                return null;
+            });
+        } finally {
+            fx(() -> { stage.close(); return null; });
+        }
+    }
+
+    @Test
+    void experimentalOpeningStaysInsideOriginalSceneAndSkipRemovesCanvas() throws Exception {
+        CompletableFuture<Void> complete = new CompletableFuture<>();
+        StackPane home = fx(() -> new StackPane(new Label("HOME")));
+        BlackHoleOpening opening = fx(() -> new BlackHoleOpening(() -> complete.complete(null)));
+        StackPane host = fx(() -> new StackPane(home, opening));
+        Stage stage = fx(() -> showStyled(host, 1360, 860));
+        Scene original = fx(stage::getScene);
+        try {
+            pulse();
+            fx(() -> {
+                assertSame(original, stage.getScene());
+                assertEquals(2, host.getChildren().size());
+                assertNotNull(opening.lookup("#opening-start"));
+                assertNotNull(opening.lookup("#opening-skip"));
+                assertEquals(1, opening.lookupAll(".opening-black-hole").size());
+                ((Button) opening.lookup("#opening-skip")).fire();
+                return null;
+            });
+            complete.get(5, TimeUnit.SECONDS);
+            fx(() -> {
+                assertSame(original, stage.getScene(), "Intro must never replace the Scene");
+                assertSame(host, original.getRoot(), "Intro must never replace the application root");
+                assertEquals(List.of(home), host.getChildren());
+                return null;
+            });
+        } finally {
+            fx(() -> { stage.close(); return null; });
+        }
+    }
+
+    @Test
+    void experimentalOpeningBeginUsesSingleWindowAndDisposesAfterZoom() throws Exception {
+        CompletableFuture<Void> complete = new CompletableFuture<>();
+        StackPane home = fx(() -> new StackPane(new Label("HOME")));
+        BlackHoleOpening opening = fx(() -> new BlackHoleOpening(() -> complete.complete(null)));
+        StackPane host = fx(() -> new StackPane(home, opening));
+        Stage stage = fx(() -> showStyled(host, 1360, 860));
+        Scene original = fx(stage::getScene);
+        try {
+            pulse();
+            fx(() -> {
+                ((Button) opening.lookup("#opening-start")).fire();
+                assertSame(original, stage.getScene());
+                assertTrue(host.getChildren().contains(opening),
+                        "The zoom must happen on top of the existing window");
+                return null;
+            });
+            complete.get(5, TimeUnit.SECONDS);
+            fx(() -> {
+                assertSame(original, stage.getScene());
+                assertSame(host, original.getRoot());
+                assertEquals(List.of(home), host.getChildren(),
+                        "Remove the animated overlay after entering Home");
+                return null;
+            });
+        } finally {
+            fx(() -> { stage.close(); return null; });
         }
     }
 

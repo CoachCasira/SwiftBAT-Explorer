@@ -31,6 +31,22 @@ foreach ($name in $expected) {
             if ($duplicates.Count -gt 0) {
                 throw "$name contiene $($duplicates.Count) percorsi ZIP duplicati."
             }
+            # Assicura che le due distribuzioni includano l'introduzione
+            # approvata (Canvas procedurale + ricomparsa della Home).
+            $appPrefix = 'SwiftBAT Explorer/Applicazione/'
+            $openingFiles = @(
+                'src/main/java/it/casiraghi/swiftbat/ui/BlackHoleOpening.java',
+                'src/main/java/it/casiraghi/swiftbat/ui/HomeEntranceReveal.java',
+                'src/main/java/it/casiraghi/swiftbat/ui/components/OpeningBlackHolePane.java',
+                'src/main/java/it/casiraghi/swiftbat/ui/HomePage.java',
+                'src/main/resources/stability-final.css'
+            )
+            foreach ($required in $openingFiles) {
+                if (-not $entries.ContainsKey($appPrefix + $required)) {
+                    throw "$name non include l'apertura cinematografica: $required"
+                }
+            }
+            Write-Host "  Apertura cinematografica: [OK]"
             $prefix = 'SwiftBAT Explorer/Applicazione/offline-data/v1/'
             $manifests = @($entries.Keys | Where-Object {
                 $_.StartsWith($prefix) -and $_.EndsWith('/manifest.properties')

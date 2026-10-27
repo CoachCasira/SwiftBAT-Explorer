@@ -837,3 +837,92 @@
 .table-view .table-cell {
     -fx-border-color: transparent;
 }
+
+/* ======================================================================
+ * EXPERIMENTAL BLACK-HOLE OPENING — one Scene, removable overlay.
+ * No layout watchers, no web assets, no decorative CSS animations.
+ * The costly accretion drawing is static; motion uses one 25fps Canvas.
+ * ====================================================================== */
+.opening-overlay {
+    -fx-background-color: #020610;
+}
+.opening-topbar {
+    -fx-padding: 30px 44px 14px 44px;
+    -fx-alignment: center-left;
+}
+.opening-brand {
+    -fx-text-fill: #83cfe9;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+.opening-edition {
+    -fx-text-fill: #8797b7;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+.opening-copy {
+    -fx-alignment: center;
+}
+.opening-eyebrow {
+    -fx-text-fill: #67d5f5;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+.opening-title-row {
+    -fx-alignment: center;
+}
+.opening-title {
+    -fx-font-size: 58px;
+    -fx-font-weight: 900;
+    -fx-text-fill: #f0f6ff;
+    -fx-effect: dropshadow(gaussian, rgba(65, 175, 235, 0.16), 22, 0.24, 0, 0);
+}
+.opening-title-accent {
+    -fx-font-size: 58px;
+    -fx-font-weight: 900;
+    -fx-text-fill: linear-gradient(to right, #52dfff, #a66aff 72%, #e56bdf);
+    -fx-effect: dropshadow(gaussian, rgba(155, 88, 245, 0.20), 25, 0.2, 0, 0);
+}
+.opening-subtitle {
+    -fx-text-fill: #a9bad6;
+    -fx-font-size: 15px;
+    -fx-padding: 0 0 16px 0;
+}
+.opening-actions {
+    -fx-alignment: center;
+    -fx-padding: 0 0 13px 0;
+}
+.opening-start-button {
+    -fx-background-color: linear-gradient(to right, #b92aea, #5274f8 50%, #2caaff);
+    -fx-border-color: rgba(182, 212, 255, 0.55);
+    -fx-border-radius: 12px;
+    -fx-border-width: 1px;
+    -fx-text-fill: white;
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-padding: 16px 35px;
+    -fx-background-radius: 12px;
+    -fx-effect: dropshadow(gaussian, rgba(115, 87, 246, 0.50), 25, 0.33, 0, 4);
+    -fx-cursor: hand;
+}
+.opening-start-button:hover {
+    -fx-background-color: linear-gradient(to right, #cc46f4, #6288ff 50%, #50c3ff);
+}
+.opening-start-button:disabled {
+    -fx-opacity: 0.78;
+}
+.opening-skip-button {
+    -fx-font-size: 13px;
+    -fx-padding: 14px 23px;
+    -fx-background-color: rgba(10, 20, 42, 0.72);
+    -fx-border-color: rgba(91, 154, 219, 0.26);
+    -fx-border-radius: 12px;
+    -fx-background-radius: 12px;
+    -fx-text-fill: #a9bedf;
+    -fx-cursor: hand;
+}
+.opening-hint {
+    -fx-text-fill: #7383a5;
+    -fx-font-size: 10px;
+    -fx-padding: 6px 0 0 0;
+}

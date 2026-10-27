@@ -6,6 +6,10 @@ Questa variante serve a distribuire SwiftBAT Explorer 1.3.0 a un esperto che usa
 
 Nella cartella estratta `SwiftBAT Explorer` si vedono soltanto `AVVIA_SWIFTBAT.command` e la cartella `Applicazione`. Tutti gli altri file (codice, Maven, documentazione e il runtime creato al primo avvio) rimangono in `Applicazione`; non occorre aprirla.
 
+## Apertura cinematografica
+
+Al primo avvio compare un'introduzione grafica con un buco nero animato: scegliere **Inizia l'esplorazione** per visualizzare l'ingresso e la costruzione progressiva della Home, oppure **Salta l'apertura** per accedere immediatamente. L'animazione si svolge interamente nella stessa finestra JavaFX. Nella Home, un clic sull'**immagine animata del buco nero** riapre la schermata introduttiva, senza ricaricare i dati scientifici o perdere gli eventi già aperti. La grafica è inclusa nel pacchetto: non richiede immagini aggiuntive, video o servizi online.
+
 ## Obiettivo
 
 L'esperto deve:
