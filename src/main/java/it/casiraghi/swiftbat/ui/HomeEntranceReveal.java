@@ -23,6 +23,7 @@ import java.util.List;
  */
 public final class HomeEntranceReveal {
     private final BorderPane app;
+    private final HomePage homePage;
     private final List<Node> prepared = new ArrayList<>();
     private final List<Node> navigation = new ArrayList<>();
     private final List<Node> homeSections = new ArrayList<>();
@@ -30,8 +31,9 @@ public final class HomeEntranceReveal {
     private boolean preparedOnce;
     private boolean completed;
 
-    public HomeEntranceReveal(BorderPane app) {
+    public HomeEntranceReveal(BorderPane app, HomePage homePage) {
         this.app = app;
+        this.homePage = homePage;
     }
 
     /** Call after MainView.initialize(), while the cinematic overlay is opaque. */
@@ -57,7 +59,7 @@ public final class HomeEntranceReveal {
 
         // Only the four content groups, not nested individual chart controls:
         // welcome, live summary, central hero and footer shortcuts.
-        Node home = app.lookup(".mockup-home-content");
+        Node home = homePage == null ? null : homePage.getContent();
         if (home instanceof VBox page) {
             for (Node section : page.getChildren()) {
                 hide(section, 17);
