@@ -17,7 +17,6 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
-import javafx.scene.transform.Scale;
 import javafx.util.Duration;
 
 /**
@@ -30,7 +29,6 @@ import javafx.util.Duration;
  */
 public final class BlackHoleOpening extends StackPane {
     private final OpeningBlackHolePane blackHole = new OpeningBlackHolePane();
-    private final Scale horizonZoom = new Scale(1, 1);
     private final VBox captions;
     private final Button start;
     private final Button skip;
@@ -53,11 +51,6 @@ public final class BlackHoleOpening extends StackPane {
         setFocusTraversable(true);
 
         blackHole.setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
-        blackHole.getTransforms().add(horizonZoom);
-        // Scale around the image's physical black-hole position, not
-        // around the centre of the window (which would miss the horizon).
-        horizonZoom.pivotXProperty().bind(blackHole.widthProperty().multiply(0.56));
-        horizonZoom.pivotYProperty().bind(blackHole.heightProperty().multiply(0.31));
 
         HBox top = new HBox();
         top.getStyleClass().add("opening-topbar");
@@ -161,35 +154,20 @@ public final class BlackHoleOpening extends StackPane {
         reveal.stop();
         start.setDisable(true);
         skip.setDisable(true);
-        blackHole.pauseParticles(); // Transition uses cached images, not live Canvas rendering.
 
-        // Enter precisely through the photographic event horizon.
-        double shiftX = blackHole.getWidth() * (0.50 - 0.56);
-        double shiftY = blackHole.getHeight() * (0.50 - 0.31);
         transition = new Timeline(
                 new KeyFrame(Duration.ZERO,
-                        new KeyValue(horizonZoom.xProperty(), 1),
-                        new KeyValue(horizonZoom.yProperty(), 1),
-                        new KeyValue(blackHole.translateXProperty(), 0),
-                        new KeyValue(blackHole.translateYProperty(), 0),
-                        new KeyValue(blackHole.tunnelOpacityProperty(), 0),
+                        new KeyValue(blackHole.scaleXProperty(), 1),
+                        new KeyValue(blackHole.scaleYProperty(), 1),
                         new KeyValue(captions.opacityProperty(), 1),
                         new KeyValue(opacityProperty(), 1)),
-                new KeyFrame(Duration.millis(300),
-                        new KeyValue(horizonZoom.xProperty(), 1.17, Interpolator.EASE_IN),
-                        new KeyValue(horizonZoom.yProperty(), 1.17, Interpolator.EASE_IN),
-                        new KeyValue(blackHole.tunnelOpacityProperty(), 0.04),
+                new KeyFrame(Duration.millis(310),
+                        new KeyValue(blackHole.scaleXProperty(), 1.26, Interpolator.EASE_IN),
+                        new KeyValue(blackHole.scaleYProperty(), 1.26, Interpolator.EASE_IN),
                         new KeyValue(captions.opacityProperty(), 0, Interpolator.EASE_BOTH)),
-                new KeyFrame(Duration.millis(720),
-                        new KeyValue(horizonZoom.xProperty(), 2.6, Interpolator.EASE_IN),
-                        new KeyValue(horizonZoom.yProperty(), 2.6, Interpolator.EASE_IN),
-                        new KeyValue(blackHole.translateXProperty(), shiftX, Interpolator.EASE_IN),
-                        new KeyValue(blackHole.translateYProperty(), shiftY, Interpolator.EASE_IN),
-                        new KeyValue(blackHole.tunnelOpacityProperty(), 0.93)),
-                new KeyFrame(Duration.millis(1190),
-                        new KeyValue(horizonZoom.xProperty(), 9.0, Interpolator.EASE_IN),
-                        new KeyValue(horizonZoom.yProperty(), 9.0, Interpolator.EASE_IN),
-                        new KeyValue(blackHole.tunnelOpacityProperty(), 1),
+                new KeyFrame(Duration.millis(980),
+                        new KeyValue(blackHole.scaleXProperty(), 6.5, Interpolator.EASE_IN),
+                        new KeyValue(blackHole.scaleYProperty(), 6.5, Interpolator.EASE_IN),
                         new KeyValue(opacityProperty(), 0, Interpolator.EASE_BOTH)));
         transition.setOnFinished(event -> complete(true));
         transition.play();
