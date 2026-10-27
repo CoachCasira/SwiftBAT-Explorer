@@ -33,12 +33,18 @@ public final class BlackHoleOpening extends StackPane {
     private final Button start;
     private final Button skip;
     private final Runnable onFinished;
+    private final Runnable onSkipped;
     private Timeline transition;
     private Timeline reveal;
     private boolean finishing;
 
     public BlackHoleOpening(Runnable onFinished) {
+        this(onFinished, onFinished);
+    }
+
+    public BlackHoleOpening(Runnable onFinished, Runnable onSkipped) {
         this.onFinished = onFinished == null ? () -> { } : onFinished;
+        this.onSkipped = onSkipped == null ? this.onFinished : onSkipped;
         getStyleClass().add("opening-overlay");
         setMinSize(0, 0);
         setMaxSize(Double.MAX_VALUE, Double.MAX_VALUE);
@@ -97,7 +103,7 @@ public final class BlackHoleOpening extends StackPane {
         captions = new VBox(9, eyebrow, title, subheading, actions, hint);
         captions.getStyleClass().add("opening-copy");
         captions.setAlignment(Pos.CENTER);
-        captions.setPadding(new Insets(0, 25, 50, 25));
+        captions.setPadding(new Insets(0, 25, 40, 25));
         captions.setOpacity(0);
         captions.setTranslateY(14);
         reveal = new Timeline(
@@ -113,6 +119,8 @@ public final class BlackHoleOpening extends StackPane {
         layout.setTop(top);
         layout.setBottom(captions);
         BorderPane.setAlignment(captions, Pos.CENTER);
+        // Raise typography and CTA slightly without overlapping the disk.
+        BorderPane.setMargin(captions, new Insets(0, 0, 74, 0));
 
         getChildren().addAll(blackHole, layout);
         setOnKeyPressed(event -> {
@@ -161,7 +169,7 @@ public final class BlackHoleOpening extends StackPane {
                         new KeyValue(blackHole.scaleXProperty(), 6.5, Interpolator.EASE_IN),
                         new KeyValue(blackHole.scaleYProperty(), 6.5, Interpolator.EASE_IN),
                         new KeyValue(opacityProperty(), 0, Interpolator.EASE_BOTH)));
-        transition.setOnFinished(event -> complete());
+        transition.setOnFinished(event -> complete(true));
         transition.play();
     }
 
@@ -170,14 +178,15 @@ public final class BlackHoleOpening extends StackPane {
         if (finishing) return;
         finishing = true;
         reveal.stop();
-        complete();
+        complete(false);
     }
 
-    private void complete() {
+    private void complete(boolean animateHome) {
         blackHole.dispose();
         if (getParent() instanceof javafx.scene.layout.Pane parent) {
             parent.getChildren().remove(this);
         }
-        onFinished.run();
+        if (animateHome) onFinished.run();
+        else onSkipped.run();
     }
 }
