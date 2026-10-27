@@ -94,6 +94,16 @@ jobs:
                   assert prefix + launch in names
                   assert prefix + "Applicazione/pom.xml" in names
                   assert prefix + "Applicazione/" + internal in names
+                  for filename_required in (
+                      "src/main/java/it/casiraghi/swiftbat/ui/BlackHoleOpening.java",
+                      "src/main/java/it/casiraghi/swiftbat/ui/HomeEntranceReveal.java",
+                      "src/main/java/it/casiraghi/swiftbat/ui/components/OpeningBlackHolePane.java",
+                      "src/main/java/it/casiraghi/swiftbat/ui/HomePage.java",
+                      "src/main/resources/stability-final.css",
+                  ):
+                      assert prefix + "Applicazione/" + filename_required in names, (
+                          f"{filename}: missing approved opening {filename_required}"
+                      )
                   assert not any("/.swiftbat-runtime/" in n for n in names), "Runtime di sviluppo nello ZIP"
                   print("OK:", filename, "solo launcher + Applicazione/")
           PY
@@ -203,6 +213,12 @@ jobs:
         shell: powershell
         run: |
           & cmd.exe /d /c 'CREA_PACCHETTI_DISTRIBUZIONE_WINDOWS.bat <NUL'
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Verifica apertura inclusa in entrambi gli ZIP
+        shell: powershell
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\\VERIFICA_PACCHETTI_WINDOWS.ps1 -MinimumGrbs 0
           if ($LASTEXITCODE -ne 0) { exit 1 }
 
       - name: Controlla struttura dei due ZIP, checksum, LF e permessi Unix
