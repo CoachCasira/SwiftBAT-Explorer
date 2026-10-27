@@ -125,7 +125,12 @@ public final class OpeningBlackHolePane extends Region {
         GraphicsContext gc = tunnelLayer.getGraphicsContext2D();
         gc.clearRect(0, 0, width, height);
         if (tunnelArt != null) {
-            cover(gc, tunnelArt, width, height);
+            // The still photograph's event horizon is around y=31% while
+            // the prerendered vortex has its void around y=54%. Frame the
+            // second asset vertically so both black cores overlap during
+            // the crossfade; the extra magnification reinforces the dive.
+            gc.drawImage(tunnelArt, 0, -height * 0.50,
+                    width, height * 1.50);
         } else {
             gc.setFill(Color.rgb(2, 3, 12, 0.93));
             gc.fillRect(0, 0, width, height);
