@@ -37,6 +37,7 @@ public final class I18n {
         put("Non sono disponibili coordinate ufficiali né GRB locali.", "Neither official coordinates nor local GRBs are available.");
         put("Attendo il catalogo…", "Waiting for catalog…");
         put("Metadati scientifici non disponibili", "Scientific metadata unavailable");
+        put("Rivedi l'apertura di SwiftBAT Explorer", "Replay the SwiftBAT Explorer opening");
         put("OLTRE L'ORIZZONTE DEGLI EVENTI", "BEYOND THE EVENT HORIZON");
         put("L'Universo estremo ti aspetta. Esplora i lampi di raggi gamma.",
                 "The extreme universe is waiting. Explore gamma-ray bursts.");
