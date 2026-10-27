@@ -13,6 +13,7 @@ import it.casiraghi.swiftbat.ui.InteractionPolishEnhancer;
 import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
 import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
 import it.casiraghi.swiftbat.ui.MainView;
+import it.casiraghi.swiftbat.ui.BlackHoleOpening;
 import it.casiraghi.swiftbat.ui.PageScopedPolishRouter;
 import it.casiraghi.swiftbat.ui.PopulationDurationMultiSelectEnhancer;
 import it.casiraghi.swiftbat.ui.PopulationFracexpSliderFix;
@@ -27,6 +28,8 @@ import it.casiraghi.swiftbat.ui.UiRefinements;
 import it.casiraghi.swiftbat.ui.UiTableAndStartupFixes;
 import it.casiraghi.swiftbat.ui.components.BrandLogoAsset;
 import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.scene.layout.StackPane;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
 
@@ -39,7 +42,14 @@ public final class SwiftBatExplorerApp extends Application {
         GlobalSearchAssistEnhancer.install(mainView);
         PopulationDurationMultiSelectEnhancer.install(mainView);
         PopulationFracexpSliderFix.install(mainView);
-        Scene scene = new Scene(mainView.getRoot(), 1580, 960);
+        // Experimental game-style opening. One Stage, one Scene: the
+        // already-built app sits behind an opaque cinematic overlay, so the
+        // user's first click never launches another window. The overlay and
+        // its animation timer are disposed when Enter/Skip completes.
+        StackPane applicationLayers = new StackPane(mainView.getRoot());
+        BlackHoleOpening opening = new BlackHoleOpening(mainView.getRoot()::requestFocus);
+        applicationLayers.getChildren().add(opening);
+        Scene scene = new Scene(applicationLayers, 1580, 960);
 
         /*
          * CSS performance: four base/theme sheets plus one consolidated final
@@ -105,6 +115,10 @@ public final class SwiftBatExplorerApp extends Application {
         /* Adds only the scoped spectroscopy hover labels. Catalogue search,
            filtering and scrollbar behaviour are owned by the page itself. */
         ExplorerUiRegressionFix.install(mainView);
+
+        // MainView and its services initialize normally in the background.
+        // Focus stays on the opening until Enter or Skip is pressed.
+        Platform.runLater(opening::requestFocus);
     }
 
     @Override
