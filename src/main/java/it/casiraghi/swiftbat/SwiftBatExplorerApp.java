@@ -14,6 +14,7 @@ import it.casiraghi.swiftbat.ui.InteractiveViewSyncEnhancer;
 import it.casiraghi.swiftbat.ui.LegacyI18nBridge;
 import it.casiraghi.swiftbat.ui.MainView;
 import it.casiraghi.swiftbat.ui.BlackHoleOpening;
+import it.casiraghi.swiftbat.ui.HomeEntranceReveal;
 import it.casiraghi.swiftbat.ui.PageScopedPolishRouter;
 import it.casiraghi.swiftbat.ui.PopulationDurationMultiSelectEnhancer;
 import it.casiraghi.swiftbat.ui.PopulationFracexpSliderFix;
@@ -47,7 +48,8 @@ public final class SwiftBatExplorerApp extends Application {
         // user's first click never launches another window. The overlay and
         // its animation timer are disposed when Enter/Skip completes.
         StackPane applicationLayers = new StackPane(mainView.getRoot());
-        BlackHoleOpening opening = new BlackHoleOpening(mainView.getRoot()::requestFocus);
+        HomeEntranceReveal arrival = new HomeEntranceReveal(mainView.getRoot());
+        BlackHoleOpening opening = new BlackHoleOpening(arrival::play, arrival::showImmediately);
         applicationLayers.getChildren().add(opening);
         Scene scene = new Scene(applicationLayers, 1580, 960);
 
@@ -108,6 +110,9 @@ public final class SwiftBatExplorerApp extends Application {
         ExplorerRegressionFixes.install(mainView.getRoot());
 
         mainView.initialize();
+        // Hide only the controls that should assemble AFTER the horizon dive.
+        // MainView's real scientific services are already initialized.
+        arrival.prepare();
 
         FinalMacAndPopulationPolish.install(mainView.getRoot());
         PageScopedPolishRouter.install(mainView.getRoot());
