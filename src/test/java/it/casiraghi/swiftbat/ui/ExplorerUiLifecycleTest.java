@@ -30,6 +30,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.PickResult;
+import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
@@ -1244,6 +1245,79 @@ class ExplorerUiLifecycleTest {
                 fx(() -> { h.stage.close(); return null; });
             }
         }
+    }
+
+    @Test
+    void experimentalHomeArrivesInStagesAndLeavesNoHiddenControls() throws Exception {
+        HomePage page = fx(() -> new HomePage(
+                () -> { }, () -> { }, () -> { }, () -> { }, () -> { },
+                new SimpleStringProperty("218 local"),
+                new SimpleStringProperty("0 RAM"),
+                new SimpleStringProperty("Partial offline")));
+        BorderPane app = fx(() -> {
+            BorderPane root = new BorderPane();
+            VBox navigation = new VBox(5);
+            for (int i = 0; i < 6; i++) navigation.getChildren().add(new Button("Nav " + i));
+            root.setLeft(navigation);
+            root.setTop(new Label("SWIFTBAT"));
+            root.setCenter(new StackPane(page));
+            return root;
+        });
+        HomeEntranceReveal reveal = new HomeEntranceReveal(app, page);
+        Stage stage = fx(() -> showStyled(app, 1360, 900));
+        try {
+            fx(() -> {
+                reveal.prepare();
+                assertEquals(0, app.getLeft().getOpacity(), 0.01);
+                assertEquals(0, app.getTop().getOpacity(), 0.01);
+                VBox sections = (VBox) page.getContent();
+                assertEquals(4, sections.getChildren().size());
+                assertTrue(sections.getChildren().stream().allMatch(n -> n.getOpacity() == 0));
+                reveal.play();
+                return null;
+            });
+            for (int i = 0; i < 9; i++) pulse(); // 9 × 200 ms > all staggered stages
+            fx(() -> {
+                assertEquals(1, app.getLeft().getOpacity(), 0.01);
+                assertEquals(1, app.getTop().getOpacity(), 0.01);
+                assertFalse(app.isMouseTransparent(), "Home remains interactive");
+                for (Node item : ((VBox) app.getLeft()).getChildren()) {
+                    assertEquals(1, item.getOpacity(), 0.01);
+                }
+                for (Node section : ((VBox) page.getContent()).getChildren()) {
+                    assertEquals(1, section.getOpacity(), 0.01);
+                    assertEquals(0, section.getTranslateY(), 0.01);
+                }
+                return null;
+            });
+        } finally { fx(() -> { stage.close(); return null; }); }
+    }
+
+    @Test
+    void experimentalHomeSkipRevealsEverythingWithoutPlayingAnimation() throws Exception {
+        HomePage home = fx(() -> new HomePage(
+                () -> { }, () -> { }, () -> { }, () -> { }, () -> { },
+                new SimpleStringProperty("218 local"),
+                new SimpleStringProperty("0 RAM"),
+                new SimpleStringProperty("Partial offline")));
+        BorderPane app = fx(() -> {
+            BorderPane root = new BorderPane();
+            root.setLeft(new VBox(new Button("Home"), new Button("Explore")));
+            root.setTop(new Label("HEADER"));
+            root.setCenter(home);
+            return root;
+        });
+        fx(() -> {
+            HomeEntranceReveal reveal = new HomeEntranceReveal(app, home);
+            reveal.prepare();
+            reveal.showImmediately();
+            assertEquals(1, app.getLeft().getOpacity(), 0.01);
+            assertEquals(1, app.getTop().getOpacity(), 0.01);
+            assertTrue(((VBox) home.getContent()).getChildren().stream()
+                    .allMatch(n -> n.getOpacity() == 1 && n.getTranslateY() == 0));
+            assertFalse(app.isMouseTransparent());
+            return null;
+        });
     }
 
     @Test
