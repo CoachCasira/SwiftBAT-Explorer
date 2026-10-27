@@ -69,101 +69,210 @@ public final class OpeningBlackHolePane extends Region {
     private void paintStatic(double width, double height) {
         GraphicsContext gc = backdrop.getGraphicsContext2D();
         gc.clearRect(0, 0, width, height);
-        gc.setFill(Color.web("#020610"));
+        gc.setFill(Color.web("#02050e"));
         gc.fillRect(0, 0, width, height);
 
-        // All light-transport geometry is rendered ONCE. Never use blur or
-        // software effects on a giant Canvas during application startup.
         double cx = width * 0.51;
         double cy = height * 0.405;
-        double core = Math.min(width * 0.112, height * 0.150);
+        double core = Math.min(width * 0.112, height * 0.15);
 
+        // Atmospheric scattering: broad, soft radial gradients are rendered
+        // ONCE into the static Canvas, never into the 25 fps motion layer.
         gc.setFill(new RadialGradient(0, 0, cx, cy,
-                Math.max(width, height) * 0.58, false, CycleMethod.NO_CYCLE,
-                new Stop(0.00, Color.rgb(91, 40, 150, 0.26)),
-                new Stop(0.22, Color.rgb(33, 67, 144, 0.18)),
-                new Stop(0.55, Color.rgb(10, 25, 68, 0.045)),
+                Math.max(width, height) * 0.59, false, CycleMethod.NO_CYCLE,
+                new Stop(0.00, Color.rgb(57, 38, 113, 0.44)),
+                new Stop(0.18, Color.rgb(40, 58, 130, 0.21)),
+                new Stop(0.43, Color.rgb(9, 31, 71, 0.11)),
+                new Stop(0.78, Color.rgb(4, 11, 28, 0.03)),
                 new Stop(1.00, Color.TRANSPARENT)));
         gc.fillRect(0, 0, width, height);
 
-        for (int i = 0; i < 178; i++) {
+        for (int i = 0; i < 260; i++) {
             double x = ((i * 769L + 191) % 2003) / 2003.0 * width;
             double y = ((i * 1277L + 53) % 2011) / 2011.0 * height;
-            double size = i % 33 == 0 ? 1.55 : 0.45 + (i % 5) * 0.14;
-            double alpha = i % 33 == 0 ? 0.52 : 0.12 + (i % 7) * 0.03;
-            gc.setFill(i % 9 == 0
-                    ? Color.rgb(95, 213, 255, alpha)
-                    : Color.rgb(200, 218, 255, alpha));
+            double size = i % 29 == 0 ? 1.70 : 0.42 + (i % 5) * 0.13;
+            double alpha = i % 29 == 0 ? 0.57 : 0.10 + (i % 7) * 0.03;
+            gc.setFill(i % 9 == 0 ? Color.rgb(91, 206, 255, alpha)
+                    : Color.rgb(206, 220, 251, alpha));
             gc.fillOval(x, y, size, size);
         }
 
-        // Rear disk with gravitational lensing rising behind the shadow.
         gc.save();
         gc.translate(cx, cy);
-        gc.rotate(-7.2);
-        for (int i = 0; i < 23; i++) {
-            double t = i / 22.0;
-            double extent = core * (3.0 + t * 1.46);
-            double crown = core * (1.35 + t * 0.95);
-            double alpha = 0.07 + 0.30 * (1.0 - Math.abs(t - 0.44) * 1.5);
-            gc.setStroke(diskColor(t, Math.max(0.02, alpha)));
-            gc.setLineWidth(0.8 + (1 - t) * 1.4);
+        gc.rotate(-6.5);
+        gc.setLineCap(javafx.scene.shape.StrokeLineCap.ROUND);
+
+        // A diffuse torus of hot gas replaces the old thin-line "Saturn"
+        // illustration. Layered broad ribbons create luminous turbulent plasma.
+        // The far side is gravitationally lensed ABOVE the black shadow.
+        gc.setFill(new RadialGradient(0, 0, -core * 0.40, -core * 0.35,
+                core * 5.30, false, CycleMethod.NO_CYCLE,
+                new Stop(0.00, Color.rgb(251, 130, 71, 0.04)),
+                new Stop(0.28, Color.rgb(235, 95, 164, 0.095)),
+                new Stop(0.58, Color.rgb(79, 84, 197, 0.09)),
+                new Stop(1.00, Color.TRANSPARENT)));
+        gc.fillOval(-core * 5.7, -core * 4.3, core * 11.4, core * 8.6);
+
+        // Gaussian-like wide glow around the rear lensed disk. Each layer is
+        // a simple Bézier stroke; no per-frame blur, reflection or 3D scene.
+        for (int g = 0; g < 16; g++) {
+            double w = 42 - g * 2.25;
+            double xExt = core * (3.48 + g * 0.028);
+            double top = core * (1.73 + g * 0.025);
+            gc.setStroke(g < 7 ? Color.rgb(251, 141, 92, 0.014)
+                    : Color.rgb(129, 103, 239, 0.017));
+            gc.setLineWidth(Math.max(2.0, w));
             gc.beginPath();
-            gc.moveTo(-extent, core * (0.19 + t * 0.18));
-            gc.bezierCurveTo(-core * 2.2, -core * 0.12,
-                    -core * 1.2, -crown, 0, -crown);
-            gc.bezierCurveTo(core * 1.2, -crown,
-                    core * 2.2, -core * 0.12,
-                    extent, core * (0.19 + t * 0.18));
+            gc.moveTo(-xExt, core * 0.25);
+            gc.bezierCurveTo(-core * 2.2, -core * 0.43,
+                    -core * 1.48, -top, 0, -top);
+            gc.bezierCurveTo(core * 1.48, -top,
+                    core * 2.2, -core * 0.43,
+                    xExt, core * 0.25);
             gc.stroke();
         }
-        for (int i = 0; i < 10; i++) {
-            double t = i / 9.0;
-            gc.setStroke(diskColor(t, 0.045 + (1 - t) * 0.06));
+
+        for (int lane = 0; lane < 112; lane++) {
+            double t = lane / 111.0;
+            double jitter = Math.sin(lane * 2.91) * 0.027
+                    + Math.sin(lane * 0.47) * 0.032;
+            double xExt = core * (2.88 + t * 2.10);
+            double dome = core * (1.25 + t * 1.10);
+            double edge = core * (0.11 + t * 0.35);
+            double intensity = Math.pow(Math.max(0, 1 - Math.abs(t - 0.40) * 1.45), 1.45);
+            gc.setStroke(plasmaColor(t, 0.035 + intensity * 0.37));
+            gc.setLineWidth(0.5 + 0.55 * intensity + (lane % 9 == 0 ? 1.3 : 0));
+            gc.beginPath();
+            gc.moveTo(-xExt, edge + core * jitter);
+            gc.bezierCurveTo(-core * (2.50 + t * 0.35),
+                    -core * (0.22 + t * 0.24),
+                    -core * 1.13, -dome * 1.04, -core * 0.13, -dome);
+            gc.bezierCurveTo(core * 1.15, -dome,
+                    core * (2.56 + t * 0.33),
+                    -core * (0.18 + t * 0.19),
+                    xExt, edge - core * jitter);
+            gc.stroke();
+        }
+
+        // Faint secondary lower lensed image, only partially exposed.
+        for (int lane = 0; lane < 25; lane++) {
+            double t = lane / 24.0;
+            double d = core * (1.60 + t * 1.16);
+            gc.setStroke(plasmaColor(1 - t, 0.018 + (1 - t) * 0.075));
             gc.setLineWidth(0.7);
             gc.beginPath();
-            gc.moveTo(-core * (1.7 + t), core * 0.24);
-            gc.bezierCurveTo(-core * 1.2, core * 1.5,
-                    core * 1.2, core * 1.5,
-                    core * (1.7 + t), core * 0.24);
+            gc.moveTo(-d, core * 0.17);
+            gc.bezierCurveTo(-core * 0.96, core * (1.12 + t * 0.50),
+                    core * 0.96, core * (1.12 + t * 0.50), d, core * 0.17);
             gc.stroke();
         }
 
-        // Central black shadow, with a narrow photon ring and asymmetric
-        // cyan/orange edge. The foreground disk is drawn AFTER this shadow.
-        gc.setFill(new RadialGradient(0, 0, 0, 0,
-                core * 1.06, false, CycleMethod.NO_CYCLE,
-                new Stop(0.00, Color.BLACK),
-                new Stop(0.91, Color.rgb(1, 2, 9)),
-                new Stop(1.00, Color.rgb(6, 12, 25))));
-        gc.fillOval(-core, -core, core * 2, core * 2);
-        gc.setLineWidth(Math.max(1.2, core * 0.018));
-        gc.setStroke(Color.rgb(255, 222, 175, 0.72));
-        gc.strokeArc(-core * 1.034, -core * 1.034,
-                core * 2.068, core * 2.068, 210, 155, ArcType.OPEN);
-        gc.setStroke(Color.rgb(74, 198, 255, 0.62));
-        gc.strokeArc(-core * 1.034, -core * 1.034,
-                core * 2.068, core * 2.068, 4, 203, ArcType.OPEN);
+        // Shadow, gravitationally hot photon edge and color-dependent glow.
+        gc.setFill(new RadialGradient(0, 0, 0, 0, core * 1.23,
+                false, CycleMethod.NO_CYCLE,
+                new Stop(0.00, Color.rgb(0, 1, 5)),
+                new Stop(0.74, Color.rgb(1, 1, 5)),
+                new Stop(0.90, Color.rgb(1, 2, 7)),
+                new Stop(1.00, Color.rgb(7, 6, 17, 0.0))));
+        gc.fillOval(-core * 1.23, -core * 1.23, core * 2.46, core * 2.46);
+        gc.setFill(Color.rgb(0, 0, 3, 0.998));
+        gc.fillOval(-core * 0.995, -core * 0.995, core * 1.99, core * 1.99);
 
-        // Broad foreground accretion stream; only a few translucent splines.
-        for (int i = 0; i < 34; i++) {
-            double t = i / 33.0;
-            double extent = core * (3.15 + t * 1.36);
-            double y = core * (-0.10 + t * 0.54);
-            double bend = core * (0.07 + t * 0.15);
-            double centerGlow = Math.max(0.0, 1.0 - Math.abs(t - 0.32) * 1.58);
-            gc.setStroke(diskColor(t, 0.06 + centerGlow * 0.47));
-            gc.setLineWidth(0.9 + centerGlow * 1.4);
+        for (int i = 8; i >= 1; i--) {
+            gc.setLineWidth(i * 1.08);
+            gc.setStroke(i > 3 ? Color.rgb(240, 116, 79, 0.021)
+                    : Color.rgb(255, 218, 168, 0.14));
+            gc.strokeArc(-core * 1.03, -core * 1.03,
+                    core * 2.06, core * 2.06, 185, 161, ArcType.OPEN);
+            gc.setStroke(i > 3 ? Color.rgb(42, 151, 241, 0.026)
+                    : Color.rgb(78, 177, 246, 0.16));
+            gc.strokeArc(-core * 1.03, -core * 1.03,
+                    core * 2.06, core * 2.06, 350, 205, ArcType.OPEN);
+        }
+
+        // Near-side accretion disk: optical depth increases toward the
+        // approaching bright limb, which is warm white/orange (Doppler beaming).
+        // A wide body and sharp turbulent filaments replace flat crossing lines.
+        for (int layer = 0; layer < 20; layer++) {
+            double widthStroke = 63 - layer * 2.75;
+            double y = core * (0.56 + layer * 0.009);
+            gc.setStroke(layer < 10
+                    ? Color.rgb(243, 112, 81, 0.013 + layer * 0.0005)
+                    : Color.rgb(249, 181, 112, 0.018));
+            gc.setLineWidth(Math.max(1, widthStroke));
             gc.beginPath();
-            gc.moveTo(-extent, y + bend);
-            gc.bezierCurveTo(-core * 2.0, y - bend,
-                    -core * 0.80, y - core * 0.035, 0, y);
-            gc.bezierCurveTo(core * 0.80, y + core * 0.035,
-                    core * 2.0, y + bend * 0.40,
-                    extent, y - bend);
+            gc.moveTo(-core * 4.70, y + core * 0.16);
+            gc.bezierCurveTo(-core * 2.14, y - core * 0.24,
+                    core * 1.70, y - core * 0.14,
+                    core * 4.70, y - core * 0.15);
             gc.stroke();
+        }
+
+        for (int lane = 0; lane < 132; lane++) {
+            double t = lane / 131.0;
+            double wobble = 0.055 * Math.sin(lane * 2.17)
+                    + 0.023 * Math.cos(lane * 0.53);
+            double xExt = core * (3.22 + t * 1.78);
+            double y = core * (0.35 + t * 0.55 + wobble);
+            double brightness = Math.max(0, 1 - Math.abs(t - 0.38) * 1.65);
+            gc.setStroke(plasmaColor(t * 0.91, 0.044 + brightness * 0.54));
+            gc.setLineWidth(0.72 + brightness * 0.76 + (lane % 11 == 0 ? 1.0 : 0));
+            gc.beginPath();
+            gc.moveTo(-xExt, y + core * (0.10 + t * 0.06));
+            gc.bezierCurveTo(-core * 2.1, y - core * 0.30,
+                    core * 1.9, y - core * 0.12,
+                    xExt, y - core * (0.12 + t * 0.04));
+            gc.stroke();
+        }
+
+        // Dense amber-white Doppler hot spot, blended through layered
+        // transparent gradients, with no costly live GaussianBlur effect.
+        for (int glow = 5; glow >= 0; glow--) {
+            double gx = -core * 1.95;
+            double gy = core * 0.49;
+            double radius = core * (0.78 + glow * 0.36);
+            gc.setFill(new RadialGradient(0, 0, gx, gy,
+                    radius, false, CycleMethod.NO_CYCLE,
+                    new Stop(0.00, Color.rgb(255, 211, 154, 0.12)),
+                    new Stop(0.19, Color.rgb(255, 160, 105, 0.095)),
+                    new Stop(0.53, Color.rgb(242, 85, 134, 0.042)),
+                    new Stop(1.00, Color.TRANSPARENT)));
+            gc.fillOval(gx - radius, gy - radius, radius * 2, radius * 2);
+        }
+
+        // Fine dust/granulation provides volume: a broad, ragged plasma
+        // distribution rather than ruler-straight lines.
+        for (int i = 0; i < 1120; i++) {
+            double u = fract(i * 0.61803398875 + 0.13);
+            double v = fract(i * 0.41421356237 + 0.67);
+            double x = core * (u * 8.9 - 4.45);
+            double y = core * (0.42 + v * 0.68
+                    - 0.13 * Math.cos(x / (core * 4.5) * Math.PI));
+            double intensity = Math.pow(Math.max(0, 1 - Math.abs(v - 0.34) * 1.55), 2.0);
+            double size = 0.32 + (i % 7) * 0.18;
+            gc.setFill(plasmaColor(0.10 + v * 0.72,
+                    Math.min(0.38, 0.025 + intensity * 0.32)));
+            gc.fillOval(x, y, size, size);
         }
         gc.restore();
+
+        // Vignette from outside the singularity keeps foreground titles crisp.
+        gc.setFill(new RadialGradient(0, 0, cx, cy,
+                Math.max(width, height) * 0.77, false, CycleMethod.NO_CYCLE,
+                new Stop(0.00, Color.TRANSPARENT),
+                new Stop(0.70, Color.rgb(0, 2, 10, 0.03)),
+                new Stop(1.00, Color.rgb(0, 2, 10, 0.63))));
+        gc.fillRect(0, 0, width, height);
+    }
+
+    private static Color plasmaColor(double position, double opacity) {
+        // Hot bright approaching side, cooling toward pink, violet and cyan.
+        double alpha = Math.max(0, Math.min(0.99, opacity));
+        if (position < 0.16) return Color.rgb(255, 241, 201, alpha);
+        if (position < 0.35) return Color.rgb(255, 184, 108, alpha);
+        if (position < 0.55) return Color.rgb(246, 110, 156, alpha);
+        if (position < 0.77) return Color.rgb(159, 110, 234, alpha);
+        return Color.rgb(64, 190, 252, alpha);
     }
 
     private void paintParticles(double seconds) {
@@ -189,7 +298,7 @@ public final class OpeningBlackHolePane extends Region {
             double radius = core * (4.35 - phase * 3.1);
             double prevRadius = core * (4.35 - before * 3.1);
             double fade = Math.min(Math.min(phase / 0.11, (1 - phase) / 0.14), 1.0);
-            gc.setStroke(diskColor(phase, 0.25 * Math.max(0, fade)));
+            gc.setStroke(plasmaColor(phase * 0.8, 0.25 * Math.max(0, fade)));
             gc.setLineWidth(0.8 + phase * 0.7);
             gc.strokeLine(
                     Math.cos(prevAngle) * prevRadius,
@@ -198,13 +307,6 @@ public final class OpeningBlackHolePane extends Region {
                     Math.sin(angle) * radius * 0.28);
         }
         gc.restore();
-    }
-
-    private static Color diskColor(double position, double alpha) {
-        if (position < 0.25) return Color.rgb(255, 227, 181, alpha);
-        if (position < 0.50) return Color.rgb(250, 133, 183, alpha);
-        if (position < 0.73) return Color.rgb(157, 96, 234, alpha);
-        return Color.rgb(66, 194, 255, alpha);
     }
 
     private static double fract(double number) {
