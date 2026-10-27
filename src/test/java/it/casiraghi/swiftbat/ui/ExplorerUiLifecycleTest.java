@@ -1360,7 +1360,8 @@ class ExplorerUiLifecycleTest {
                 assertNotNull(graphic, "The animated Home black hole must be present");
                 assertFalse(graphic.isMouseTransparent(), "The graphic must accept clicks");
                 graphic.fireEvent(mouse(graphic, MouseEvent.MOUSE_CLICKED,
-                        graphic.getWidth() / 2, graphic.getHeight() / 2, false));
+                        graphic.getLayoutBounds().getWidth() / 2,
+                        graphic.getLayoutBounds().getHeight() / 2, false));
                 assertEquals(2, layers.getChildren().size());
                 assertTrue(layers.getChildren().get(1) instanceof BlackHoleOpening);
                 BlackHoleOpening first = (BlackHoleOpening) layers.getChildren().get(1);
