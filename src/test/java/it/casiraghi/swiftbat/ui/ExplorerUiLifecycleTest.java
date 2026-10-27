@@ -1321,6 +1321,84 @@ class ExplorerUiLifecycleTest {
     }
 
     @Test
+    void homeBlackHoleReopensIntroRepeatedlyWithoutChangingStageOrHomeData()
+            throws Exception {
+        SimpleStringProperty catalog = new SimpleStringProperty("218 GRBs - local");
+        HomePage home = fx(() -> new HomePage(
+                () -> { }, () -> { }, () -> { }, () -> { }, () -> { },
+                catalog, new SimpleStringProperty("0 RAM"),
+                new SimpleStringProperty("Partial offline")));
+        BorderPane app = fx(() -> {
+            BorderPane pane = new BorderPane();
+            pane.setTop(new Label("SwiftBAT"));
+            pane.setLeft(new VBox(new Button("Home"), new Button("Explore")));
+            pane.setCenter(home);
+            return pane;
+        });
+        StackPane layers = fx(() -> new StackPane(app));
+        // Use the same callback wiring as SwiftBatExplorerApp: a NEW intro and
+        // a NEW HomeEntranceReveal for each user click, on the same Scene.
+        fx(() -> {
+            home.setOnOpeningRequested(() -> {
+                if (layers.getChildren().stream()
+                        .anyMatch(BlackHoleOpening.class::isInstance)) return;
+                HomeEntranceReveal arrival = new HomeEntranceReveal(app, home);
+                BlackHoleOpening opening = new BlackHoleOpening(
+                        arrival::play, arrival::showImmediately);
+                layers.getChildren().add(opening);
+                arrival.prepare();
+                Platform.runLater(opening::requestFocus);
+            });
+            return null;
+        });
+        Stage stage = fx(() -> showStyled(layers, 1320, 880));
+        Scene originalScene = fx(stage::getScene);
+        try {
+            pulse();
+            fx(() -> {
+                Node graphic = home.lookup(".black-hole-hero-pane");
+                assertNotNull(graphic, "The animated Home black hole must be present");
+                assertFalse(graphic.isMouseTransparent(), "The graphic must accept clicks");
+                graphic.fireEvent(mouse(graphic, MouseEvent.MOUSE_CLICKED,
+                        graphic.getWidth() / 2, graphic.getHeight() / 2, false));
+                assertEquals(2, layers.getChildren().size());
+                assertTrue(layers.getChildren().get(1) instanceof BlackHoleOpening);
+                BlackHoleOpening first = (BlackHoleOpening) layers.getChildren().get(1);
+                ((Button) first.lookup("#opening-skip")).fire();
+                assertEquals(List.of(app), layers.getChildren());
+                assertSame(originalScene, stage.getScene());
+                assertEquals("218 GRBs - local", catalog.get(),
+                        "Replay must not reload or mutate the scientific catalog");
+                return null;
+            });
+            pulse();
+            fx(() -> {
+                Node graphic = home.lookup(".black-hole-hero-pane");
+                graphic.fireEvent(mouse(graphic, MouseEvent.MOUSE_CLICKED, 40, 40, false));
+                assertEquals(2, layers.getChildren().size());
+                BlackHoleOpening second = (BlackHoleOpening) layers.getChildren().get(1);
+                ((Button) second.lookup("#opening-start")).fire();
+                return null;
+            });
+            // The cinematic dive is ~980 ms and the staged Home entrance
+            // completes after another ~1.5 s. No other Stage is ever opened.
+            for (int i = 0; i < 15; i++) pulse();
+            fx(() -> {
+                assertSame(originalScene, stage.getScene());
+                assertSame(layers, stage.getScene().getRoot());
+                assertEquals(List.of(app), layers.getChildren());
+                assertFalse(app.isMouseTransparent());
+                assertEquals(1, app.getTop().getOpacity(), 0.001);
+                assertEquals(1, app.getLeft().getOpacity(), 0.001);
+                assertEquals("218 GRBs - local", catalog.get());
+                return null;
+            });
+        } finally {
+            fx(() -> { stage.close(); return null; });
+        }
+    }
+
+    @Test
     void experimentalOpeningStaysInsideOriginalSceneAndSkipRemovesCanvas() throws Exception {
         CompletableFuture<Void> complete = new CompletableFuture<>();
         StackPane home = fx(() -> new StackPane(new Label("HOME")));
