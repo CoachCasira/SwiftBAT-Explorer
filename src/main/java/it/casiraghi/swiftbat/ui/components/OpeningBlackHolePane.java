@@ -103,6 +103,10 @@ public final class OpeningBlackHolePane extends Region {
         animation.stop();
         particles.getGraphicsContext2D().clearRect(
                 0, 0, particles.getWidth(), particles.getHeight());
+        // Cache the two composited pictures for hardware-accelerated travel.
+        // No expensive Canvas redraws occur during the horizon zoom.
+        setCache(true);
+        setCacheHint(CacheHint.SPEED);
     }
 
     private static void cover(GraphicsContext gc, Image img, double width, double height) {
