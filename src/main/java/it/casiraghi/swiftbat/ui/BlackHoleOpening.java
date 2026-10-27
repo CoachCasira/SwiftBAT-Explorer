@@ -34,6 +34,7 @@ public final class BlackHoleOpening extends StackPane {
     private final Button skip;
     private final Runnable onFinished;
     private Timeline transition;
+    private Timeline reveal;
     private boolean finishing;
 
     public BlackHoleOpening(Runnable onFinished) {
@@ -97,6 +98,15 @@ public final class BlackHoleOpening extends StackPane {
         captions.getStyleClass().add("opening-copy");
         captions.setAlignment(Pos.CENTER);
         captions.setPadding(new Insets(0, 25, 50, 25));
+        captions.setOpacity(0);
+        captions.setTranslateY(14);
+        reveal = new Timeline(
+                new KeyFrame(Duration.ZERO,
+                        new KeyValue(captions.opacityProperty(), 0),
+                        new KeyValue(captions.translateYProperty(), 14)),
+                new KeyFrame(Duration.millis(750),
+                        new KeyValue(captions.opacityProperty(), 1, Interpolator.EASE_OUT),
+                        new KeyValue(captions.translateYProperty(), 0, Interpolator.EASE_OUT)));
 
         BorderPane layout = new BorderPane();
         layout.setMouseTransparent(false);
@@ -115,8 +125,11 @@ public final class BlackHoleOpening extends StackPane {
             }
         });
         sceneProperty().addListener((obs, oldScene, newScene) -> {
-            if (oldScene != null && newScene == null) {
+            if (oldScene == null && newScene != null && !finishing) {
+                reveal.playFromStart();
+            } else if (oldScene != null && newScene == null) {
                 if (transition != null) transition.stop();
+                reveal.stop();
                 blackHole.dispose();
             }
         });
@@ -130,6 +143,7 @@ public final class BlackHoleOpening extends StackPane {
     public void enter() {
         if (finishing) return;
         finishing = true;
+        reveal.stop();
         start.setDisable(true);
         skip.setDisable(true);
 
@@ -155,6 +169,7 @@ public final class BlackHoleOpening extends StackPane {
     public void skip() {
         if (finishing) return;
         finishing = true;
+        reveal.stop();
         complete();
     }
 
