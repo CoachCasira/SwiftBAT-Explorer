@@ -48,7 +48,7 @@ public final class SwiftBatExplorerApp extends Application {
         // user's first click never launches another window. The overlay and
         // its animation timer are disposed when Enter/Skip completes.
         StackPane applicationLayers = new StackPane(mainView.getRoot());
-        HomeEntranceReveal arrival = new HomeEntranceReveal(mainView.getRoot());
+        HomeEntranceReveal arrival = new HomeEntranceReveal(mainView.getRoot(), mainView.getHomePage());
         BlackHoleOpening opening = new BlackHoleOpening(arrival::play, arrival::showImmediately);
         applicationLayers.getChildren().add(opening);
         Scene scene = new Scene(applicationLayers, 1580, 960);
