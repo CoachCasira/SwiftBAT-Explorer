@@ -926,3 +926,39 @@
     -fx-font-size: 10px;
     -fx-padding: 6px 0 0 0;
 }
+
+/* NASA endpoint availability notice: one in-window, non-modal status line.
+   Hidden notices are unmanaged, so the normal layout remains unchanged. */
+.reference-redesign .nasa-endpoint-notice {
+    -fx-background-color: linear-gradient(to right, #201c24, #171d30);
+    -fx-border-color: #b2783c transparent transparent transparent;
+    -fx-border-width: 1 0 0 0;
+}
+.reference-redesign .nasa-endpoint-notice-icon {
+    -fx-text-fill: #ffca78;
+    -fx-font-size: 20px;
+    -fx-font-weight: bold;
+}
+.reference-redesign .nasa-endpoint-notice-heading {
+    -fx-text-fill: #ffdb9e;
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+}
+.reference-redesign .nasa-endpoint-notice-description {
+    -fx-text-fill: #d8dded;
+    -fx-font-size: 11px;
+}
+.reference-redesign .nasa-endpoint-notice-dismiss {
+    -fx-background-color: transparent;
+    -fx-text-fill: #d8dded;
+    -fx-font-size: 19px;
+    -fx-font-weight: bold;
+    -fx-padding: 2 10;
+    -fx-border-color: #6c5c57;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+}
+.reference-redesign .nasa-endpoint-notice-dismiss:hover {
+    -fx-background-color: #383344;
+    -fx-text-fill: white;
+}
