@@ -46,6 +46,10 @@ public final class I18n {
         put("in memoria", "in memory");
         put("Online", "Online");
         put("Offline parziale", "Partial offline");
+        put("Endpoint NASA non disponibili", "NASA endpoints unavailable");
+        put("Alcuni collegamenti Swift/BAT non rispondono. Sono utilizzabili i dati salvati in locale; le funzioni che richiedono dati online potrebbero essere limitate.",
+                "Some Swift/BAT data links are not responding. Locally saved data remain available; features requiring online data may be limited.");
+        put("Chiudi avviso endpoint NASA", "Dismiss NASA endpoint notice");
         put("Aggiorna il catalogo online", "Refresh online catalog");
         put("Apri il catalogo ufficiale", "Open official catalog");
         put("Curva 2D", "2D curve");
