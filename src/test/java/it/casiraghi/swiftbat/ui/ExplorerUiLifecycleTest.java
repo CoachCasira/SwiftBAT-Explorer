@@ -90,6 +90,68 @@ class ExplorerUiLifecycleTest {
     }
 
     @Test
+    void nasaEndpointWarningAppearsOnceDismissesAndReappearsOnlyAfterRecovery()
+            throws Exception {
+        NasaEndpointNotice notice = fx(NasaEndpointNotice::new);
+        Stage stage = fx(() -> showStyled(new BorderPane(null, null, null, notice, null), 1120, 650));
+        I18n.Language original = fx(I18n::language);
+        try {
+            fx(() -> {
+                assertFalse(notice.isVisible(), "No NASA alert before an endpoint failure");
+                assertFalse(notice.isManaged(), "A hidden banner must consume no layout height");
+                notice.reportUnavailable(NasaEndpointNotice.Endpoint.CATALOG);
+                assertTrue(notice.isVisible());
+                assertTrue(notice.isManaged());
+                Label heading = (Label) notice.lookup(".nasa-endpoint-notice-heading");
+                assertNotNull(heading);
+                assertEquals(I18n.dynamic("Endpoint NASA non disponibili",
+                        "NASA endpoints unavailable"), heading.getText());
+                notice.reportUnavailable(NasaEndpointNotice.Endpoint.CATALOG);
+                assertEquals(3, notice.getChildren().size(), "Repeated failures must never stack alerts");
+                Button dismiss = (Button) notice.lookup("#dismiss-nasa-endpoint-notice");
+                assertNotNull(dismiss);
+                dismiss.fire();
+                assertFalse(notice.isVisible());
+                assertFalse(notice.isManaged());
+                notice.reportUnavailable(NasaEndpointNotice.Endpoint.SKY_METADATA);
+                assertFalse(notice.isVisible(), "Dismissed outage must stay silent");
+                notice.reportAvailable(NasaEndpointNotice.Endpoint.CATALOG);
+                assertFalse(notice.isVisible(), "Another unresolved outage remains dismissed");
+                notice.reportAvailable(NasaEndpointNotice.Endpoint.SKY_METADATA);
+                assertFalse(notice.hasUnavailableEndpoints());
+                notice.reportUnavailable(NasaEndpointNotice.Endpoint.REDSHIFT);
+                assertTrue(notice.isVisible(), "A new outage after recovery must be announced");
+                I18n.setLanguage(I18n.Language.EN);
+                assertEquals("NASA endpoints unavailable", heading.getText());
+                I18n.setLanguage(I18n.Language.IT);
+                assertEquals("Endpoint NASA non disponibili", heading.getText());
+                return null;
+            });
+        } finally {
+            fx(() -> {
+                I18n.setLanguage(original);
+                stage.close();
+                return null;
+            });
+        }
+    }
+
+    @Test
+    void nasaLinkAlertDistinguishesNetworkErrorsFromDataParsingErrors() {
+        assertTrue(NasaEndpointNotice.isLikelyEndpointFailure(
+                new javax.net.ssl.SSLHandshakeException("PKIX path building failed")));
+        assertTrue(NasaEndpointNotice.isLikelyEndpointFailure(
+                new java.io.IOException("ASCII: HTTP 404. FITS: HTTP 503.")));
+        assertTrue(NasaEndpointNotice.isLikelyEndpointFailure(
+                new java.io.IOException("NASA unreachable",
+                        new java.net.UnknownHostException("swift.gsfc.nasa.gov"))));
+        assertFalse(NasaEndpointNotice.isLikelyEndpointFailure(
+                new java.io.IOException("The FITS file is malformed")));
+        assertFalse(NasaEndpointNotice.isLikelyEndpointFailure(
+                new IllegalArgumentException("invalid local column")));
+    }
+
+    @Test
     void lateLocalizationCannotRestoreLoadingCaption() throws Exception {
         ExplorerPage page = fx(() -> {
             I18n.setLanguage(I18n.Language.EN);
