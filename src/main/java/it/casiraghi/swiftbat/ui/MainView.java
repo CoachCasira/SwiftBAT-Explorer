@@ -547,12 +547,18 @@ public final class MainView {
         task.setOnSucceeded(event -> {
             compareLoadsInFlight.remove(entry.grbName());
             GrbData data = task.getValue();
-            if (data != null) sessionData.put(data.grbName(), data);
+            if (data != null) {
+                sessionData.put(data.grbName(), data);
+                nasaEndpointNotice.reportAvailable(NasaEndpointNotice.Endpoint.LIGHT_CURVES);
+            }
             restoreCatalogConnection();
         });
         task.setOnFailed(event -> {
             compareLoadsInFlight.remove(entry.grbName());
             comparePage.loadFailed(entry.grbName());
+            if (NasaEndpointNotice.isLikelyEndpointFailure(task.getException())) {
+                nasaEndpointNotice.reportUnavailable(NasaEndpointNotice.Endpoint.LIGHT_CURVES);
+            }
             setConnection(I18n.dynamic("Errore caricamento confronto", "Comparison load failed"), "status-warning");
         });
         DOWNLOAD_EXECUTOR.execute(task);
@@ -601,11 +607,15 @@ public final class MainView {
             sessionData.put(data.grbName(), data);
             if (requestVersion != explorerRequestVersion) return;
             explorerPage.showData(data);
+            nasaEndpointNotice.reportAvailable(NasaEndpointNotice.Endpoint.LIGHT_CURVES);
             restoreCatalogConnection();
         });
         task.setOnFailed(event -> {
             if (requestVersion == explorerRequestVersion) {
                 explorerPage.showError(entry, task.getException());
+                if (NasaEndpointNotice.isLikelyEndpointFailure(task.getException())) {
+                    nasaEndpointNotice.reportUnavailable(NasaEndpointNotice.Endpoint.LIGHT_CURVES);
+                }
                 restoreCatalogConnection();
             }
         });
