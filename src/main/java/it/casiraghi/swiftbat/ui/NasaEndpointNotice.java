@@ -95,6 +95,35 @@ public final class NasaEndpointNotice extends HBox {
         setVisible(false);
     }
 
+    /**
+     * A scientific parse/validation error is not an unavailable NASA URL.
+     * Report an endpoint issue only for recognizable transport/TLS/HTTP
+     * failures, including the combined ASCII/FITS error messages.
+     */
+    public static boolean isLikelyEndpointFailure(Throwable error) {
+        Throwable cause = error;
+        for (int depth = 0; cause != null && depth < 12; depth++, cause = cause.getCause()) {
+            if (cause instanceof java.net.ConnectException
+                    || cause instanceof java.net.UnknownHostException
+                    || cause instanceof java.net.SocketTimeoutException
+                    || cause instanceof java.net.http.HttpTimeoutException
+                    || cause instanceof javax.net.ssl.SSLException) {
+                return true;
+            }
+            String message = cause.getMessage();
+            if (message == null) continue;
+            String text = message.toLowerCase(java.util.Locale.ROOT);
+            if (text.contains("http 4") || text.contains("http 5")
+                    || text.contains("certificate") || text.contains("handshake")
+                    || text.contains("timed out") || text.contains("timeout")
+                    || text.contains("unknown host") || text.contains("connection refused")
+                    || text.contains("connectexception") || text.contains("ssl")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     boolean hasUnavailableEndpoints() {
         return !unavailable.isEmpty();
     }
