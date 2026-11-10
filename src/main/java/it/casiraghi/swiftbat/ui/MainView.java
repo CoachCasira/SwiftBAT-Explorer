@@ -77,6 +77,9 @@ public final class MainView {
     private final Label connectionStatus = UiFactory.label("Connessione…", "status-pill", "status-neutral");
     private final Label catalogStatus = UiFactory.label("Catalogo…", "top-info");
     private final Label sessionStatus = UiFactory.label("0 in memoria", "top-info");
+    // One unobtrusive warning shared by all NASA data endpoints. It never
+    // creates modal windows or interrupts an analysis already in progress.
+    private final NasaEndpointNotice nasaEndpointNotice = new NasaEndpointNotice();
 
     private final ExplorerPage explorerPage;
     private final HomePage homePage;
@@ -142,6 +145,7 @@ public final class MainView {
         root.getStyleClass().addAll("app-root", "black-hole-redesign", "reference-redesign");
         root.setLeft(buildNavigation());
         root.setTop(buildTopBar());
+        root.setBottom(nasaEndpointNotice);
         pageHost.getStyleClass().add("page-host");
         StackPane workspace = new StackPane(new BlackHoleBackdropPane(), pageHost);
         workspace.getStyleClass().add("workspace-shell");
@@ -421,6 +425,7 @@ public final class MainView {
             comparePage.setCatalog(entries);
             I18n.setText(catalogStatus, entries.size() + " GRB", entries.size() + " GRBs");
             setConnection("Online", "status-online");
+            nasaEndpointNotice.reportAvailable(NasaEndpointNotice.Endpoint.CATALOG);
             loadSkyCatalog();
         });
         task.setOnFailed(event -> {
@@ -439,6 +444,7 @@ public final class MainView {
                     fallback.size() + (fromLocalCache ? " GRB locali" : " GRB ridotti"),
                     fallback.size() + (fromLocalCache ? " GRBs · local cache" : " GRBs · fallback"));
             setConnection("Offline parziale", "status-warning");
+            nasaEndpointNotice.reportUnavailable(NasaEndpointNotice.Endpoint.CATALOG);
             loadSkyCatalog();
         });
         BACKGROUND_EXECUTOR.execute(task);
@@ -479,6 +485,16 @@ public final class MainView {
             explorerPage.setScientificMetadata(metadata);
             populationPage.setBursts(metadata);
             if (skyCatalogService.lastFetchOffline()) {
+                nasaEndpointNotice.reportUnavailable(NasaEndpointNotice.Endpoint.SKY_METADATA);
+            } else {
+                nasaEndpointNotice.reportAvailable(NasaEndpointNotice.Endpoint.SKY_METADATA);
+            }
+            if (scientific.redshiftAvailable()) {
+                nasaEndpointNotice.reportAvailable(NasaEndpointNotice.Endpoint.REDSHIFT);
+            } else {
+                nasaEndpointNotice.reportUnavailable(NasaEndpointNotice.Endpoint.REDSHIFT);
+            }
+            if (skyCatalogService.lastFetchOffline()) {
                 skyMapPage.showOfflineCoverage(plottable.size(), metadata.size());
             } else if (!scientific.redshiftAvailable()) {
                 skyMapPage.showWarning("Coordinate e T90 caricati; redshift temporaneamente non disponibile");
@@ -491,6 +507,7 @@ public final class MainView {
                     : I18n.dynamic("Mappa non disponibile: " + error.getMessage(),
                             "Map unavailable: " + I18n.english(error.getMessage()));
             skyMapPage.showError(detail);
+            nasaEndpointNotice.reportUnavailable(NasaEndpointNotice.Endpoint.SKY_METADATA);
         });
         BACKGROUND_EXECUTOR.execute(task);
     }
@@ -502,8 +519,19 @@ public final class MainView {
                 return spectralCatalogService.fetchCatalog(forceRefresh);
             }
         };
-        task.setOnSucceeded(event -> explorerPage.setSpectralCatalog(task.getValue()));
-        task.setOnFailed(event -> explorerPage.setSpectralCatalog(Map.of()));
+        task.setOnSucceeded(event -> {
+            Map<String, SpectralData> results = task.getValue();
+            explorerPage.setSpectralCatalog(results);
+            if (results.isEmpty()) {
+                nasaEndpointNotice.reportUnavailable(NasaEndpointNotice.Endpoint.SPECTROSCOPY);
+            } else {
+                nasaEndpointNotice.reportAvailable(NasaEndpointNotice.Endpoint.SPECTROSCOPY);
+            }
+        });
+        task.setOnFailed(event -> {
+            explorerPage.setSpectralCatalog(Map.of());
+            nasaEndpointNotice.reportUnavailable(NasaEndpointNotice.Endpoint.SPECTROSCOPY);
+        });
         BACKGROUND_EXECUTOR.execute(task);
     }
 
